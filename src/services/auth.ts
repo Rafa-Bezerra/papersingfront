@@ -10,15 +10,12 @@ export interface LoginResponse {
   usuario: {
     id: number;
     usuario: string;
-    email: string;
-    especialidade_id: number;
-    email_verificacao: string | null;
-    ativo: boolean;
+    nome: string;
   };
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE}/api/Usuarios/Login`, {
+  const res = await fetch(`${API_BASE}/api/Usuarios/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

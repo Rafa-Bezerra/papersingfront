@@ -1,4 +1,3 @@
-import { AtendimentoFilas, AtendimentoFluxo } from '@/types/Fluxo'
 import { differenceInYears, format, parseISO, isValid } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -77,55 +76,4 @@ export function badgeClass(status: BadgeStatus): string {
         default:
             return 'border border-zinc-500 text-zinc-700 bg-transparent'
     }
-}
-
-export function computeFilaStatus(
-    at: AtendimentoFluxo,
-    f: AtendimentoFilas
-  ): BadgeStatus {
-    var response: BadgeStatus = 'pending'
-    if (at.fila_id == f?.fila_id) {
-        response = 'active' 
-        if (at.consultorio?.especialidade_id == f.fila.especialidade_id) response = 'atendendo'
-    }
-    if (f?.atendido == 1) response = 'expired'
-    return response
-}
-
-export function prioridadeColor(prioridade:string): string {
-    var cor = "";
-    switch (prioridade) {
-        case "urgente":
-            cor = "bg-red-600";
-            break;
-        case "alta":
-            cor = "bg-orange-600";
-            break;
-        case "media":
-            cor = "bg-amber-600";
-            break;
-        default:
-            cor = "bg-emerald-600";
-            break;
-    }
-    return cor;
-}
-
-export function prioridadeDesc(prioridade:string): string {
-    var cor = "";
-    switch (prioridade) {
-        case "urgente":
-            cor = "Urgente";
-            break;
-        case "alta":
-            cor = "Alta";
-            break;
-        case "media":
-            cor = "Média";
-            break;
-        default:
-            cor = "Baixa";
-            break;
-    }
-    return cor;
 }

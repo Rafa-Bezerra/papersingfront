@@ -48,17 +48,6 @@ export default function AppSidebar({ navMain }: AppSidebarProps) {
 
   return (
     <Sidebar className="w-64">
-      <SidebarHeader className="flex items-start justify-center py-6">
-        <Image
-          src="/images/e-pantanal-logo.png" // coloque sua logo aqui
-          alt="Logo e-Pantanal"
-          width={931}
-          height={330}
-          className="h-4/6 w-auto"
-          priority
-        />
-      </SidebarHeader>
-
       <SidebarContent>
         {navMain.map(section => (
           <SidebarGroup key={section.title}>

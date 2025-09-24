@@ -57,28 +57,14 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen w-full bg-muted flex items-center justify-center p-4">
-      <div className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-lg md:grid-cols-2">
-        {/* Coluna esquerda (form) */}
+      <div className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-lg">        
         <section className="flex items-center justify-center p-8 md:p-12">
           <Card className="w-full max-w-md border-0 shadow-none">
             <CardHeader className="space-y-6 p-0">
-              {/* Logo nova */}
-              <div className="flex items-center gap-3">
-                <Image
-                  src="/images/e-pantanal-logo.png" // coloque sua logo aqui
-                  alt="Logo e-Pantanal"
-                  width={931}
-                  height={330}
-                  className="h-max w-auto"
-                  priority
-                />
-                <span className="sr-only">e-Pantanal</span>
-              </div>
-
               <div>
                 <CardTitle className="text-3xl md:text-4xl leading-tight">
                   Bem-vindo ao{' '}
-                  <span className="text-pakistan_green-700">e-Pantanal</span>
+                  <span className="text-pakistan_green-700">PaperSing</span>
                 </CardTitle>
                 <CardDescription className="mt-1">
                   Faça login na sua conta para continuar
@@ -133,41 +119,6 @@ export default function LoginPage() {
             </CardContent>
           </Card>
         </section>
-
-        {/* Coluna direita (arte/gradiente cortada) */}
-        <aside className="relative hidden md:block">
-          {/* Fundo gradiente */}
-          <div className="absolute inset-0 bg-gradient-to-br  from-amber-200 via-lime-300 to-pakistan_green-200" />
-
-          {/* Área arredondada + recorte das bordas */}
-          <div className="relative z-10 h-full p-6 rounded-3xl overflow-hidden">
-            {/* Stack vertical centralizado */}
-            <div className="flex h-full w-full flex-col items-center justify-center gap-8">
-              {/* Logo 1 */}
-              <div className="relative w-full max-w-[460px] aspect-[16/9]">
-                <Image
-                  src="/images/alma.png"
-                  alt="Logo patrocinadora ALMA"
-                  fill
-                  className="object-contain"
-                  sizes="(min-width: 1024px) 460px, (min-width: 768px) 50vw, 100vw"
-                  priority
-                />
-              </div>
-
-              {/* Logo 2 */}
-              <div className="relative w-full max-w-[460px] aspect-[16/9]">
-                <Image
-                  src="/images/med-pantanal.png"
-                  alt="Logo patrocinadora Med Pantanal"
-                  fill
-                  className="object-contain"
-                  sizes="(min-width: 1024px) 460px, (min-width: 768px) 50vw, 100vw"
-                />
-              </div>
-            </div>
-          </div>
-        </aside>
       </div>
     </main>
   )

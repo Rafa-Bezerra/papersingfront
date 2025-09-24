@@ -24,11 +24,9 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
 
   useEffect(() => {
     const storedUser = localStorage.getItem("userData");
-    console.log(storedUser);
-    
     if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setUserName(user.usuario);
+      const user = JSON.parse(storedUser);      
+      setUserName(user);
     }
   }, []);
 

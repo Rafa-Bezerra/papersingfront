@@ -14,14 +14,8 @@ export const data = {
     {
       title: "Módulos",
       items: [
-        { title: "Inicio",  url: "/home" },
-        { title: "Pacientes",    url: "/pacientes" },
-        { title: "Triagem",      url: "/triagem" },
-        { title: "Atendimento",  url: "/atendimento" },
-        { title: "Histórico",    url: "/historico" },
-        { title: "Fila de Espera", url: "/fila-espera" },
-        { title: "Farmácia",     url: "/farmacia" },
-        { title: "Configurações",     url: "/configuracoes" },
+        { title: "Inicio", url: "/home" },
+        { title: "Requisições", url: "/requisicoes" },
       ],
     },
   ] as NavSection[],
