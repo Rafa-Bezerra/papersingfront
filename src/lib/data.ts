@@ -16,6 +16,7 @@ export const data = {
       items: [
         { title: "Inicio", url: "/home" },
         { title: "Requisições", url: "/requisicoes" },
+        { title: "Usuários", url: "/usuarios" },
       ],
     },
   ] as NavSection[],
