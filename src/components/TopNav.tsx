@@ -23,10 +23,10 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("userData");
+    const storedUser = localStorage.getItem("userData");    
     if (storedUser) {
-      const user = JSON.parse(storedUser);      
-      setUserName(user);
+      const user = JSON.parse(storedUser);  
+      setUserName(user.nome);
     }
   }, []);
 
@@ -58,7 +58,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               >
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground">
-                  Olá, {userName.toUpperCase()}
+                  Olá, {userName?.toUpperCase()}
                 </span>
               </Button>
             </DropdownMenuTrigger>

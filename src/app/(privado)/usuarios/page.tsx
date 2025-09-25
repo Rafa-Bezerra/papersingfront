@@ -63,9 +63,16 @@ export default function PageUsuarios() {
 
   const form = useForm<Usuario>({
     defaultValues: { 
-      id: 0,
-      usuario: '',
-      nome: '',
+      SEQUENCIAL: 0,
+      CODUSUARIO: '',
+      NOME: '',
+      EMPRESA: '',
+      CODPERFIL: '',
+      DIRETORIA: '',
+      EMAIL: '',
+      ATIVO: true,
+      DATACRIACAO: '',
+      CODSISTEMA: '',
     }
   })
 
@@ -110,12 +117,13 @@ export default function PageUsuarios() {
       const filtrados = qNorm
         ? dados.filter(
             p =>
-              p.id !== 1 && (
-                stripDiacritics((p.usuario ?? '').toLowerCase()).includes(qNorm) ||
-                String(p.id ?? '').includes(qNorm)
+              (
+                stripDiacritics((p.NOME ?? '').toLowerCase()).includes(qNorm) ||
+                stripDiacritics((p.CODUSUARIO ?? '').toLowerCase()).includes(qNorm) ||
+                String(p.SEQUENCIAL ?? '').includes(qNorm)
               )
           )
-        : dados.filter(p => p.id !== 1);
+        : dados;
 
       setResults(filtrados)
     } catch (err) {
@@ -157,9 +165,16 @@ export default function PageUsuarios() {
       const response = await getUsuarioById(id)
       setResultById(response)
       form.reset({ 
-        id: response.id, 
-        usuario: response.usuario,
-        nome: response.nome
+        SEQUENCIAL: response.SEQUENCIAL,
+        CODUSUARIO: response.CODUSUARIO,
+        NOME: response.NOME,
+        EMPRESA: response.EMPRESA,
+        CODPERFIL: response.CODPERFIL,
+        DIRETORIA: response.DIRETORIA,
+        EMAIL: response.EMAIL,
+        ATIVO: response.ATIVO,
+        DATACRIACAO: response.DATACRIACAO,
+        CODSISTEMA: response.CODSISTEMA
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -168,7 +183,18 @@ export default function PageUsuarios() {
   }
 
   function handleInsert() {
-    form.reset({ id: 0, usuario: '', nome: '' })
+    form.reset({ 
+      SEQUENCIAL: 0,
+      CODUSUARIO: '',
+      NOME: '',
+      EMPRESA: '',
+      CODPERFIL: '',
+      DIRETORIA: '',
+      EMAIL: '',
+      ATIVO: true,
+      DATACRIACAO: '',
+      CODSISTEMA: '',
+    })
     setUpdateMode(false)
     setIsModalOpen(true)
   }
@@ -176,7 +202,7 @@ export default function PageUsuarios() {
   async function onSubmit(data: Usuario) {
     setError(null)
     try {
-      if (data.id && data.id !== 0) {
+      if (data.SEQUENCIAL && data.SEQUENCIAL !== 0) {
         await updateUsuario(data)        
       } else {
         await createUsuario(data)
@@ -193,9 +219,10 @@ export default function PageUsuarios() {
 
   const colunas = useMemo<ColumnDef<Usuario>[]>(
     () => [
-      { accessorKey: 'id', header: 'ID' },
-      { accessorKey: 'usuario', header: 'Usuário' },
-      { accessorKey: 'nome', header: 'Nome' },
+      { accessorKey: 'sequencial', header: 'SEQUENCIAL' },
+      { accessorKey: 'codusuario', header: 'CODUSUARIO' },
+      { accessorKey: 'nome', header: 'NOME' },
+      { accessorKey: 'empresa', header: 'EMPRESA' },
       {
         id: 'actions',
         header: 'Ações',
@@ -204,14 +231,14 @@ export default function PageUsuarios() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleUpdate(row.original.id)}
+              onClick={() => handleUpdate(row.original.SEQUENCIAL)}
             >
               Editar
             </Button>
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => setDeleteId(row.original.id)}
+              onClick={() => setDeleteId(row.original.SEQUENCIAL)}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -274,7 +301,7 @@ export default function PageUsuarios() {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-center">
               {updateMode
-                ? `${tituloUpdate}: ${resultById?.id}`
+                ? `${tituloUpdate}: ${resultById?.SEQUENCIAL}`
                 : `${tituloInsert}`}
             </DialogTitle>
           </DialogHeader>
@@ -283,11 +310,11 @@ export default function PageUsuarios() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               <FormField
                 control={form.control}
-                name="usuario"
+                name="CODUSUARIO"
                 rules={{ required: 'Usuário é obrigatório' }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Usuário</FormLabel>
+                    <FormLabel>COD. USUÁRIO</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -298,10 +325,67 @@ export default function PageUsuarios() {
 
               <FormField
                 control={form.control}
-                name="nome"
+                name="NOME"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome</FormLabel>
+                    <FormLabel>NOME</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="EMPRESA"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>EMPRESA</FormLabel>
+                    <FormControl>
+                      <select
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background
+                             focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={field.value ?? ''}
+                        onChange={e =>
+                          field.onChange(
+                            e.target.value ? Number(e.target.value) : 0
+                          )
+                        }
+                      >
+                        <option value={0}>Selecione…</option>
+                        <option key={'48.851.242'} value={'48.851.242'}>{'WAY 112'}</option>
+                        <option key={'58.492.120'} value={'58.492.120'}>{'WAY 262'}</option>
+                        <option key={'36.128.741'} value={'36.128.741'}>{'WAY 306'}</option>
+                        <option key={'57.190.446'} value={'57.190.446'}>{'MIGRA BR'}</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="DIRETORIA"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>DIRETORIA</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="EMAIL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>EMAIL</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>

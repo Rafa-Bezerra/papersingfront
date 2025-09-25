@@ -44,8 +44,9 @@ export default function LoginPage() {
         username: values.usuario,
         password: values.password
       }
-      const { token, usuario } = await login(payload)
-      localStorage.setItem('authToken', token)
+      const usuario = await login(payload)
+      
+      localStorage.setItem('authToken', usuario.token)
       localStorage.setItem('userData', JSON.stringify(usuario))
       router.push('/home')
     } catch (error) {
