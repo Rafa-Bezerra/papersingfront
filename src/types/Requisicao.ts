@@ -5,36 +5,29 @@ export type RequisicaoDto = {
 }
 
 export type Requisicao = {
-    id: number,
-    tipo: string,
-    base_de_dado: string,
-    movimento: string,
+    idmov: number,
+    centro_custo: string,
+    nome_solicitante: string,
+    numero_movimento: string,
     tipo_movimento: string,
     data_emissao: string,
-    valor_bruto: number,
-    situacao: string,
+    valorbruto: number,
+    historico_solicitacao: string,
+    cod_status_aprovacao: string,
     arquivo: string,
     requisicao_itens: Requisicao_item[],
     requisicao_aprovacoes?: Requisicao_aprovacao[]
 }
 
 export type Requisicao_item = {
-    id: number,
-    requisicao_id: number,
-    descricao: string,
-    quantidade: number,
-    cotacao_1: number,
-    fornecedor_1: string,
-    cotacao_2: number,
-    fornecedor_2: string,
-    cotacao_selecionada: number,
-    fornecedor_selecionado: string
+    cod_item: number,
+    quantidade_produto: number,
+    historico_item: string
 }
 
 export type Requisicao_aprovacao = {
     id: number,
-    requisicao_id: number,
-    usuario_id: number,
+    usuario: string,
     situacao: string,
     data_aprovacao: string
 }

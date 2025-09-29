@@ -77,3 +77,35 @@ export function badgeClass(status: BadgeStatus): string {
             return 'border border-zinc-500 text-zinc-700 bg-transparent'
     }
 }
+
+const statusMap: Record<string, string> = {
+    'A': "Em Andamento",
+    'R': "Concluído a responder",
+    'O': "Concluído respondido",
+    'D': "Concluído confirmado",
+    'U': "Concluído automático (pelo sistema)",
+    'V': "Avaliado",
+    'G': "Agendado a responder",
+    'S': "Agendado respondido",
+    'T': "Aguardando terceiros",
+    'C': "Cancelado",
+    'E': "Despertado",
+};
+  
+export function getStatusDescricao(cod: string): string {
+    return statusMap[cod] ?? "Sem status";
+}
+
+export function base64ToBlob(base64: string, type: string) {
+    // Decodifica o Base64 para string binária
+    const binary = atob(base64)
+  
+    // Cria um array de bytes
+    const array = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+        array[i] = binary.charCodeAt(i)
+    }
+  
+    // Retorna um Blob do tipo especificado
+    return new Blob([array], { type })
+}

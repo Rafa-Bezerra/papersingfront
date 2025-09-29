@@ -1,4 +1,4 @@
-import { RequisicaoDto } from "@/types/Requisicao";
+import { RequisicaoDto, Requisicao_aprovacao, Requisicao_item } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Requisicoes";
 const elemento_singular = "requisição";
@@ -16,4 +16,4 @@ export async function getAll(): Promise<RequisicaoDto[]> {
     return list;
 }
 
-export type { RequisicaoDto }
+export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao }
