@@ -1,7 +1,7 @@
 import { RequisicaoDto, Requisicao_aprovacao, Requisicao_item } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Requisicoes";
-const elemento_singular = "requisição";
+// const elemento_singular = "requisição";
 const elemento_plural = "requisições";
 
 export async function getAll(): Promise<RequisicaoDto[]> {

@@ -6,7 +6,7 @@ export type Usuario = {
     CODPERFIL: string,
     DIRETORIA: string,
     EMAIL: string,
-    ATIVO: Boolean,
+    ATIVO: boolean,
     DATACRIACAO: string,
     CODSISTEMA: string,
 }
