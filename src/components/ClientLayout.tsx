@@ -36,7 +36,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
 
   // Public route (login) without sidebar
-  if (pathname === "/login") {
+  if (pathname === "/login/") {
     return <>{children}</>;
   }
 

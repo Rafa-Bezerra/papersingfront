@@ -15,7 +15,12 @@ export const data = {
       title: "Módulos",
       items: [
         { title: "Inicio", url: "/home" },
-        { title: "Requisições", url: "/requisicoes" },
+        { title: "Solicitação de compra", url: "/solicitacoes" },
+        { title: "Recebimento de materiais", url: "/requisicoes" },
+        { title: "Controle imobilizado", url: "/controle" },
+        { title: "Ordem de compra", url: "/ordens" },
+        { title: "Aquisição de serviços", url: "/aquisicoes" },
+        { title: "Outras movimentações", url: "/outras" },
         { title: "Usuários", url: "/usuarios" },
       ],
     },
