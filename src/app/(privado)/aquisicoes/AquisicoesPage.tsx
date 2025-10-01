@@ -47,6 +47,13 @@ export default function PageUsuarios() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [tipos_movimento] : string[] = [
+        '1.2.31',
+        '1.2.32',
+        '1.2.33',
+        '1.2.34',
+        '1.2.35',
+    ];
     // const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
@@ -94,8 +101,9 @@ export default function PageUsuarios() {
                 const movimento = stripDiacritics((d.requisicao.numero_movimento ?? '').toLowerCase())
                 const base = stripDiacritics((d.requisicao.centro_custo ?? '').toLowerCase())
                 const matchQuery = qNorm === '' || movimento.includes(qNorm)|| base.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
+                const matchTipos = tipos_movimento.includes(d.requisicao.tipo_movimento);
                 // const matchSituacao = situacaoFiltrada == '' || d.requisicao.cod_status_aprovacao == situacaoFiltrada
-                return matchQuery //&& matchSituacao
+                return matchQuery && matchTipos //&& matchSituacao
             })
 
             setResults(filtrados)
