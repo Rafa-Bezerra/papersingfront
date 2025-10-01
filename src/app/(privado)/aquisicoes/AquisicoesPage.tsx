@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { SearchIcon, X } from 'lucide-react'
+import { Filter, SearchIcon, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,13 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuTrigger
+  } from '@/components/ui/dropdown-menu'
 import { getStatusDescricao, safeDateLabel, stripDiacritics } from '@/utils/functions'
 import {
     RequisicaoDto,
@@ -31,10 +37,11 @@ import {
 } from '@/services/requisicoesService'
 
 export default function PageUsuarios() {
-    const titulo = 'Requisições'
+    const titulo = 'Aquisições de serviço'
     const router = useRouter()
     const searchParams = useSearchParams()
 
+    const [userName, setUserName] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<RequisicaoDto[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
@@ -47,14 +54,14 @@ export default function PageUsuarios() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const [tipos_movimento] : string[] = [
+    const tipos_movimento : string[] = [
         '1.2.31',
         '1.2.32',
         '1.2.33',
         '1.2.34',
         '1.2.35',
     ];
-    // const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
 
@@ -69,8 +76,12 @@ export default function PageUsuarios() {
         }
     }
 
-    useEffect(() => {
-        // on mount: run an initial search
+    useEffect(() => {        
+        const storedUser = localStorage.getItem("userData");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            setUserName(user.nome.toUpperCase());
+        }
         handleSearch(searchParams.get('q') ?? '')
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -90,7 +101,7 @@ export default function PageUsuarios() {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query])
+    }, [query, situacaoFiltrada])
 
     async function handleSearch(q: string) {
         setError(null)
@@ -100,10 +111,10 @@ export default function PageUsuarios() {
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.numero_movimento ?? '').toLowerCase())
                 const base = stripDiacritics((d.requisicao.centro_custo ?? '').toLowerCase())
-                const matchQuery = qNorm === '' || movimento.includes(qNorm)|| base.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
-                const matchTipos = tipos_movimento.includes(d.requisicao.tipo_movimento);
-                // const matchSituacao = situacaoFiltrada == '' || d.requisicao.cod_status_aprovacao == situacaoFiltrada
-                return matchQuery && matchTipos //&& matchSituacao
+                const matchQuery = qNorm === "" || movimento.includes(qNorm)|| base.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
+                const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
+                const matchSituacao = situacaoFiltrada === "" || d.requisicao.cod_status_aprovacao == situacaoFiltrada
+                return matchQuery && matchTipos && matchSituacao
             })
 
             setResults(filtrados)
@@ -193,17 +204,25 @@ export default function PageUsuarios() {
                         >
                             Aprovações
                         </Button>
-                        {row.original.requisicao.cod_status_aprovacao == "P" && (<Button
+                        {row.original.requisicao.cod_status_aprovacao == "A" 
+                            && row.original.requisicao_aprovacoes.some(
+                                (ap) => ap.usuario === userName
+                            )
+                            && (<Button
                             size="sm"
                             className="bg-green-500 hover:bg-green-600 text-white"
                             onClick={() => handleAprovar(row.original.requisicao.idmov)}
                         >
                             Aprovar
                         </Button>)}
-                        {row.original.requisicao.cod_status_aprovacao == "P" && (<Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleReprovar(row.original.requisicao.idmov)}
+                        {row.original.requisicao.cod_status_aprovacao == "A" 
+                            && row.original.requisicao_aprovacoes.some(
+                                (ap) => ap.usuario === userName
+                            )
+                            && (<Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleReprovar(row.original.requisicao.idmov)}
                         >
                             Reprovar
                         </Button>)}
@@ -238,6 +257,30 @@ export default function PageUsuarios() {
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    
+                    {/* Botão de Filtros - Dropdown com checkboxes */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" aria-label="Abrir filtros">
+                                <Filter className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">Filtros</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-64" align="end">
+                            <DropdownMenuLabel>Status</DropdownMenuLabel>
+                            <DropdownMenuCheckboxItem key={"A"} checked={situacaoFiltrada == "A"} onCheckedChange={() => setSituacaoFiltrada("A")}>Em Andamento</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"R"} checked={situacaoFiltrada == "R"} onCheckedChange={() => setSituacaoFiltrada("R")}>Concluído a responder</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"O"} checked={situacaoFiltrada == "O"} onCheckedChange={() => setSituacaoFiltrada("O")}>Concluído respondido</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"D"} checked={situacaoFiltrada == "D"} onCheckedChange={() => setSituacaoFiltrada("D")}>Concluído confirmado</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"U"} checked={situacaoFiltrada == "U"} onCheckedChange={() => setSituacaoFiltrada("U")}>Concluído automático (pelo sistema)</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"V"} checked={situacaoFiltrada == "V"} onCheckedChange={() => setSituacaoFiltrada("V")}>Avaliado</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"G"} checked={situacaoFiltrada == "G"} onCheckedChange={() => setSituacaoFiltrada("G")}>Agendado a responder</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"S"} checked={situacaoFiltrada == "S"} onCheckedChange={() => setSituacaoFiltrada("S")}>Agendado respondido</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"T"} checked={situacaoFiltrada == "T"} onCheckedChange={() => setSituacaoFiltrada("T")}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"C"} checked={situacaoFiltrada == "C"} onCheckedChange={() => setSituacaoFiltrada("C")}>Cancelado</DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem key={"E"} checked={situacaoFiltrada == "E"} onCheckedChange={() => setSituacaoFiltrada("E")}>Despertado</DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </CardHeader>
 
                 <CardContent className="flex flex-col gap-2 md:flex-row">

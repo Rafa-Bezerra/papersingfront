@@ -78,7 +78,7 @@ export function badgeClass(status: BadgeStatus): string {
     }
 }
 
-const statusMap: Record<string, string> = {
+export const statusMap: Record<string, string> = {
     'A': "Em Andamento",
     'R': "Concluído a responder",
     'O': "Concluído respondido",
