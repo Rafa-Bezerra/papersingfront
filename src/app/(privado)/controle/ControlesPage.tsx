@@ -229,7 +229,7 @@ export default function PageUsuarios() {
                 )
             }
         ],
-        []
+        [userName]
     )
     
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
