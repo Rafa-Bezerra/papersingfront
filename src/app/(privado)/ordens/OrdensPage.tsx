@@ -33,7 +33,9 @@ import {
     RequisicaoDto,
     Requisicao_aprovacao,
     Requisicao_item,
-    getAll as getAllRequisicoes
+    aprovar,
+    getAll as getAllRequisicoes,
+    reprovar
 } from '@/services/requisicoesService'
 
 export default function PageUsuarios() {
@@ -165,11 +167,21 @@ export default function PageUsuarios() {
     }
 
     async function handleAprovar (id: number) {
-        console.log(id);
+        try {
+            await aprovar(id)
+            handleSearchClick()
+        } catch (err) {
+            setError((err as Error).message)
+        }  
     }
 
     async function handleReprovar (id: number) {
-        console.log(id);
+        try {
+            await reprovar(id)
+            handleSearchClick()
+        } catch (err) {
+            setError((err as Error).message)
+        }  
     }
     
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
