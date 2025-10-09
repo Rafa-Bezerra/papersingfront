@@ -70,6 +70,12 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 </Link>
               </DropdownMenuItem>
 
+              <DropdownMenuItem asChild>
+                <Link href="/assinatura" className="w-full">
+                  Assinatura
+                </Link>
+              </DropdownMenuItem>
+
               <DropdownMenuSeparator />
 
               <DropdownMenuItem

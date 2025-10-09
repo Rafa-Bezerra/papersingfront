@@ -37,6 +37,8 @@ import {
     getAll as getAllRequisicoes,
     reprovar
 } from '@/services/requisicoesService'
+import { Assinar, assinar } from '@/services/assinaturaService'
+import { toast } from 'sonner'
 
 export default function PageUsuarios() {
     const titulo = 'Ordens de compra'
@@ -56,6 +58,7 @@ export default function PageUsuarios() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const tipos_movimento : string[] = [
         "1.1.20",
         "1.1.21",
@@ -153,6 +156,48 @@ export default function PageUsuarios() {
         setRequisicaoSelecionada(requisicao)
         setRequisicaoDocumentoSelecionada(requisicao.requisicao.arquivo)
     }
+
+    async function handleAssinar(data: Assinar) {
+        setSearched(false)
+        try {
+            await assinar(data)
+            toast.success("Assinatura enviada com sucesso!");
+        } catch (err) {
+            toast.error((err as Error).message)            
+        } finally {
+            setSearched(true)
+        }
+    }
+
+    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
+        const overlay = e.currentTarget as HTMLDivElement;
+        const rect = overlay.getBoundingClientRect();
+        
+        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
+        const y = (e.clientY - rect.top - 56) / rect.height;  // 0 a 1        
+        const x2 = e.clientX - rect.left;
+        const y2 = e.clientY - rect.top;
+        const yI = (rect.height - y2)  / rect.height;
+        
+        setCoords({ x, y, x2, y2, yI });
+    }
+
+    async function confirmarAssinatura() {
+        if (!coords) {
+          toast.error("Clique no local onde deseja assinar o documento.");
+          return;
+        }      
+        const dadosAssinatura: Assinar = {
+          idmov: requisicaoSelecionada!.requisicao.idmov,
+          arquivo: requisicaoSelecionada!.requisicao.arquivo,
+          pagina: 1,
+          posX: coords.x,
+          posY: coords.yI,
+          largura: 90,
+          altura: 30,
+        };      
+        await handleAssinar(dadosAssinatura);
+    }    
 
     async function handleItens (requisicao: RequisicaoDto) {
         setIsModalItensOpen(true)
@@ -370,19 +415,39 @@ export default function PageUsuarios() {
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
                     <DialogContent className="w-full max-w-4xl h-[90vh] flex flex-col">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Documento requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader> 
-                            <div className="flex-1">
-                                {requisicaoDocumentoSelecionada ? (       
-                                    <iframe
-                                        src={`data:application/pdf;base64,${requisicaoDocumentoSelecionada}`}
-                                        className="w-full h-full"
-                                        title="Documento"
+                        <div className="relative flex-1">
+                            {requisicaoDocumentoSelecionada ? (
+                                <>
+                                {/* PDF */}
+                                <iframe
+                                    src={`data:application/pdf;base64,${requisicaoDocumentoSelecionada}`}
+                                    className="w-full h-full"
+                                    title="Documento"
+                                    id="pdf-viewer"
+                                />
+
+                                {/* Captura do clique */}
+                                <div
+                                    id="assinatura-overlay"
+                                    className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                                    onClick={handleClickPdf}
+                                />
+
+                                {/* Indicador visual */}
+                                {coords && (
+                                    <div
+                                    className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                    style={{ left: coords.x2 - 10, top: coords.y2 - 10 }}
                                     />
-                                ) : (
-                                    <p>Nenhum documento disponível</p>
                                 )}
-                            </div>                             
+                                </>
+                            ) : (
+                                <p>Nenhum documento disponível</p>
+                            )}
+                        </div>           
+                        <Button onClick={confirmarAssinatura} className="flex items-center"> Assinar </Button>
                     </DialogContent>
                 </Dialog>
             )}
