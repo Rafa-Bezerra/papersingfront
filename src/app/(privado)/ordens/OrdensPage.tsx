@@ -1,5 +1,11 @@
 'use client'
 
+declare global {
+    interface Window {
+        _pdfMessageListener?: boolean;
+    }
+}
+
 import React, {
   useEffect,
   useMemo,
@@ -78,7 +84,16 @@ export default function PageUsuarios() {
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
-
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
+    
+    function changePage(newPage: number) {
+        if (!iframeRef.current) return;
+        setCurrentPage(newPage);
+        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+      
     function clearQuery() {
         setQuery('')
     }
@@ -152,9 +167,28 @@ export default function PageUsuarios() {
     }
 
     async function handleDocumento (requisicao: RequisicaoDto) {
+        setTotalPages(1);
         setIsModalDocumentosOpen(true)  
         setRequisicaoSelecionada(requisicao)
-        setRequisicaoDocumentoSelecionada(requisicao.requisicao.arquivo)
+        const arquivoBase64 = requisicao.requisicao.arquivo;        
+        setRequisicaoDocumentoSelecionada(arquivoBase64);
+
+        if (!window._pdfMessageListener) {
+            window._pdfMessageListener = true;
+        
+            window.addEventListener("message", (event) => {
+                if (event.data?.totalPages) {
+                    setTotalPages(event.data.totalPages);
+                }
+            });
+        }
+
+        setTimeout(() => {
+            iframeRef.current?.contentWindow?.postMessage(
+                { pdfBase64: arquivoBase64 },
+                '*'
+            );
+        }, 500);
     }
 
     async function handleAssinar(data: Assinar) {
@@ -174,7 +208,7 @@ export default function PageUsuarios() {
         const rect = overlay.getBoundingClientRect();
         
         const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
-        const y = (e.clientY - rect.top - 56) / rect.height;  // 0 a 1        
+        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
         const x2 = e.clientX - rect.left;
         const y2 = e.clientY - rect.top;
         const yI = (rect.height - y2)  / rect.height;
@@ -190,7 +224,7 @@ export default function PageUsuarios() {
         const dadosAssinatura: Assinar = {
           idmov: requisicaoSelecionada!.requisicao.idmov,
           arquivo: requisicaoSelecionada!.requisicao.arquivo,
-          pagina: 1,
+          pagina: currentPage,
           posX: coords.x,
           posY: coords.yI,
           largura: 90,
@@ -413,41 +447,52 @@ export default function PageUsuarios() {
             {/* Modal */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-full max-w-4xl h-[90vh] flex flex-col">
+                    <DialogContent className="w-full max-w-4xl h-full flex flex-col">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Documento requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
-                        </DialogHeader> 
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Documento requisição n° ${requisicaoSelecionada.requisicao.idmov}`}
+                            </DialogTitle>
+                        </DialogHeader>
+            
                         <div className="relative flex-1">
                             {requisicaoDocumentoSelecionada ? (
                                 <>
-                                {/* PDF */}
-                                <iframe
-                                    src={`data:application/pdf;base64,${requisicaoDocumentoSelecionada}`}
-                                    className="w-full h-full"
-                                    title="Documento"
-                                    id="pdf-viewer"
-                                />
-
-                                {/* Captura do clique */}
-                                <div
-                                    id="assinatura-overlay"
-                                    className="absolute top-0 left-0 w-full h-full cursor-crosshair"
-                                    onClick={handleClickPdf}
-                                />
-
-                                {/* Indicador visual */}
-                                {coords && (
-                                    <div
-                                    className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
-                                    style={{ left: coords.x2 - 10, top: coords.y2 - 10 }}
+                                    <iframe
+                                        ref={iframeRef}
+                                        src="/pdf-viewer.html"
+                                        className="w-full h-full"
+                                        style={{ border: "none" }}
                                     />
-                                )}
+
+                                    {/* Captura do clique */}
+                                    <div
+                                        id="assinatura-overlay"
+                                        className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                                        onClick={handleClickPdf}
+                                    />
+
+                                    {/* Indicador visual */} 
+                                    {coords && (<div className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none" style={{ left: coords.x2 - 10, top: coords.y2 - 10 }}/>)}
                                 </>
                             ) : (
                                 <p>Nenhum documento disponível</p>
                             )}
-                        </div>           
-                        <Button onClick={confirmarAssinatura} className="flex items-center"> Assinar </Button>
+                        </div>
+            
+                        {/* Paginação */}
+                        <div className="flex justify-center items-center gap-2 mt-2">
+                            <Button disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)}>
+                                Anterior
+                            </Button>
+                            <span>Página {currentPage}{totalPages ? ` / ${totalPages}` : ""}</span>
+                            <Button disabled={currentPage >= (totalPages == null ? 1 : totalPages)} onClick={() => changePage(currentPage + 1)}>
+                                Próxima
+                            </Button>
+                        </div>
+                
+                        <Button onClick={confirmarAssinatura} className="flex items-center">
+                            Assinar
+                        </Button>
                     </DialogContent>
                 </Dialog>
             )}

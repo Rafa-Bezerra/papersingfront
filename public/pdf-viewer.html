@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>PDF Viewer</title>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                overflow: hidden;
+                background: #fff;
+            }
+
+            #pdfContainer {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                overflow: auto;
+            }
+
+            canvas {
+                display: block;
+                max-width: 100%;
+                height: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="pdfContainer"></div>
+
+        <!-- PDF.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+        <script>
+            let currentPdf = null;
+            let currentPage = 1;
+
+            function base64ToUint8Array(base64) {
+                const raw = atob(base64);
+                const uint8Array = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) {
+                    uint8Array[i] = raw.charCodeAt(i);
+                }
+                return uint8Array;
+            }
+
+            function renderPage(pageNum) {
+                if (!currentPdf) return;
+
+                currentPdf.getPage(pageNum).then(page => {
+                    const container = document.getElementById('pdfContainer');
+                    container.innerHTML = '';
+
+                    const viewport = page.getViewport({ scale: 1 });
+                    const scale = container.clientWidth / viewport.width;
+                    const scaledViewport = page.getViewport({ scale });
+
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = scaledViewport.width;
+                    canvas.height = scaledViewport.height;
+                    container.appendChild(canvas);
+
+                    page.render({ canvasContext: context, viewport: scaledViewport });
+                });
+            }
+
+            // Ouve mensagens do parent (PDF + navegação)
+            window.addEventListener('message', (event) => {
+                const { pdfBase64, page } = event.data;
+
+                    if (pdfBase64) {
+                        const pdfData = base64ToUint8Array(pdfBase64);
+                        pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
+                            currentPdf = pdf;
+                            currentPage = 1;
+                            window.parent.postMessage({ totalPages: pdf.numPages }, "*");
+                            renderPage(currentPage);
+                        }).catch(err => console.error('Erro ao carregar PDF:', err));
+                    }
+
+                    if (page && currentPdf) {
+                        currentPage = Math.min(Math.max(page, 1), currentPdf.numPages);
+                        renderPage(currentPage);
+                    }
+                }
+            );
+        </script>
+    </body>
+</html>
