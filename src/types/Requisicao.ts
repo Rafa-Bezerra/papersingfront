@@ -23,6 +23,11 @@ export type Requisicao_item = {
     cod_item: number,
     quantidade_produto: number,
     historico_item: string
+    codcoligada: string,
+    cod_fornecedor: string,
+    centro_custo: string,
+    nat_orcamentaria: string,
+    nome_etapa: string,
 }
 
 export type Requisicao_aprovacao = {

@@ -64,7 +64,6 @@ export default function PageUsuarios() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const tipos_movimento : string[] = [
         "1.1.20",
         "1.1.21",
@@ -87,6 +86,7 @@ export default function PageUsuarios() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
+    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     
     function changePage(newPage: number) {
         if (!iframeRef.current) return;
@@ -423,6 +423,30 @@ export default function PageUsuarios() {
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader> 
+                        
+                        {requisicaoItensSelecionada?.length > 0 && (
+                            <Card className="p-4 my-4">
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Coligada:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.codcoligada ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Fornecedor:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.cod_fornecedor ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Natureza Orçamentária:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.nat_orcamentaria ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-muted-foreground">Etapa:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.nome_etapa ?? "-"}</span>
+                                </div>
+                            </Card>
+                        )}
                         <div className="w-full">
                             <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={loading} />         
                         </div>  
