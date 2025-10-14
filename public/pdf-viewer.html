@@ -8,23 +8,17 @@
                 margin: 0;
                 padding: 0;
                 height: 100%;
-                overflow: hidden;
+                overflow: hidden !important;
                 background: #fff;
             }
 
-            #pdfContainer {
+            #pdfContainer, #viewerContainer, canvas {
                 width: 100%;
                 height: 100%;
                 display: flex;
                 justify-content: center;
                 align-items: flex-start;
-                overflow: auto;
-            }
-
-            canvas {
-                display: block;
-                max-width: 100%;
-                height: auto;
+                overflow: hidden !important;
             }
         </style>
     </head>
@@ -54,7 +48,8 @@
                     container.innerHTML = '';
 
                     const viewport = page.getViewport({ scale: 1 });
-                    const scale = container.clientWidth / viewport.width;
+                    // const scale = container.clientWidth / viewport.width;
+                    const scale = 1.5;
                     const scaledViewport = page.getViewport({ scale });
 
                     const canvas = document.createElement('canvas');

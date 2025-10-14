@@ -443,56 +443,83 @@ export default function PageUsuarios() {
                     </DialogContent>
                 </Dialog>
             )}
-
+            
             {/* Modal */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-full max-w-4xl h-full flex flex-col">
-                        <DialogHeader>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 bg-white sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento requisição n° ${requisicaoSelecionada.requisicao.idmov}`}
                             </DialogTitle>
                         </DialogHeader>
-            
-                        <div className="relative flex-1">
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex justify-center  min-w-[800px] bg-gray-50">
                             {requisicaoDocumentoSelecionada ? (
-                                <>
-                                    <iframe
-                                        ref={iframeRef}
-                                        src="/pdf-viewer.html"
-                                        className="w-full h-full"
-                                        style={{ border: "none" }}
-                                    />
+                            <>
+                                {/* PDF sem overflow interno */}
+                                <iframe
+                                    ref={iframeRef}
+                                    src="/pdf-viewer.html"
+                                    className="relative w-auto h-auto min-w-[800px] border-none  cursor-crosshair"
+                                    style={{
+                                        aspectRatio: '1/1.414', // mantém proporção A4 se desejar
+                                    }}
+                                    onClick={handleClickPdf}
+                                />
 
-                                    {/* Captura do clique */}
+                                {/* Overlay */}
+                                <div
+                                    id="assinatura-overlay"
+                                    className="absolute inset-0 cursor-crosshair"
+                                    onClick={handleClickPdf}
+                                />
+
+                                {/* Indicador visual */}
+                                {coords && (
                                     <div
-                                        id="assinatura-overlay"
-                                        className="absolute top-0 left-0 w-full h-full cursor-crosshair"
-                                        onClick={handleClickPdf}
+                                        className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                        style={{
+                                            left: coords.x2 - 10,
+                                            top: coords.y2 - 10,
+                                        }}
                                     />
-
-                                    {/* Indicador visual */} 
-                                    {coords && (<div className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none" style={{ left: coords.x2 - 10, top: coords.y2 - 10 }}/>)}
-                                </>
+                                )}
+                            </>
                             ) : (
-                                <p>Nenhum documento disponível</p>
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
                             )}
                         </div>
-            
+
                         {/* Paginação */}
-                        <div className="flex justify-center items-center gap-2 mt-2">
-                            <Button disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)}>
+                        <div className="flex justify-center items-center gap-2 mt-4 shrink-0 bg-white sticky bottom-16 p-4 border-t">
+                            <Button
+                                disabled={currentPage <= 1}
+                                onClick={() => changePage(currentPage - 1)}
+                            >
                                 Anterior
                             </Button>
-                            <span>Página {currentPage}{totalPages ? ` / ${totalPages}` : ""}</span>
-                            <Button disabled={currentPage >= (totalPages == null ? 1 : totalPages)} onClick={() => changePage(currentPage + 1)}>
+                            <span>
+                                Página {currentPage}
+                                {totalPages ? ` / ${totalPages}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
+                                onClick={() => changePage(currentPage + 1)}
+                            >
                                 Próxima
                             </Button>
                         </div>
-                
-                        <Button onClick={confirmarAssinatura} className="flex items-center">
-                            Assinar
-                        </Button>
+
+                        {/* Botão assinar */}
+                        <div className="flex justify-center mt-2 mb-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
+                            <Button onClick={confirmarAssinatura} className="flex items-center">
+                                Assinar
+                            </Button>
+                        </div>
                     </DialogContent>
                 </Dialog>
             )}

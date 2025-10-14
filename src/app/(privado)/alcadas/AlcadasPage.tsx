@@ -75,7 +75,8 @@ export default function Page() {
     const form = useForm<Alcada>({
         defaultValues: { 
             id: 0,
-            centro_custo: ''
+            centro_custo: '',
+            centro_custo_nome: ''
         }
     })
 
@@ -161,6 +162,7 @@ export default function Page() {
         form.reset({ 
             id: 0,
             centro_custo: '',
+            centro_custo_nome: ''
         })
         setUpdateAlcadaMode(false)
         setIsFormAlcadaOpen(true)
@@ -184,10 +186,12 @@ export default function Page() {
     async function handleEditar (alcada: Alcada) {
         form.reset({ 
             id: alcada.id,
-            centro_custo: alcada.centro_custo,
+            centro_custo: alcada.centro_custo_nome,
+            centro_custo_nome: alcada.centro_custo_nome
         })
         setUpdateAlcadaMode(true)
         setIsFormAlcadaOpen(true)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }
 
     async function handleExcluir () {
@@ -246,6 +250,7 @@ export default function Page() {
         setAprovadorSelecionado(aprovador)
         setUpdateAprovadoresMode(false)
         setIsFormAprovadoresOpen(true)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }
 
     async function handleExcluirAprovador () {
@@ -285,6 +290,7 @@ export default function Page() {
         () => [
             { accessorKey: 'id', header: 'ID' },
             { accessorKey: 'centro_custo', header: 'Centro de custo' },
+            { accessorKey: 'centro_custo_nome', header: 'Descrição' },
             {
                 id: 'actions',
                 header: 'Ações',
@@ -475,6 +481,20 @@ export default function Page() {
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Centro de custo</FormLabel>
+                                    <FormControl>
+                                    <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="centro_custo_nome"
+                                rules={{ required: 'Descrição é obrigatória' }}
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Descrição</FormLabel>
                                     <FormControl>
                                     <Input {...field} />
                                     </FormControl>

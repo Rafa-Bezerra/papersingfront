@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { login, LoginPayload } from '@/services/auth'
+import Image from "next/image";
 
 interface LoginFormValues {
   usuario: string
@@ -60,11 +61,21 @@ export default function LoginPage() {
       <div className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-lg">        
         <section className="flex items-center justify-center p-8 md:p-12">
           <Card className="w-full max-w-md border-0 shadow-none">
-            <CardHeader className="space-y-6 p-0">
+            <CardHeader className="flex flex-row items-center gap-6 p-0">
+              <div className="flex-shrink-0">
+                <Image
+                  src="/papersign-logo.png"
+                  alt="Logo PaperSign"
+                  width={200}
+                  height={200}
+                  className="h-30 w-auto md:h-30"
+                  unoptimized
+                />
+              </div>
               <div>
                 <CardTitle className="text-3xl md:text-4xl leading-tight">
                   Bem-vindo ao{' '}
-                  <span className="text-pakistan_green-700">PaperSing</span>
+                  <span className="text-pakistan_green-700">PaperSign</span>
                 </CardTitle>
                 <CardDescription className="mt-1">
                   Faça login na sua conta para continuar
