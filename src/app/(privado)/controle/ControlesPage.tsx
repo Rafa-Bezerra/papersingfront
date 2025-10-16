@@ -1,5 +1,11 @@
 'use client'
 
+declare global {
+    interface Window {
+        _pdfMessageListener?: boolean;
+    }
+}
+
 import React, {
   useEffect,
   useMemo,
@@ -28,21 +34,25 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
   } from '@/components/ui/dropdown-menu'
-import { getStatusDescricao, safeDateLabel, stripDiacritics } from '@/utils/functions'
+import { safeDateLabel, stripDiacritics } from '@/utils/functions'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
     Requisicao_item,
-    getAll as getAllRequisicoes
+    aprovar,
+    getAll as getAllRequisicoes,
+    reprovar
 } from '@/services/requisicoesService'
-import { toast } from 'sonner'
 import { Assinar, assinar } from '@/services/assinaturaService'
+import { toast } from 'sonner'
+import { Loader2 } from "lucide-react";
 
 export default function PageUsuarios() {
     const titulo = 'Controle imobilizado'
     const router = useRouter()
     const searchParams = useSearchParams()
 
+    const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<RequisicaoDto[]>([])
@@ -75,7 +85,7 @@ export default function PageUsuarios() {
         setCurrentPage(newPage);
         iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
-
+      
     function clearQuery() {
         setQuery('')
     }
@@ -115,16 +125,16 @@ export default function PageUsuarios() {
     }, [query, situacaoFiltrada])
 
     async function handleSearch(q: string) {
+        setIsLoading(true)
         setError(null)
         try {      
             const dados = await getAllRequisicoes()
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
-                const movimento = stripDiacritics((d.requisicao.numero_movimento ?? '').toLowerCase())
-                const base = stripDiacritics((d.requisicao.centro_custo ?? '').toLowerCase())
-                const matchQuery = qNorm === "" || movimento.includes(qNorm)|| base.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
+                const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
+                const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
-                const matchSituacao = situacaoFiltrada === "" || d.requisicao.cod_status_aprovacao == situacaoFiltrada
+                const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
                 return matchQuery && matchTipos && matchSituacao
             })
 
@@ -134,6 +144,7 @@ export default function PageUsuarios() {
             setResults([])
         } finally {
             setSearched(true)
+            setIsLoading(false)
         }
     }
 
@@ -149,6 +160,7 @@ export default function PageUsuarios() {
     }
 
     async function handleDocumento (requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setTotalPages(1);
         setIsModalDocumentosOpen(true)  
         setRequisicaoSelecionada(requisicao)
@@ -171,18 +183,36 @@ export default function PageUsuarios() {
                 '*'
             );
         }, 500);
+        setIsLoading(false)
     }
 
     async function handleAssinar(data: Assinar) {
+        setIsLoading(true)
         setSearched(false)
         try {
             await assinar(data)
+            handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
             toast.error((err as Error).message)            
         } finally {
+            setIsModalDocumentosOpen(false)
             setSearched(true)
+            setIsLoading(false)
         }
+    }
+
+    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
+        const overlay = e.currentTarget as HTMLDivElement;
+        const rect = overlay.getBoundingClientRect();
+        
+        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
+        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
+        const x2 = e.clientX - rect.left;
+        const y2 = e.clientY - rect.top;
+        const yI = (rect.height - y2)  / rect.height;
+        
+        setCoords({ x, y, x2, y2, yI });
     }
 
     async function confirmarAssinatura() {
@@ -202,19 +232,6 @@ export default function PageUsuarios() {
         await handleAssinar(dadosAssinatura);
     }    
 
-    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const overlay = e.currentTarget as HTMLDivElement;
-        const rect = overlay.getBoundingClientRect();
-        
-        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
-        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
-        const x2 = e.clientX - rect.left;
-        const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2)  / rect.height;
-        
-        setCoords({ x, y, x2, y2, yI });
-    }
-
     async function handleItens (requisicao: RequisicaoDto) {
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
@@ -228,40 +245,56 @@ export default function PageUsuarios() {
     }
 
     async function handleAprovar (id: number) {
-        console.log(id);
+        setIsLoading(true)
+        try {
+            await aprovar(id)
+            handleSearchClick()
+        } catch (err) {
+            setError((err as Error).message)
+        }  finally {
+            setIsLoading(false)
+        }
     }
 
     async function handleReprovar (id: number) {
-        console.log(id);
+        setIsLoading(true)
+        try {
+            await reprovar(id)
+            handleSearchClick()
+        } catch (err) {
+            setError((err as Error).message)
+        }  finally {
+            setIsLoading(false)
+        }
     }
     
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
-            { accessorKey: 'requisicao.centro_custo', header: 'Centro de custo' },
-            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
-            { accessorKey: 'requisicao.numero_movimento', header: 'Movimento' },
+            { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.nome_fornecedor', header: 'Fornecedor' },
             { accessorKey: 'requisicao.data_emissao', header: 'Data emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
             { 
                 accessorKey: 'requisicao.valorbruto', 
                 header: 'Valor bruto', 
-                accessorFn: (row) => `R$ ${row.requisicao.valorbruto.toFixed(2)}`
+                accessorFn: (row) => `R$ ${row.requisicao.valor_total.toFixed(2)}`
             },
-            { accessorKey: 'requisicao.historico_solicitacao', header: 'Histórico' },
-            { accessorKey: 'requisicao.cod_status_aprovacao', header: 'Situação', accessorFn: (row) => getStatusDescricao(row.requisicao.cod_status_aprovacao) },
+            { accessorKey: 'requisicao.historico_movimento', header: 'Histórico' },
+            { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => (
                     <div className="flex gap-2">
-                        <Button
+                        {row.original.requisicao.arquivo && (<Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleDocumento(row.original)}
                         >
                             Documento
-                        </Button>
+                        </Button>)}
                         <Button
                             size="sm"
                             variant="outline"
@@ -276,9 +309,8 @@ export default function PageUsuarios() {
                         >
                             Aprovações
                         </Button>
-                        {row.original.requisicao.cod_status_aprovacao == "A" 
-                            && row.original.requisicao_aprovacoes.some(
-                                (ap) => ap.usuario === userName
+                        {row.original.requisicao_aprovacoes.some(
+                                (ap) => ap.usuario === userName && ap.situacao != "A"
                             )
                             && (<Button
                             size="sm"
@@ -287,9 +319,8 @@ export default function PageUsuarios() {
                         >
                             Aprovar
                         </Button>)}
-                        {row.original.requisicao.cod_status_aprovacao == "A" 
-                            && row.original.requisicao_aprovacoes.some(
-                                (ap) => ap.usuario === userName
+                        {row.original.requisicao_aprovacoes.some(
+                                (ap) => ap.usuario === userName && ap.situacao != "R"
                             )
                             && (<Button
                                 size="sm"
@@ -307,11 +338,15 @@ export default function PageUsuarios() {
     
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
         () => [
-            { accessorKey: 'cod_item', header: 'Cod. Item' },
-            { accessorKey: 'quantidade_produto', header: 'Quantidade' },
+            { accessorKey: 'centro_custo', header: 'Centro de custo' },
+            { accessorKey: 'codigo_item_movimento', header: 'Cod. Item' },
+            { accessorKey: 'item_preco_unitario', header: 'Quantidade' },
+            { accessorKey: 'item_quantidade', header: 'Quantidade' },
+            { accessorKey: 'item_total', header: 'Quantidade' },
             { accessorKey: 'historico_item', header: 'Histórico' }
         ],
         []
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     )
     
     const colunasAprovacoes = useMemo<ColumnDef<Requisicao_aprovacao>[]>(
@@ -391,35 +426,29 @@ export default function PageUsuarios() {
             {/* Modal */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px] ">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Itens requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader> 
                         
                         {requisicaoItensSelecionada?.length > 0 && (
                             <Card className="p-4 my-4">
                                 <div className="flex justify-between border-b border-muted pb-1">
                                     <span className="font-semibold text-muted-foreground">Coligada:</span>
-                                    <span>{requisicaoItensSelecionada[0]?.codcoligada ?? "-"}</span>
-                                </div>
-
-                                <div className="flex justify-between border-b border-muted pb-1">
-                                    <span className="font-semibold text-muted-foreground">Fornecedor:</span>
-                                    <span>{requisicaoItensSelecionada[0]?.cod_fornecedor ?? "-"}</span>
+                                    <span>{requisicaoSelecionada.requisicao.codcoligada}</span>
                                 </div>
 
                                 <div className="flex justify-between border-b border-muted pb-1">
                                     <span className="font-semibold text-muted-foreground">Natureza Orçamentária:</span>
-                                    <span>{requisicaoItensSelecionada[0]?.nat_orcamentaria ?? "-"}</span>
+                                    <span>{requisicaoItensSelecionada[0]?.nome_natureza_orcamentaria ?? "-"}</span>
                                 </div>
 
                                 <div className="flex justify-between">
                                     <span className="font-semibold text-muted-foreground">Etapa:</span>
-                                    <span>{requisicaoItensSelecionada[0]?.nome_etapa ?? "-"}</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_etapa ?? "-"}</span>
                                 </div>
                             </Card>
                         )}
-                        
                         <div className="w-full">
                             <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={loading} />         
                         </div>  
@@ -432,7 +461,7 @@ export default function PageUsuarios() {
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações requisição n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader> 
                         <div className="w-full">
                             <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />         
@@ -440,28 +469,31 @@ export default function PageUsuarios() {
                     </DialogContent>
                 </Dialog>
             )}
-                        
+
             {/* Modal */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 bg-white sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
-                                {`Documento requisição n° ${requisicaoSelecionada.requisicao.idmov}`}
+                                {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
                             </DialogTitle>
                         </DialogHeader>
 
                         {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center  min-w-[800px] bg-gray-50">
+                        <div className="relative w-full flex justify-center bg-gray-50">
                             {requisicaoDocumentoSelecionada ? (
                             <>
                                 {/* PDF sem overflow interno */}
                                 <iframe
                                     ref={iframeRef}
                                     src="/pdf-viewer.html"
-                                    className="relative w-auto h-auto min-w-[800px] border-none  cursor-crosshair"
+                                    className="relative border-none  cursor-crosshair"
                                     style={{
-                                        aspectRatio: '1/1.414', // mantém proporção A4 se desejar
+                                        width: '100%',
+                                        height: '100%',
+                                        maxWidth: '800px',
+                                        aspectRatio: '1/sqrt(2)', // Proporção A4
                                     }}
                                     onClick={handleClickPdf}
                                 />
@@ -491,8 +523,8 @@ export default function PageUsuarios() {
                             )}
                         </div>
 
-                        {/* Paginação */}
-                        <div className="flex justify-center items-center gap-2 mt-4 shrink-0 bg-white sticky bottom-16 p-4 border-t">
+                        {/* Ações */}
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
                             <Button
                                 disabled={currentPage <= 1}
                                 onClick={() => changePage(currentPage - 1)}
@@ -509,10 +541,6 @@ export default function PageUsuarios() {
                             >
                                 Próxima
                             </Button>
-                        </div>
-
-                        {/* Botão assinar */}
-                        <div className="flex justify-center mt-2 mb-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
                             <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
                             </Button>
@@ -520,6 +548,22 @@ export default function PageUsuarios() {
                     </DialogContent>
                 </Dialog>
             )}
+
+            {/* Modal */}
+            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+                <DialogContent
+                    showCloseButton={false}
+                    className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
+                >
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
+                    </DialogHeader> 
+                    <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 shadow-lg">
+                        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                    <p className="text-sm text-gray-600 mt-2">Carregando</p>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {error && (
                 <p className="mb-4 text-center text-sm text-destructive">

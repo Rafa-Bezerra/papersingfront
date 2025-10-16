@@ -75,7 +75,7 @@ export default function LoginPage() {
               <div>
                 <CardTitle className="text-3xl md:text-4xl leading-tight">
                   Bem-vindo ao{' '}
-                  <span className="text-pakistan_green-700">PaperSign</span>
+                  <span className="text-blue-700">PaperSign</span>
                 </CardTitle>
                 <CardDescription className="mt-1">
                   Faça login na sua conta para continuar
@@ -121,7 +121,7 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-pakistan_green-600 hover:bg-pakistan_green-700"
+                    className="w-full bg-blue-700 hover:bg-blue-800"
                   >
                     {isSubmitting ? 'Entrando...' : 'Entrar'}
                   </Button>
