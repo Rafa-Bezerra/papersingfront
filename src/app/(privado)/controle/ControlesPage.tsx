@@ -46,6 +46,7 @@ import {
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
+import { Label } from '@radix-ui/react-label';
 
 export default function PageUsuarios() {
     const titulo = 'Controle imobilizado'
@@ -54,6 +55,8 @@ export default function PageUsuarios() {
 
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<RequisicaoDto[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
@@ -98,6 +101,8 @@ export default function PageUsuarios() {
     }
 
     useEffect(() => {        
+        setDateFrom(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10));
+        setDateTo(new Date().toISOString().substring(0, 10));
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
@@ -122,13 +127,13 @@ export default function PageUsuarios() {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, situacaoFiltrada])
+    }, [query, situacaoFiltrada, dateFrom, dateTo])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
         setError(null)
         try {      
-            const dados = await getAllRequisicoes()
+            const dados = await getAllRequisicoes(dateFrom ?? new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10))
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -364,30 +369,53 @@ export default function PageUsuarios() {
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    
-                    {/* Botão de Filtros - Dropdown com checkboxes */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" aria-label="Abrir filtros">
-                                <Filter className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Filtros</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64" align="end">
-                            <DropdownMenuLabel>Status</DropdownMenuLabel>
-                            <DropdownMenuCheckboxItem key={"A"} checked={situacaoFiltrada == "A"} onCheckedChange={() => setSituacaoFiltrada("A")}>Em Andamento</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"R"} checked={situacaoFiltrada == "R"} onCheckedChange={() => setSituacaoFiltrada("R")}>Concluído a responder</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"O"} checked={situacaoFiltrada == "O"} onCheckedChange={() => setSituacaoFiltrada("O")}>Concluído respondido</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"D"} checked={situacaoFiltrada == "D"} onCheckedChange={() => setSituacaoFiltrada("D")}>Concluído confirmado</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"U"} checked={situacaoFiltrada == "U"} onCheckedChange={() => setSituacaoFiltrada("U")}>Concluído automático (pelo sistema)</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"V"} checked={situacaoFiltrada == "V"} onCheckedChange={() => setSituacaoFiltrada("V")}>Avaliado</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"G"} checked={situacaoFiltrada == "G"} onCheckedChange={() => setSituacaoFiltrada("G")}>Agendado a responder</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"S"} checked={situacaoFiltrada == "S"} onCheckedChange={() => setSituacaoFiltrada("S")}>Agendado respondido</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"T"} checked={situacaoFiltrada == "T"} onCheckedChange={() => setSituacaoFiltrada("T")}>Aguardando terceiros</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"C"} checked={situacaoFiltrada == "C"} onCheckedChange={() => setSituacaoFiltrada("C")}>Cancelado</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"E"} checked={situacaoFiltrada == "E"} onCheckedChange={() => setSituacaoFiltrada("E")}>Despertado</DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex justify-end items-end gap-4">
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateFrom">Data de</Label>
+                            <Input
+                            id="dateFrom"
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            className="w-40"
+                            />
+                        </div>
+
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateTo">Data até</Label>
+                            <Input
+                            id="dateTo"
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            className="w-40"
+                            />
+                        </div>
+                        {/* Botão de Filtros - Dropdown com checkboxes */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Filtros</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => setSituacaoFiltrada("Em Andamento")}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={() => setSituacaoFiltrada("Concluído a responder")}>Concluído a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={() => setSituacaoFiltrada("Concluído respondido")}>Concluído respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={() => setSituacaoFiltrada("Concluído confirmado")}>Concluído confirmado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={() => setSituacaoFiltrada("Concluído automático(pelo sistema)")}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={() => setSituacaoFiltrada("Avaliado")}>Avaliado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={() => setSituacaoFiltrada("Agendado a responder")}>Agendado a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={() => setSituacaoFiltrada("Agendado respondido")}>Agendado respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={() => setSituacaoFiltrada("Aguardando terceiros")}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={() => setSituacaoFiltrada("Cancelado")}>Cancelado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={() => setSituacaoFiltrada("Despertado")}>Despertado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="flex flex-col gap-2 md:flex-row">

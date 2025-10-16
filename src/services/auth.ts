@@ -4,11 +4,13 @@ import { API_BASE } from "@/utils/constants";
 export interface LoginPayload {
   username: string;
   password: string;
+  base: string;
 }
 
 export interface LoginResponse {
   sequencial: number;
   codusuario: string;
+  unidade: string;
   nome: string;
   token: string;
 }
@@ -29,7 +31,6 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     // 401 virá aqui: text === "Usuário ou senha inválidos."
     throw new Error(text || `Erro ${res.status}`);
   }
-  console.log(text);
 
   // se a sua API retornar JSON com { token: '...' }
   try {

@@ -134,7 +134,8 @@ export default function Page() {
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const centro_custo = stripDiacritics((d.centro_custo ?? '').toLowerCase())
-                const matchQuery = qNorm === "" || centro_custo.includes(qNorm)|| String(d.id ?? '').includes(qNorm)
+                const centro_custo_nome = stripDiacritics((d.centro_custo_nome ?? '').toLowerCase())
+                const matchQuery = qNorm === "" || centro_custo.includes(qNorm) || centro_custo_nome.includes(qNorm) || String(d.id ?? '').includes(qNorm)
                 return matchQuery
             })
 

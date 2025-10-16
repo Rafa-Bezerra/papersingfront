@@ -21,15 +21,17 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { login, LoginPayload } from '@/services/auth'
 import Image from "next/image";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface LoginFormValues {
   usuario: string
   password: string
+  base: string
 }
 
 export default function LoginPage() {
   const form = useForm<LoginFormValues>({
-    defaultValues: { usuario: '', password: '' }
+    defaultValues: { usuario: '', password: '', base: '' }
   })
   const {
     control,
@@ -42,7 +44,8 @@ export default function LoginPage() {
     try {
       const payload: LoginPayload = {
         username: values.usuario,
-        password: values.password
+        password: values.password,
+        base: values.base
       }
       const usuario = await login(payload)
       
@@ -112,6 +115,29 @@ export default function LoginPage() {
                             placeholder="••••••••"
                             {...field}
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={control}
+                    name="base"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Base</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a base" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="WAY 112">WAY 112</SelectItem>
+                              <SelectItem value="WAY 262">WAY 262</SelectItem>
+                              <SelectItem value="WAY 306">WAY 306</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
