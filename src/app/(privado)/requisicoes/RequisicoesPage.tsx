@@ -331,7 +331,7 @@ export default function Page() {
         if (!requisicaoSelecionada) return toast.error("Selecione um arquivo primeiro!")
         if (!file) return toast.error("Selecione um arquivo primeiro!")
         const base64 = await toBase64(file)
-        var anexo: AnexoUpload = {
+        const anexo: AnexoUpload = {
             anexo: base64,
             nome: fileName,
             idmov: requisicaoSelecionada.requisicao.idmov
@@ -571,7 +571,7 @@ export default function Page() {
                         {row.original.anexo && (<Button
                             size="sm"
                             variant="destructive"
-                            onClick={(e) => setDeleteAnexoId(row.original.id)}
+                            onClick={() => setDeleteAnexoId(row.original.id)}
                         >
                             Excluir
                         </Button>)}
