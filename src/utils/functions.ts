@@ -112,63 +112,72 @@ export function base64ToBlob(base64: string, type: string) {
 }
 
 export function getTrimmedImage(sig: SignatureCanvas | null): string | null {
-    if (!sig) return null;
-    const canvas = sig.getCanvas();
-    const ctx = canvas.getContext("2d");
-    const width = canvas.width;
-    const height = canvas.height;
-    const imgData = ctx?.getImageData(0, 0, width, height);
-    if (!imgData) return null;
-  
-    // Encontrar limites da assinatura
-    let top = 0, left = 0, right = width, bottom = height;
-    const pixels = imgData.data;
-    let x, y;
-    for (y = 0; y < height; y++) {
-      for (x = 0; x < width; x++) {
-        if (pixels[(y * width + x) * 4 + 3] > 0) {
-          top = y;
-          y = height;
-          break;
-        }
-      }
-    }
-    for (y = height - 1; y >= 0; y--) {
-      for (x = 0; x < width; x++) {
-        if (pixels[(y * width + x) * 4 + 3] > 0) {
-          bottom = y;
-          y = -1;
-          break;
-        }
-      }
-    }
+  if (!sig) return null;
+  const canvas = sig.getCanvas();
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const imgData = ctx?.getImageData(0, 0, width, height);
+  if (!imgData) return null;
+
+  // Encontrar limites da assinatura
+  let top = 0, left = 0, right = width, bottom = height;
+  const pixels = imgData.data;
+  let x, y;
+  for (y = 0; y < height; y++) {
     for (x = 0; x < width; x++) {
-      for (y = 0; y < height; y++) {
-        if (pixels[(y * width + x) * 4 + 3] > 0) {
-          left = x;
-          x = width;
-          break;
-        }
+      if (pixels[(y * width + x) * 4 + 3] > 0) {
+        top = y;
+        y = height;
+        break;
       }
     }
-    for (x = width - 1; x >= 0; x--) {
-      for (y = 0; y < height; y++) {
-        if (pixels[(y * width + x) * 4 + 3] > 0) {
-          right = x;
-          x = -1;
-          break;
-        }
-      }
-    }
-  
-    const trimmedWidth = right - left;
-    const trimmedHeight = bottom - top;
-    const trimmed = document.createElement("canvas");
-    trimmed.width = trimmedWidth;
-    trimmed.height = trimmedHeight;
-    trimmed
-      .getContext("2d")
-      ?.putImageData(ctx!.getImageData(left, top, trimmedWidth, trimmedHeight), 0, 0);
-  
-    return trimmed.toDataURL("image/png");
   }
+  for (y = height - 1; y >= 0; y--) {
+    for (x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3] > 0) {
+        bottom = y;
+        y = -1;
+        break;
+      }
+    }
+  }
+  for (x = 0; x < width; x++) {
+    for (y = 0; y < height; y++) {
+      if (pixels[(y * width + x) * 4 + 3] > 0) {
+        left = x;
+        x = width;
+        break;
+      }
+    }
+  }
+  for (x = width - 1; x >= 0; x--) {
+    for (y = 0; y < height; y++) {
+      if (pixels[(y * width + x) * 4 + 3] > 0) {
+        right = x;
+        x = -1;
+        break;
+      }
+    }
+  }
+  
+  const trimmedWidth = right - left;
+  const trimmedHeight = bottom - top;
+  const trimmed = document.createElement("canvas");
+  trimmed.width = trimmedWidth;
+  trimmed.height = trimmedHeight;
+  trimmed
+    .getContext("2d")
+    ?.putImageData(ctx!.getImageData(left, top, trimmedWidth, trimmedHeight), 0, 0);
+
+  return trimmed.toDataURL("image/png");
+}
+
+export function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = (error) => reject(error)
+  })
+}
