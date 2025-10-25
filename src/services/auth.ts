@@ -10,6 +10,7 @@ export interface LoginPayload {
 export interface LoginResponse {
   sequencial: number;
   codusuario: string;
+  email: string;
   unidade: string;
   nome: string;
   token: string;
@@ -26,7 +27,8 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   });
 
   const text = await res.text();
-
+  console.log(text);
+  
   if (!res.ok) {
     // 401 virá aqui: text === "Usuário ou senha inválidos."
     throw new Error(text || `Erro ${res.status}`);
