@@ -727,7 +727,7 @@ export default function Page() {
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 bg-white sticky top-0 z-10">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
                             </DialogTitle>
@@ -777,7 +777,7 @@ export default function Page() {
                         </div>
 
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
                             <Button
                                 disabled={currentPage <= 1}
                                 onClick={() => changePage(currentPage - 1)}
@@ -818,7 +818,7 @@ export default function Page() {
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
                     </DialogHeader> 
-                    <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 shadow-lg">
+                    <div className="flex flex-col items-center justify-center rounded-2xl p-6 shadow-lg">
                         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
                     <p className="text-sm text-gray-600 mt-2">Carregando</p>
                     </div>
@@ -836,7 +836,7 @@ export default function Page() {
                             <DataTable columns={colunasAnexos} data={anexos} loading={loading} />         
                         </div>  
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
                             <Input
                                 type="file"
                                 accept="application/pdf/*"
@@ -866,7 +866,7 @@ export default function Page() {
             {anexoSelecionado && (
                 <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 bg-white sticky top-0 z-10">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}`}
                             </DialogTitle>
@@ -916,7 +916,7 @@ export default function Page() {
                         </div>
 
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 bg-white sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
                             <Button
                                 disabled={currentPageAnexo <= 1}
                                 onClick={() => changePageAnexo(currentPageAnexo - 1)}
