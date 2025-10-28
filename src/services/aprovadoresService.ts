@@ -35,7 +35,7 @@ export async function createElement(data: Aprovadores): Promise<void> {
 }
   
 export async function updateElement(data: Aprovadores): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${data.id}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
+    const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
@@ -43,7 +43,7 @@ export async function updateElement(data: Aprovadores): Promise<void> {
 }
   
 export async function deleteElement(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "DELETE", headers: headers() });
+    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "POST", headers: headers() });
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);

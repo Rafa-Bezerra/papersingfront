@@ -11,7 +11,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { KeyIcon, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
@@ -40,7 +40,8 @@ import {
   getElementById as getUsuarioById,
   createElement as createUsuario,
   updateElement as updateUsuario,
-  deleteElement as deleteUsuario
+  deleteElement as deleteUsuario,
+  resetPassword
 } from '@/services/usuariosService'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -60,11 +61,12 @@ export default function PageUsuarios() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [updateMode, setUpdateMode] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [resetId, setResetId] = useState<number | null>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const loading = isPending
 
   const form = useForm<Usuario>({
-    defaultValues: { 
+    defaultValues: {
       sequencial: 0,
       codusuario: '',
       nome: '',
@@ -114,21 +116,21 @@ export default function PageUsuarios() {
 
   async function handleSearch(q: string) {
     setError(null)
-    try {            
-      const dados = await getAllUsuarios()      
+    try {
+      const dados = await getAllUsuarios()
       const qNorm = stripDiacritics(q.toLowerCase().trim())
       console.log('q:', q)
       console.log('qNorm:', stripDiacritics(q.toLowerCase().trim()))
       console.log('dados exemplo:', dados[0])
       const filtrados = qNorm
         ? dados.filter(
-            p =>              
-              (
-                stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
-                stripDiacritics((p.codusuario ?? '').toLowerCase()).includes(qNorm) ||
-                String(p.sequencial ?? '').includes(qNorm)
-              )
+          p =>
+          (
+            stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
+            stripDiacritics((p.codusuario ?? '').toLowerCase()).includes(qNorm) ||
+            String(p.sequencial ?? '').includes(qNorm)
           )
+        )
         : dados;
       setResults(filtrados)
     } catch (err) {
@@ -151,14 +153,26 @@ export default function PageUsuarios() {
 
   async function handleDeleteConfirmed() {
     if (!deleteId) return
-    
     try {
-      await deleteUsuario(deleteId)        
+      await deleteUsuario(deleteId)
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
       toast.success(`Registro excluído`)
       setDeleteId(null)
+      await handleSearchClick()
+    }
+  }
+
+  async function handleResetConfirmed() {
+    if (!resetId) return
+    try {
+      await resetPassword(resetId)
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      toast.success(`Senha resetada para '123456'`)
+      setResetId(null)
       await handleSearchClick()
     }
   }
@@ -169,7 +183,7 @@ export default function PageUsuarios() {
     try {
       const response = await getUsuarioById(id)
       console.log(response);
-      
+
       setResultById(response)
       form.reset({
         sequencial: response.sequencial,
@@ -191,7 +205,7 @@ export default function PageUsuarios() {
   }, [form])
 
   function handleInsert() {
-    form.reset({ 
+    form.reset({
       sequencial: 0,
       codusuario: '',
       nome: '',
@@ -212,7 +226,7 @@ export default function PageUsuarios() {
     setError(null)
     try {
       if (data.sequencial && data.sequencial !== 0) {
-        await updateUsuario(data)        
+        await updateUsuario(data)
       } else {
         await createUsuario(data)
       }
@@ -243,6 +257,13 @@ export default function PageUsuarios() {
               onClick={() => handleUpdate(row.original.sequencial)}
             >
               Editar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setResetId(row.original.sequencial)}
+            >
+              <KeyIcon className="w-4 h-4" />
             </Button>
             <Button
               size="sm"
@@ -357,11 +378,7 @@ export default function PageUsuarios() {
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background
                              focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={field.value ?? ''}
-                        onChange={e =>
-                          field.onChange(
-                            e.target.value ? Number(e.target.value) : 0
-                          )
-                        }
+                        onChange={e => field.onChange(e.target.value)}
                       >
                         <option value={0}>Selecione…</option>
                         <option key={'48.851.242'} value={'48.851.242'}>{'WAY 112'}</option>
@@ -464,6 +481,28 @@ export default function PageUsuarios() {
               </Button>
               <Button variant="destructive" onClick={handleDeleteConfirmed}>
                 Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmação de exclusão (simples) */}
+      {resetId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+            <h3 className="mb-2 text-base font-semibold">
+              Resetar a senha do usuário
+            </h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Tem certeza que deseja resetar a senha do registro #{resetId}?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setResetId(null)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleResetConfirmed}>
+                Resetar
               </Button>
             </div>
           </div>

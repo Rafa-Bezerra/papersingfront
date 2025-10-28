@@ -78,7 +78,7 @@ export default function HomePage() {
           icon={FileText}
           color="blue"
           description="Total de documentos"
-          href="/solicitacoes"
+          href="/geral"
           className="w-full"
         />
         
@@ -88,7 +88,7 @@ export default function HomePage() {
           icon={CheckCircle}
           color="green"
           description="Documentos aprovados"
-          href="/solicitacoes?status=Aprovados"
+          href="/geral?status=Aprovados"
           className="w-full"
         />
         
@@ -98,7 +98,7 @@ export default function HomePage() {
           icon={Clock}
           color="yellow"
           description="Processos em análise"
-          href="/solicitacoes?status=EmAndamento"
+          href="/geral?status=Andamento"
           className="w-full"
         />
         
@@ -108,7 +108,7 @@ export default function HomePage() {
           icon={CheckSquare}
           color="purple"
           description="Processos finalizados"
-          href="/solicitacoes?status=Concluidos"
+          href="/geral?status=Finalizados"
           className="w-full"
         />
         
@@ -118,7 +118,7 @@ export default function HomePage() {
           icon={AlertCircle}
           color="red"
           description="Aguardando ação"
-          href="/solicitacoes?status=Pendentes"
+          href="/geral?status=Pendentes"
           className="w-full"
         />
       </div>

@@ -188,7 +188,7 @@ export default function Page() {
     async function handleEditar (alcada: Alcada) {
         form.reset({ 
             id: alcada.id,
-            centro_custo: alcada.centro_custo_nome,
+            centro_custo: alcada.centro_custo,
             centro_custo_nome: alcada.centro_custo_nome
         })
         setUpdateAlcadaMode(true)

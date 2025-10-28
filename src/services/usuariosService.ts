@@ -35,7 +35,7 @@ export async function createElement(data: Usuario): Promise<void> {
 }
   
 export async function updateElement(data: Usuario): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${data.sequencial}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
+    const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.sequencial}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
@@ -43,7 +43,14 @@ export async function updateElement(data: Usuario): Promise<void> {
 }
   
 export async function deleteElement(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "DELETE", headers: headers() });
+    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "POST", headers: headers() });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+    }
+}
+export async function resetPassword(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/resetar_senha/${id}`, { method: "POST", headers: headers() });
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
