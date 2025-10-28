@@ -45,6 +45,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [lastCollapseClickTime, setLastCollapseClickTime] = useState(0)
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [userAdmin, setUserAdmin] = useState(false)
   
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
@@ -60,6 +61,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       const user = JSON.parse(storedUser);  
       setUserName(user.nome);
       setUserEmail(user.email);
+      setUserAdmin(user.admin);
     }
   }, []);
 
@@ -181,7 +183,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       </div>
                     )}
                   {section.items.map(item => (
-                    <SidebarMenuItem key={item.title}>
+                    ((item.url != "/alcadas" && item.url != "/usuarios") || userAdmin) && (<SidebarMenuItem key={item.title}>
                         <SidebarMenuButton 
                           asChild
                           isActive={path === item.url || path.startsWith(item.url + '/')}
@@ -213,7 +215,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                           </div>
                         </Link>
                       </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    </SidebarMenuItem>)
                   ))}
                 </div>
               ))}

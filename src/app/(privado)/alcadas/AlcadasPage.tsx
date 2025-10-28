@@ -87,7 +87,8 @@ export default function Page() {
             usuario: '',
             cargo: '',
             valor_inicial: 0,
-            valor_final: 0
+            valor_final: 0,
+            nivel: 1
         }
     })
     
@@ -233,7 +234,8 @@ export default function Page() {
             usuario: '',
             cargo: '',
             valor_inicial: 0,
-            valor_final: 0
+            valor_final: 0,
+            nivel: 1
         })
         setUpdateAprovadoresMode(false)
         setIsFormAprovadoresOpen(true)
@@ -246,7 +248,8 @@ export default function Page() {
             usuario: aprovador.usuario,
             cargo: aprovador.cargo,
             valor_inicial: aprovador.valor_inicial,
-            valor_final: aprovador.valor_final
+            valor_final: aprovador.valor_final,
+            nivel: aprovador.nivel
         })
         setAprovadorSelecionado(aprovador)
         setUpdateAprovadoresMode(false)
@@ -332,6 +335,7 @@ export default function Page() {
             { accessorKey: 'cargo', header: 'Cargo' },
             { accessorKey: 'valor_inicial', header: 'Valor inicial' },
             { accessorKey: 'valor_final', header: 'Valor final' },
+            { accessorKey: 'nivel', header: 'Nível' },
             {
                 id: 'actions',
                 header: 'Ações',
@@ -405,7 +409,7 @@ export default function Page() {
             {/* Modal */}
             {alcadaSelecionada && (
                 <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Centro de custo - ${alcadaSelecionada.centro_custo}`}</DialogTitle>
 
@@ -466,7 +470,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAlcadaOpen} onOpenChange={setIsFormAlcadaOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateAlcadaMode ? `${tituloUpdate}: ${alcadaSelecionada?.centro_custo}` : `${tituloInsert}`}
@@ -572,6 +576,20 @@ export default function Page() {
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor final</FormLabel>
+                                    <FormControl>
+                                    <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={formAprovadores.control}
+                                name="nivel"
+                                rules={{ required: 'Nível é obrigatório' }}
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nível</FormLabel>
                                     <FormControl>
                                     <Input {...field} />
                                     </FormControl>

@@ -1,14 +1,15 @@
 export type Usuario = {
-    SEQUENCIAL: number,
-    CODUSUARIO: string,
-    NOME: string,
-    EMPRESA: string,
-    CODPERFIL: string,
-    DIRETORIA: string,
-    EMAIL: string,
-    ATIVO: boolean,
-    DATACRIACAO: string,
-    CODSISTEMA: string,
+    sequencial: number,
+    codusuario: string,
+    nome: string,
+    empresa: string,
+    codperfil: string,
+    diretoria: string,
+    email: string,
+    ativo: boolean,
+    datacriacao: string,
+    codsistema: string,
+    admin: boolean,
 }
 
 export interface LoginPayload {
@@ -17,8 +18,8 @@ export interface LoginPayload {
 }
 
 export interface LoginResponse {
-    SEQUENCIAL: number;
-    CODUSUARIO: string;
-    NOME: string;
-    TOKEN: string;
+    sequencial: number;
+    codusuario: string;
+    nome: string;
+    token: string;
 }

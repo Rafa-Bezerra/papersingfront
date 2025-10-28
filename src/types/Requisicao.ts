@@ -38,6 +38,8 @@ export type Requisicao_item = {
 export type Requisicao_aprovacao = {
     id: number,
     usuario: string,
+    nome: string,
+    nivel: number,
     situacao: string,
     data_aprovacao: string
 }

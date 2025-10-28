@@ -7,11 +7,11 @@ declare global {
 }
 
 import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
@@ -22,10 +22,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
 } from '@/components/ui/dialog'
 import {
     DropdownMenu,
@@ -33,7 +33,7 @@ import {
     DropdownMenuContent,
     DropdownMenuLabel,
     DropdownMenuTrigger
-  } from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import { safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import {
     RequisicaoDto,
@@ -47,10 +47,10 @@ import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
-import { 
-    Anexo, 
-    AnexoAssinar, 
-    AnexoUpload, 
+import {
+    Anexo,
+    AnexoAssinar,
+    AnexoUpload,
     getAll as getAllAnexos,
     createElement as createAnexo,
     updateElement as updateAnexo,
@@ -59,11 +59,19 @@ import {
 
 export default function Page() {
     const titulo = 'Aquisição de serviços'
+    const tipos_movimento : string[] = [
+        '1.2.31',
+        '1.2.32',
+        '1.2.33',
+        '1.2.34',
+        '1.2.35',
+    ];
     const router = useRouter()
     const searchParams = useSearchParams()
 
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
+    const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -78,13 +86,6 @@ export default function Page() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const tipos_movimento : string[] = [
-        '1.2.31',
-        '1.2.32',
-        '1.2.33',
-        '1.2.34',
-        '1.2.35',
-    ];
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
@@ -93,23 +94,23 @@ export default function Page() {
     const [totalPages, setTotalPages] = useState<number | null>(null);
     const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const [anexos, setAnexos] = useState<Anexo[]>([])
-    const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)    
-    const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)   
-    const [file, setFile] = useState<File | null>(null)  
-    const [fileName, setFileName] = useState<string>("")    
+    const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
+    const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
+    const [file, setFile] = useState<File | null>(null)
+    const [fileName, setFileName] = useState<string>("")
     const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
     const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
-    
+
     function changePage(newPage: number) {
         if (!iframeRef.current) return;
         setCurrentPage(newPage);
         iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
-      
+
     function clearQuery() {
         setQuery('')
     }
@@ -121,13 +122,14 @@ export default function Page() {
         }
     }
 
-    useEffect(() => {        
+    useEffect(() => {
         setDateFrom(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10));
         setDateTo(new Date().toISOString().substring(0, 10));
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());
+            setCodusuario(user.codusuario.toUpperCase());
         }
         handleSearch(searchParams.get('q') ?? '')
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,7 +155,7 @@ export default function Page() {
     async function handleSearch(q: string) {
         setIsLoading(true)
         setError(null)
-        try {      
+        try {
             const dados = await getAllRequisicoes(dateFrom ?? new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10))
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
@@ -174,7 +176,7 @@ export default function Page() {
         }
     }
 
-    
+
     async function handleSearchClick() {
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
@@ -185,17 +187,17 @@ export default function Page() {
         await handleSearch(query)
     }
 
-    async function handleDocumento (requisicao: RequisicaoDto) {
+    async function handleDocumento(requisicao: RequisicaoDto) {
         setIsLoading(true)
         setTotalPages(1);
-        setIsModalDocumentosOpen(true)  
+        setIsModalDocumentosOpen(true)
         setRequisicaoSelecionada(requisicao)
-        const arquivoBase64 = requisicao.requisicao.arquivo;        
+        const arquivoBase64 = requisicao.requisicao.arquivo;
         setRequisicaoDocumentoSelecionada(arquivoBase64);
 
         if (!window._pdfMessageListener) {
             window._pdfMessageListener = true;
-        
+
             window.addEventListener("message", (event) => {
                 if (event.data?.totalPages) {
                     setTotalPages(event.data.totalPages);
@@ -220,7 +222,7 @@ export default function Page() {
             handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
-            toast.error((err as Error).message)            
+            toast.error((err as Error).message)
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
@@ -231,36 +233,36 @@ export default function Page() {
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
         const overlay = e.currentTarget as HTMLDivElement;
         const rect = overlay.getBoundingClientRect();
-        
+
         const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
         const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
         const x2 = e.clientX - rect.left;
         const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2)  / rect.height;
-        
+        const yI = (rect.height - y2) / rect.height;
+
         setCoords({ x, y, x2, y2, yI });
     }
 
     async function confirmarAssinatura() {
         if (!coords) {
-          toast.error("Clique no local onde deseja assinar o documento.");
-          return;
-        }      
+            toast.error("Clique no local onde deseja assinar o documento.");
+            return;
+        }
         const dadosAssinatura: Assinar = {
-          idmov: requisicaoSelecionada!.requisicao.idmov,
-          arquivo: requisicaoSelecionada!.requisicao.arquivo,
-          pagina: currentPage,
-          posX: coords.x,
-          posY: coords.yI,
-          largura: 90,
-          altura: 30,
-        };      
+            idmov: requisicaoSelecionada!.requisicao.idmov,
+            arquivo: requisicaoSelecionada!.requisicao.arquivo,
+            pagina: currentPage,
+            posX: coords.x,
+            posY: coords.yI,
+            largura: 90,
+            altura: 30,
+        };
         await handleAssinar(dadosAssinatura);
-    }        
-    
+    }
+
     function handleImprimir() {
         if (!iframeRef.current) return;
-        
+
         const iframe = iframeRef.current as HTMLIFrameElement;
         const iframeWindow = iframe.contentWindow;
 
@@ -272,38 +274,38 @@ export default function Page() {
         }
     }
 
-    async function handleItens (requisicao: RequisicaoDto) {
+    async function handleItens(requisicao: RequisicaoDto) {
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
     }
 
-    async function handleAprovacoes (requisicao: RequisicaoDto) {
+    async function handleAprovacoes(requisicao: RequisicaoDto) {
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
     }
 
-    async function handleAprovar (id: number) {
+    async function handleAprovar(id: number) {
         setIsLoading(true)
         try {
             await aprovar(id)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
-        }  finally {
+        } finally {
             setIsLoading(false)
         }
     }
 
-    async function handleReprovar (id: number) {
+    async function handleReprovar(id: number) {
         setIsLoading(true)
         try {
             await reprovar(id)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
-        }  finally {
+        } finally {
             setIsLoading(false)
         }
     }
@@ -312,7 +314,7 @@ export default function Page() {
         setRequisicaoSelecionada(requisicao)
         setIsLoading(true)
         setError(null)
-        try {      
+        try {
             const dados = await getAllAnexos(requisicao.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
@@ -339,7 +341,7 @@ export default function Page() {
         try {
             await createAnexo(anexo)
             toast.success("Arquivo enviado com sucesso!")
-            setFile(null)                
+            setFile(null)
             const dados = await getAllAnexos(requisicaoSelecionada.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
@@ -347,9 +349,9 @@ export default function Page() {
         } finally {
             setIsLoading(false)
         }
-    }   
+    }
 
-    async function handleVisualizarAnexo (anexo: Anexo) {
+    async function handleVisualizarAnexo(anexo: Anexo) {
         setIsLoading(true)
         setTotalPagesAnexo(1);
         setIsModalVisualizarAnexoOpen(true)
@@ -357,7 +359,7 @@ export default function Page() {
 
         if (!window._pdfMessageListener) {
             window._pdfMessageListener = true;
-        
+
             window.addEventListener("message", (event) => {
                 if (event.data?.totalPages) {
                     setTotalPagesAnexo(event.data.totalPages);
@@ -373,12 +375,12 @@ export default function Page() {
         }, 500);
         setIsLoading(false)
     }
-    
-    async function handleExcluirAnexo () {
-        if (!deleteAnexoId) return            
+
+    async function handleExcluirAnexo() {
+        if (!deleteAnexoId) return
         try {
-            await deleteAnexo(deleteAnexoId)       
-            handleAnexos(requisicaoSelecionada!) 
+            await deleteAnexo(deleteAnexoId)
+            handleAnexos(requisicaoSelecionada!)
             setDeleteAnexoId(null)
         } catch (err) {
             toast.error((err as Error).message)
@@ -393,9 +395,9 @@ export default function Page() {
         try {
             await updateAnexo(data)
             toast.success("Assinatura enviada com sucesso!");
-            handleAnexos(requisicaoSelecionada!) 
+            handleAnexos(requisicaoSelecionada!)
         } catch (err) {
-            toast.error((err as Error).message)            
+            toast.error((err as Error).message)
         } finally {
             setIsModalVisualizarAnexoOpen(false)
             setSearched(true)
@@ -406,33 +408,33 @@ export default function Page() {
     function handleClickPdfAnexo(e: React.MouseEvent<HTMLDivElement>) {
         const overlay = e.currentTarget as HTMLDivElement;
         const rect = overlay.getBoundingClientRect();
-        
+
         const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
         const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
         const x2 = e.clientX - rect.left;
         const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2)  / rect.height;
-        
+        const yI = (rect.height - y2) / rect.height;
+
         setCoordsAnexo({ x, y, x2, y2, yI });
     }
 
     async function confirmarAssinaturaAnexo() {
         if (!coordsAnexo) {
-          toast.error("Clique no local onde deseja assinar o documento.");
-          return;
-        }      
+            toast.error("Clique no local onde deseja assinar o documento.");
+            return;
+        }
         const dadosAssinatura: AnexoAssinar = {
-          id: anexoSelecionado!.id,
-          anexo: anexoSelecionado!.anexo,
-          pagina: currentPageAnexo,
-          posX: coordsAnexo.x,
-          posY: coordsAnexo.yI,
-          largura: 90,
-          altura: 30,
-        };      
+            id: anexoSelecionado!.id,
+            anexo: anexoSelecionado!.anexo,
+            pagina: currentPageAnexo,
+            posX: coordsAnexo.x,
+            posY: coordsAnexo.yI,
+            largura: 90,
+            altura: 30,
+        };
         await handleAssinarAnexo(dadosAssinatura);
     }
-    
+
     function changePageAnexo(newPage: number) {
         if (!iframeAnexoRef.current) return;
         setCurrentPageAnexo(newPage);
@@ -441,7 +443,7 @@ export default function Page() {
 
     function handleImprimirAnexo() {
         if (!iframeAnexoRef.current) return;
-        
+
         const iframe = iframeAnexoRef.current as HTMLIFrameElement;
         const iframeWindow = iframe.contentWindow;
 
@@ -452,7 +454,7 @@ export default function Page() {
             toast.error("Não foi possível acessar o documento para impressão.");
         }
     }
-    
+
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
@@ -461,9 +463,9 @@ export default function Page() {
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
             { accessorKey: 'requisicao.nome_fornecedor', header: 'Fornecedor' },
             { accessorKey: 'requisicao.data_emissao', header: 'Data emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
-            { 
-                accessorKey: 'requisicao.valorbruto', 
-                header: 'Valor bruto', 
+            {
+                accessorKey: 'requisicao.valorbruto',
+                header: 'Valor bruto',
                 accessorFn: (row) => `R$ ${row.requisicao.valor_total.toFixed(2)}`
             },
             { accessorKey: 'requisicao.historico_movimento', header: 'Histórico' },
@@ -471,63 +473,67 @@ export default function Page() {
             {
                 id: 'actions',
                 header: 'Ações',
-                cell: ({ row }) => (
-                    <div className="flex gap-2">
-                        {row.original.requisicao.arquivo && (<Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDocumento(row.original)}
-                        >
-                            Documento
-                        </Button>)}
-                        {row.original.requisicao && (<Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAnexos(row.original)}
-                        >
-                            Anexos
-                        </Button>)}
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleItens(row.original)}
-                        >
-                            Itens
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAprovacoes(row.original)}
-                        >
-                            Aprovações
-                        </Button>
-                        {row.original.requisicao_aprovacoes.some(
-                                (ap) => ap.usuario === userName && ap.situacao != "A"
-                            )
-                            && (<Button
-                            size="sm"
-                            className="bg-green-500 hover:bg-green-600 text-white"
-                            onClick={() => handleAprovar(row.original.requisicao.idmov)}
-                        >
-                            Aprovar
-                        </Button>)}
-                        {row.original.requisicao_aprovacoes.some(
-                                (ap) => ap.usuario === userName && ap.situacao != "R"
-                            )
-                            && (<Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleReprovar(row.original.requisicao.idmov)}
-                        >
-                            Reprovar
-                        </Button>)}
-                    </div>
-                )
+                cell: ({ row }) => {
+                    const { requisicao, requisicao_aprovacoes } = row.original;
+                    const usuarioAprovador = requisicao_aprovacoes.some(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    );
+
+                    const nivelUsuario = row.original.requisicao_aprovacoes.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    )?.nivel ?? 1;
+
+                    const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && requisicao.status_movimento !== 'Concluído confirmado';
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && requisicao.status_movimento !== 'Cancelado';
+
+                    return (
+                        <div className="flex gap-2">
+                            {requisicao.arquivo && (
+                                <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                    Documento
+                                </Button>
+                            )}
+                            {requisicao && (
+                                <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
+                                    Anexos
+                                </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
+                                Itens
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
+                                Aprovações
+                            </Button>
+
+                            {podeAprovar && (
+                                <Button
+                                    size="sm"
+                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                    onClick={() => handleAprovar(requisicao.idmov)}
+                                >
+                                    Aprovar
+                                </Button>
+                            )}
+
+                            {podeReprovar && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleReprovar(requisicao.idmov)}
+                                >
+                                    Reprovar
+                                </Button>
+                            )}
+                        </div>
+                    );
+                }
             }
         ],
         [userName]
     )
-    
+
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
         () => [
             { accessorKey: 'centro_custo', header: 'Centro de custo' },
@@ -540,17 +546,17 @@ export default function Page() {
         []
         // eslint-disable-next-line react-hooks/exhaustive-deps
     )
-    
+
     const colunasAprovacoes = useMemo<ColumnDef<Requisicao_aprovacao>[]>(
         () => [
             { accessorKey: 'id', header: 'Id' },
-            { accessorKey: 'usuario', header: 'Usuário' },
+            { accessorKey: 'nome', header: 'Usuário' },
             { accessorKey: 'situacao', header: 'Situação' },
             { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
         ],
         []
     )
-    
+
     const colunasAnexos = useMemo<ColumnDef<Anexo>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
@@ -590,22 +596,22 @@ export default function Page() {
                         <div className="flex flex-col">
                             <Label htmlFor="dateFrom">Data de</Label>
                             <Input
-                            id="dateFrom"
-                            type="date"
-                            value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            className="w-40"
+                                id="dateFrom"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="w-40"
                             />
                         </div>
 
                         <div className="flex flex-col">
                             <Label htmlFor="dateTo">Data até</Label>
                             <Input
-                            id="dateTo"
-                            type="date"
-                            value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            className="w-40"
+                                id="dateTo"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="w-40"
                             />
                         </div>
                         {/* Botão de Filtros - Dropdown com checkboxes */}
@@ -673,8 +679,8 @@ export default function Page() {
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px] ">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
-                        </DialogHeader> 
-                        
+                        </DialogHeader>
+
                         {requisicaoItensSelecionada?.length > 0 && (
                             <Card className="p-4 my-4">
                                 <div className="flex justify-between border-b border-muted pb-1">
@@ -694,8 +700,8 @@ export default function Page() {
                             </Card>
                         )}
                         <div className="w-full">
-                            <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={loading} />         
-                        </div>  
+                            <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={loading} />
+                        </div>
                     </DialogContent>
                 </Dialog>
             )}
@@ -706,10 +712,10 @@ export default function Page() {
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
-                        </DialogHeader> 
+                        </DialogHeader>
                         <div className="w-full">
-                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />         
-                        </div>  
+                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />
+                        </div>
                     </DialogContent>
                 </Dialog>
             )}
@@ -727,39 +733,39 @@ export default function Page() {
                         {/* Área do PDF */}
                         <div className="relative w-full flex justify-center bg-gray-50">
                             {requisicaoDocumentoSelecionada ? (
-                            <>
-                                {/* PDF sem overflow interno */}
-                                <iframe
-                                    ref={iframeRef}
-                                    src="/pdf-viewer.html"
-                                    className="relative border-none  cursor-crosshair"
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        maxWidth: '800px',
-                                        aspectRatio: '1/sqrt(2)', // Proporção A4
-                                    }}
-                                    onClick={handleClickPdf}
-                                />
-
-                                {/* Overlay */}
-                                <div
-                                    id="assinatura-overlay"
-                                    className="absolute inset-0 cursor-crosshair"
-                                    onClick={handleClickPdf}
-                                />
-
-                                {/* Indicador visual */}
-                                {coords && (
-                                    <div
-                                        className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                <>
+                                    {/* PDF sem overflow interno */}
+                                    <iframe
+                                        ref={iframeRef}
+                                        src="/pdf-viewer.html"
+                                        className="relative border-none  cursor-crosshair"
                                         style={{
-                                            left: coords.x2 - 10,
-                                            top: coords.y2 - 10,
+                                            width: '100%',
+                                            height: '100%',
+                                            maxWidth: '800px',
+                                            aspectRatio: '1/sqrt(2)', // Proporção A4
                                         }}
+                                        onClick={handleClickPdf}
                                     />
-                                )}
-                            </>
+
+                                    {/* Overlay */}
+                                    <div
+                                        id="assinatura-overlay"
+                                        className="absolute inset-0 cursor-crosshair"
+                                        onClick={handleClickPdf}
+                                    />
+
+                                    {/* Indicador visual */}
+                                    {coords && (
+                                        <div
+                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                            style={{
+                                                left: coords.x2 - 10,
+                                                top: coords.y2 - 10,
+                                            }}
+                                        />
+                                    )}
+                                </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">
                                     Nenhum documento disponível
@@ -808,10 +814,10 @@ export default function Page() {
                 >
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
-                    </DialogHeader> 
+                    </DialogHeader>
                     <div className="flex flex-col items-center justify-center rounded-2xl p-6 shadow-lg">
                         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-                    <p className="text-sm text-gray-600 mt-2">Carregando</p>
+                        <p className="text-sm text-gray-600 mt-2">Carregando</p>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -822,10 +828,10 @@ export default function Page() {
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
-                        </DialogHeader> 
+                        </DialogHeader>
                         <div className="w-full">
-                            <DataTable columns={colunasAnexos} data={anexos} loading={loading} />         
-                        </div>  
+                            <DataTable columns={colunasAnexos} data={anexos} loading={loading} />
+                        </div>
                         {/* Ações */}
                         <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
                             <Input
@@ -866,39 +872,39 @@ export default function Page() {
                         {/* Área do PDF */}
                         <div className="relative w-full flex justify-center bg-gray-50">
                             {anexoSelecionado ? (
-                            <>
-                                {/* PDF sem overflow interno */}
-                                <iframe
-                                    ref={iframeAnexoRef}
-                                    src="/pdf-viewer.html"
-                                    className="relative border-none  cursor-crosshair"
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        maxWidth: '800px',
-                                        aspectRatio: '1/sqrt(2)', // Proporção A4
-                                    }}
-                                    onClick={handleClickPdfAnexo}
-                                />
-
-                                {/* Overlay */}
-                                <div
-                                    id="assinatura-overlay"
-                                    className="absolute inset-0 cursor-crosshair"
-                                    onClick={handleClickPdfAnexo}
-                                />
-
-                                {/* Indicador visual */}
-                                {coordsAnexo && (
-                                    <div
-                                        className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                <>
+                                    {/* PDF sem overflow interno */}
+                                    <iframe
+                                        ref={iframeAnexoRef}
+                                        src="/pdf-viewer.html"
+                                        className="relative border-none  cursor-crosshair"
                                         style={{
-                                            left: coordsAnexo.x2 - 10,
-                                            top: coordsAnexo.y2 - 10,
+                                            width: '100%',
+                                            height: '100%',
+                                            maxWidth: '800px',
+                                            aspectRatio: '1/sqrt(2)', // Proporção A4
                                         }}
+                                        onClick={handleClickPdfAnexo}
                                     />
-                                )}
-                            </>
+
+                                    {/* Overlay */}
+                                    <div
+                                        id="assinatura-overlay"
+                                        className="absolute inset-0 cursor-crosshair"
+                                        onClick={handleClickPdfAnexo}
+                                    />
+
+                                    {/* Indicador visual */}
+                                    {coordsAnexo && (
+                                        <div
+                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                            style={{
+                                                left: coordsAnexo.x2 - 10,
+                                                top: coordsAnexo.y2 - 10,
+                                            }}
+                                        />
+                                    )}
+                                </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">
                                     Nenhum documento disponível

@@ -42,6 +42,7 @@ import {
   updateElement as updateUsuario,
   deleteElement as deleteUsuario
 } from '@/services/usuariosService'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export default function PageUsuarios() {
   const titulo = 'Usuários'
@@ -64,16 +65,17 @@ export default function PageUsuarios() {
 
   const form = useForm<Usuario>({
     defaultValues: { 
-      SEQUENCIAL: 0,
-      CODUSUARIO: '',
-      NOME: '',
-      EMPRESA: '',
-      CODPERFIL: '',
-      DIRETORIA: '',
-      EMAIL: '',
-      ATIVO: true,
-      DATACRIACAO: '',
-      CODSISTEMA: '',
+      sequencial: 0,
+      codusuario: '',
+      nome: '',
+      empresa: '',
+      codperfil: '',
+      diretoria: '',
+      email: '',
+      ativo: true,
+      datacriacao: '',
+      codsistema: '',
+      admin: false,
     }
   })
 
@@ -112,20 +114,22 @@ export default function PageUsuarios() {
 
   async function handleSearch(q: string) {
     setError(null)
-    try {      
-      const dados = await getAllUsuarios()
+    try {            
+      const dados = await getAllUsuarios()      
       const qNorm = stripDiacritics(q.toLowerCase().trim())
+      console.log('q:', q)
+      console.log('qNorm:', stripDiacritics(q.toLowerCase().trim()))
+      console.log('dados exemplo:', dados[0])
       const filtrados = qNorm
         ? dados.filter(
-            p =>
+            p =>              
               (
-                stripDiacritics((p.NOME ?? '').toLowerCase()).includes(qNorm) ||
-                stripDiacritics((p.CODUSUARIO ?? '').toLowerCase()).includes(qNorm) ||
-                String(p.SEQUENCIAL ?? '').includes(qNorm)
+                stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
+                stripDiacritics((p.codusuario ?? '').toLowerCase()).includes(qNorm) ||
+                String(p.sequencial ?? '').includes(qNorm)
               )
           )
         : dados;
-
       setResults(filtrados)
     } catch (err) {
       setError((err as Error).message)
@@ -164,18 +168,21 @@ export default function PageUsuarios() {
     setUpdateMode(true)
     try {
       const response = await getUsuarioById(id)
+      console.log(response);
+      
       setResultById(response)
       form.reset({
-        SEQUENCIAL: response.SEQUENCIAL,
-        CODUSUARIO: response.CODUSUARIO,
-        NOME: response.NOME,
-        EMPRESA: response.EMPRESA,
-        CODPERFIL: response.CODPERFIL,
-        DIRETORIA: response.DIRETORIA,
-        EMAIL: response.EMAIL,
-        ATIVO: response.ATIVO,
-        DATACRIACAO: response.DATACRIACAO,
-        CODSISTEMA: response.CODSISTEMA,
+        sequencial: response.sequencial,
+        codusuario: response.codusuario,
+        nome: response.nome,
+        empresa: response.empresa,
+        codperfil: response.codperfil,
+        diretoria: response.diretoria,
+        email: response.email,
+        ativo: response.ativo,
+        datacriacao: response.datacriacao,
+        codsistema: response.codsistema,
+        admin: response.admin,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -185,16 +192,17 @@ export default function PageUsuarios() {
 
   function handleInsert() {
     form.reset({ 
-      SEQUENCIAL: 0,
-      CODUSUARIO: '',
-      NOME: '',
-      EMPRESA: '',
-      CODPERFIL: '',
-      DIRETORIA: '',
-      EMAIL: '',
-      ATIVO: true,
-      DATACRIACAO: '',
-      CODSISTEMA: '',
+      sequencial: 0,
+      codusuario: '',
+      nome: '',
+      empresa: '',
+      codperfil: '',
+      diretoria: '',
+      email: '',
+      ativo: true,
+      datacriacao: '',
+      codsistema: '',
+      admin: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -203,7 +211,7 @@ export default function PageUsuarios() {
   async function onSubmit(data: Usuario) {
     setError(null)
     try {
-      if (data.SEQUENCIAL && data.SEQUENCIAL !== 0) {
+      if (data.sequencial && data.sequencial !== 0) {
         await updateUsuario(data)        
       } else {
         await createUsuario(data)
@@ -232,14 +240,14 @@ export default function PageUsuarios() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleUpdate(row.original.SEQUENCIAL)}
+              onClick={() => handleUpdate(row.original.sequencial)}
             >
               Editar
             </Button>
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => setDeleteId(row.original.SEQUENCIAL)}
+              onClick={() => setDeleteId(row.original.sequencial)}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -302,7 +310,7 @@ export default function PageUsuarios() {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-center">
               {updateMode
-                ? `${tituloUpdate}: ${resultById?.SEQUENCIAL}`
+                ? `${tituloUpdate}: ${resultById?.sequencial}`
                 : `${tituloInsert}`}
             </DialogTitle>
           </DialogHeader>
@@ -311,7 +319,7 @@ export default function PageUsuarios() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               <FormField
                 control={form.control}
-                name="CODUSUARIO"
+                name="codusuario"
                 rules={{ required: 'Usuário é obrigatório' }}
                 render={({ field }) => (
                   <FormItem>
@@ -326,7 +334,7 @@ export default function PageUsuarios() {
 
               <FormField
                 control={form.control}
-                name="NOME"
+                name="nome"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>NOME</FormLabel>
@@ -340,7 +348,7 @@ export default function PageUsuarios() {
 
               <FormField
                 control={form.control}
-                name="EMPRESA"
+                name="empresa"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>EMPRESA</FormLabel>
@@ -369,7 +377,7 @@ export default function PageUsuarios() {
 
               <FormField
                 control={form.control}
-                name="DIRETORIA"
+                name="diretoria"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>DIRETORIA</FormLabel>
@@ -383,12 +391,29 @@ export default function PageUsuarios() {
 
               <FormField
                 control={form.control}
-                name="EMAIL"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>EMAIL</FormLabel>
                     <FormControl>
                       <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="admin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Admin</FormLabel>
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

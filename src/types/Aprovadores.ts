@@ -4,5 +4,6 @@ export type Aprovadores = {
     usuario: string,
     cargo: string,
     valor_inicial: number,
-    valor_final: number
+    valor_final: number,
+    nivel: number
 }
