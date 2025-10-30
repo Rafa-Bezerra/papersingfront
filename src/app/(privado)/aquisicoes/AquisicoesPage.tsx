@@ -56,10 +56,12 @@ import {
     updateElement as updateAnexo,
     deleteElement as deleteAnexo
 } from '@/services/anexoService';
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 export default function Page() {
     const titulo = 'Aquisição de serviços'
-    const tipos_movimento : string[] = [
+    const tipos_movimento: string[] = [
         '1.2.31',
         '1.2.32',
         '1.2.33',
@@ -131,11 +133,7 @@ export default function Page() {
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
         }
-        handleSearch(searchParams.get('q') ?? '')
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
 
-    useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => {
             startTransition(() => {
@@ -342,6 +340,7 @@ export default function Page() {
             await createAnexo(anexo)
             toast.success("Arquivo enviado com sucesso!")
             setFile(null)
+            setFileName("")
             const dados = await getAllAnexos(requisicaoSelecionada.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
@@ -455,20 +454,32 @@ export default function Page() {
         }
     }
 
+    const handleDownloadAll = async () => {
+        if (!anexos?.length) return;
+        const zip = new JSZip();
+        const folder = zip.folder("anexos");
+        for (const anexo of anexos) {
+            try {
+                const byteCharacters = atob(anexo.anexo);
+                const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: "application/pdf" });
+                const nomeArquivo = `${anexo.nome}.pdf`;
+                folder!.file(nomeArquivo, blob);
+            } catch (err) {
+                console.error("Erro ao baixar anexo:", anexo, err);
+            }
+        }
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, `anexos_mov_${requisicaoSelecionada!.requisicao.idmov}.zip`);
+    };
+
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
-            { accessorKey: 'requisicao.nome_fornecedor', header: 'Fornecedor' },
-            { accessorKey: 'requisicao.data_emissao', header: 'Data emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
-            {
-                accessorKey: 'requisicao.valorbruto',
-                header: 'Valor bruto',
-                accessorFn: (row) => `R$ ${row.requisicao.valor_total.toFixed(2)}`
-            },
-            { accessorKey: 'requisicao.historico_movimento', header: 'Histórico' },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
                 id: 'actions',
@@ -536,11 +547,11 @@ export default function Page() {
 
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
         () => [
-            { accessorKey: 'centro_custo', header: 'Centro de custo' },
+            { accessorKey: 'centro_custo', header: 'Centro de custo', accessorFn: (row) => row.centro_custo + ' - ' + (row.nome_centro_custo ?? '-') },
             { accessorKey: 'codigo_item_movimento', header: 'Cod. Item' },
-            { accessorKey: 'item_preco_unitario', header: 'Quantidade' },
+            { accessorKey: 'item_preco_unitario', header: 'Preço unitário' },
             { accessorKey: 'item_quantidade', header: 'Quantidade' },
-            { accessorKey: 'item_total', header: 'Quantidade' },
+            { accessorKey: 'item_total', header: 'Total' },
             { accessorKey: 'historico_item', header: 'Histórico' }
         ],
         []
@@ -676,7 +687,7 @@ export default function Page() {
             {/* Itens */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px] ">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -690,12 +701,32 @@ export default function Page() {
 
                                 <div className="flex justify-between border-b border-muted pb-1">
                                     <span className="font-semibold text-muted-foreground">Natureza Orçamentária:</span>
-                                    <span>{requisicaoItensSelecionada[0]?.nome_natureza_orcamentaria ?? "-"}</span>
+                                    <span>{requisicaoItensSelecionada[0]?.codigo_natureza_orcamentaria} - {requisicaoItensSelecionada[0]?.nome_natureza_orcamentaria ?? "-"}</span>
                                 </div>
 
                                 <div className="flex justify-between">
                                     <span className="font-semibold text-muted-foreground">Etapa:</span>
                                     <span>{requisicaoSelecionada.requisicao.nome_etapa ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Fornecedor:</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_fornecedor ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Data emissão:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.data_emissao) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Valor bruto:</span>
+                                    <span>{requisicaoSelecionada.requisicao.valor_total.toFixed(2) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Histórico:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.historico_movimento) ?? "-"}</span>
                                 </div>
                             </Card>
                         )}
@@ -853,6 +884,14 @@ export default function Page() {
                                 className="flex items-center"
                             >
                                 {isLoading ? "Enviando..." : "Anexar documento"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleDownloadAll}
+                                disabled={!anexos?.length}
+                                className="flex items-center gap-2"
+                            >
+                                Baixar todos
                             </Button>
                         </div>
                     </DialogContent>
