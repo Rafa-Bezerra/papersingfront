@@ -7,6 +7,7 @@ export type RequisicaoDto = {
 export type Requisicao = {
     codcoligada: number,
     idmov: number,
+    documento_assinado: number,
     codigo_atendimento: string,
     movimento: string,
     tipo_movimento: string,
@@ -19,6 +20,7 @@ export type Requisicao = {
     historico_movimento: string,
     nome_etapa: string,
     arquivo: string,
+    quantidade_anexos: number,
     requisicao_itens: Requisicao_item[],
     requisicao_aprovacoes?: Requisicao_aprovacao[]
 }

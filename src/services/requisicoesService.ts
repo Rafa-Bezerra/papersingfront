@@ -4,19 +4,22 @@ const caminho = "Requisicoes";
 const elemento_singular = "requisição";
 const elemento_plural = "requisições";
 
-export async function getAll(dateFrom: string, dateTo: string): Promise<RequisicaoDto[]> {
+export async function getAll(dateFrom: string, dateTo: string, movimentos: string[]): Promise<RequisicaoDto[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
-    if (dateFrom) url.searchParams.append('dateFrom', dateFrom);
-    if (dateTo) url.searchParams.append('dateTo', dateTo);
     
+    const body = { dateFrom, dateTo, movimentos };
+
     const res = await fetch(url.toString(), {
+        method: 'POST',
         headers: headers(),
+        body: JSON.stringify(body),
     });
 
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
     }
+    
     const list: RequisicaoDto[] = await res.json();
     return list;
 }

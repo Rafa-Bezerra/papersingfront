@@ -15,7 +15,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Filter, SearchIcon, X } from 'lucide-react'
+import { Check, Filter, SearchIcon, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -118,8 +118,10 @@ export default function Page() {
     }
 
     useEffect(() => {
-        setDateFrom(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10));
-        setDateTo(new Date().toISOString().substring(0, 10));
+        if (dateFrom === "" && dateTo === "") {
+            setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
+            setDateTo(new Date().toISOString().substring(0, 10));
+        }
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
@@ -150,7 +152,7 @@ export default function Page() {
         setError(null)
         try {
             console.log("Buscando dados com filtro:", { filtroDashboard });
-            const dados = await getAllRequisicoes(dateFrom ?? new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10))
+            const dados = await getAllRequisicoes(dateFrom ?? new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10), [])
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -507,19 +509,27 @@ export default function Page() {
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && requisicao.status_movimento !== 'Concluído confirmado';
-                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && requisicao.status_movimento !== 'Cancelado';
+                    const usuarioAprovou = requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
+                    );
+
+                    const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
+
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
 
                     return (
                         <div className="flex gap-2">
                             {requisicao.arquivo && (
                                 <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
-                                    Documento
+                                    Documento {requisicao.documento_assinado == 1 && (
+                                        <Check className="w-4 h-4 text-green-500" />
+                                    )}
                                 </Button>
                             )}
                             {requisicao && (
                                 <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                    Anexos
+                                    Anexos {row.original.requisicao.quantidade_anexos > 0 ? `(${row.original.requisicao.quantidade_anexos})` : ''}
                                 </Button>
                             )}
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
@@ -593,7 +603,9 @@ export default function Page() {
                             variant="outline"
                             onClick={() => handleVisualizarAnexo(row.original)}
                         >
-                            Visualizar
+                            Visualizar {row.original.documento_assinado == 1 && (
+                                <Check className="w-4 h-4 text-green-500" />
+                            )}
                         </Button>)}
                         {row.original.anexo && (<Button
                             size="sm"
@@ -833,9 +845,9 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
-                            <Button onClick={confirmarAssinatura} className="flex items-center">
+                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
-                            </Button>
+                            </Button>)}
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimir()}
@@ -980,9 +992,9 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
-                            <Button onClick={confirmarAssinaturaAnexo} className="flex items-center">
+                            {(anexoSelecionado.documento_assinado == 0 && <Button onClick={confirmarAssinaturaAnexo} className="flex items-center">
                                 Assinar
-                            </Button>
+                            </Button>)}
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimirAnexo()}

@@ -1,6 +1,7 @@
 export type Anexo = {
     id: number,
     idmov: number,
+    documento_assinado: number,
     anexo: string,
     nome: string
 }
