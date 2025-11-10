@@ -21,6 +21,7 @@ export const data = {
         { title: "Ordem de compra", url: "/ordens" },
         { title: "Aquisição de serviços", url: "/aquisicoes" },
         { title: "Outras movimentações", url: "/outras" },
+        { title: "Documentos", url: "/documentos" },
         { title: "Alçadas", url: "/alcadas" },
         { title: "Usuários", url: "/usuarios" },
       ],

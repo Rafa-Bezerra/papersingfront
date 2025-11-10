@@ -93,6 +93,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Ordem de compra': <FileText className="w-5 h-5" />,
     'Aquisição de serviços': <Briefcase className="w-5 h-5" />,
     'Outras movimentações': <MoreHorizontal className="w-5 h-5" />,
+    'Documentos': <FileText className="w-5 h-5" />,
     Alçadas: <Users className="w-5 h-5" />,
     Usuários: <User className="w-5 h-5" />
   }
