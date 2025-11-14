@@ -1,6 +1,8 @@
 import { differenceInYears, format, parseISO, isValid } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import SignatureCanvas from "react-signature-canvas";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export type BadgeStatus = 'active' | 'pending' | 'expired' | 'atendendo'
 
@@ -180,6 +182,59 @@ export function toBase64(file: File): Promise<string> {
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = (error) => reject(error)
   })
+}
+export async function uint8ArraytoBase64(file: Uint8Array): Promise<string> {
+    let binary = '';
+    const bytes = new Uint8Array(file);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+export async function htmlToPdfBase64(html: string): Promise<string> {
+    // cria container invisível
+    const div = document.createElement("div");
+    div.style.position = "fixed";
+    div.style.left = "-9999px";
+    div.style.top = "0";
+    div.style.width = "800px"; // largura aproximada A4
+    div.style.background = "#fff";
+    div.style.color = "#000";
+    div.style.fontFamily = "Arial, sans-serif";
+
+    // força reset para TODAS as cores
+    div.innerHTML = `
+        <style>
+            * {
+                color: #000 !important;
+                background-color: #fff !important;
+                border-color: #000 !important;
+            }
+        </style>
+        ${html}
+    `;
+
+    document.body.appendChild(div);
+
+    const canvas = await html2canvas(div, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#fff", // garante fundo branco
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+    document.body.removeChild(div);
+
+    return pdf.output("datauristring").split(",")[1]; // base64 puro
 }
 
 export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): string {
