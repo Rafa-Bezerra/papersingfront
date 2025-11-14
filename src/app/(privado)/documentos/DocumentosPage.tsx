@@ -15,7 +15,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,21 @@ import {
     FormLabel,
     FormMessage
 } from '@/components/ui/form'
+import { useFieldArray } from "react-hook-form";
+import {
+    Usuario,
+    getAll as getAllUsuarios
+} from '@/services/usuariosService'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Command,
+    CommandInput,
+    CommandList,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+} from "@/components/ui/command"
+import { PopoverPortal } from '@radix-ui/react-popover';
 
 export default function Page() {
     const titulo = 'Documentos para Assinatura'
@@ -81,6 +96,7 @@ export default function Page() {
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [file, setFile] = useState<File | null>(null)
+    const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
     const form = useForm<Documento>({
         defaultValues: {
@@ -88,6 +104,7 @@ export default function Page() {
             data_prazo: '',
             anexo: '',
             nome: '',
+            aprovadores: []
         }
     })
 
@@ -113,6 +130,28 @@ export default function Page() {
         if (e.key === 'Enter') {
             e.preventDefault()
             handleSearchClick()
+        }
+    }
+
+    const carregou = useRef(false)
+    useEffect(() => {
+        if (carregou.current) return;
+        buscaUsuarios();
+    }, [])
+
+    async function buscaUsuarios() {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllUsuarios()
+            setUsuarios(dados)
+            carregou.current = true;
+        } catch (err) {
+            setError((err as Error).message)
+            setUsuarios([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
         }
     }
 
@@ -143,6 +182,7 @@ export default function Page() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, situacaoFiltrada, dateFrom, dateTo])
+
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -281,6 +321,7 @@ export default function Page() {
             data_prazo: '',
             anexo: '',
             nome: '',
+            aprovadores: []
         })
         setUpdateDocumentoMode(false)
         setIsFormDocumentoOpen(true)
@@ -684,6 +725,9 @@ export default function Page() {
                                 )}
                             />
 
+                            {/* --- Aprovadores (useFieldArray) --- */}
+                            <AprovadoresSection form={form} usuarios={usuarios} />
+
                             <Button type="submit" disabled={loading}>
                                 {loading ? 'Salvando…' : 'Salvar'}
                             </Button>
@@ -805,4 +849,121 @@ export default function Page() {
             )}
         </div>
     )
+}
+
+function AprovadoresSection({ form, usuarios }: { form: any, usuarios: Usuario[] }) {
+    const { control, register } = form;
+    const [openIndex, setOpenIndex] = useState<number | null>(null);
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: "aprovadores"
+    });
+
+    return (
+        <div className="flex flex-col gap-2 border p-3 rounded-md">
+            <label className="font-semibold">Aprovadores</label>
+
+            {fields.map((field, index) => (
+                <div
+                    key={field.id}
+                    className="grid grid-cols-3 gap-2 items-end border p-2 rounded"
+                >
+                    {/* Usuário (Select com busca) */}
+                    <div className="flex flex-col">
+                        <label>Usuário</label>
+
+                        <FormField
+                            control={form.control}
+                            name={`aprovadores.${index}.usuario`}
+                            rules={{ required: "Usuário obrigatório" }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <Popover
+                                            open={openIndex === index}
+                                            onOpenChange={(o) => setOpenIndex(o ? index : null)}
+                                        >
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-between"
+                                                >
+                                                    {
+                                                        usuarios.find(u => u.codusuario === field.value)?.nome ??
+                                                        "Selecione o usuário"
+                                                    }
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverPortal>
+                                                <PopoverContent
+                                                    className="p-0 w-[250px] pointer-events-auto overflow-visible z-[9999]"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Command>
+                                                        <CommandInput placeholder="Buscar usuário..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+
+                                                            <CommandGroup>
+                                                                {usuarios.map((u) => (
+                                                                    <CommandItem
+                                                                        key={u.codusuario}
+                                                                        value={u.codusuario}
+                                                                        onSelect={() => {
+                                                                            field.onChange(u.codusuario)
+                                                                            setOpenIndex(null)
+                                                                        }}
+                                                                    >
+                                                                        {u.nome}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </PopoverPortal>
+                                        </Popover>
+                                    </FormControl>
+
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+
+                    {/* Ordem */}
+                    <div className="flex flex-col">
+                        <label>Ordem</label>
+                        <Input
+                            type="number"
+                            {...register(`aprovadores.${index}.ordem`, {
+                                required: "Ordem obrigatória",
+                                valueAsNumber: true,
+                            })}
+                        />
+                    </div>
+
+                    {/* Remover */}
+                    <Button
+                        type="button"
+                        onClick={() => remove(index)}
+                        variant="destructive"
+                    >
+                        Remover
+                    </Button>
+                </div>
+            ))}
+
+            <Button
+                type="button"
+                variant="secondary"
+                onClick={() => append({ usuario: "", ordem: fields.length + 1 })}
+            >
+                + Adicionar aprovador
+            </Button>
+        </div>
+    );
 }
