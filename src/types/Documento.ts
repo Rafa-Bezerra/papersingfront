@@ -10,9 +10,9 @@ export type Documento = {
 }
 
 export type DocumentoAprovacao = {
-    id: number,
-    data_aprovacao: string,
-    aprovacao: string,
+    id?: number,
+    data_aprovacao?: string,
+    aprovacao?: string,
     ordem: number,
     usuario: string,
 }

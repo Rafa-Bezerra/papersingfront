@@ -34,11 +34,11 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { htmlToPdfBase64, safeDateLabel, stripDiacritics, toBase64, uint8ArraytoBase64 } from '@/utils/functions'
+import { htmlToPdfBase64, safeDateLabel, stripDiacritics } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement } from '@/services/comunicadoService';
-import { useForm } from 'react-hook-form';
+import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
     FormControl,
@@ -810,7 +810,7 @@ export default function Page() {
     )
 }
 
-function AprovadoresComunicadosSection({ form, usuarios }: { form: any, usuarios: Usuario[] }) {
+function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn<Comunicado>, usuarios: Usuario[] }) {
     const { control } = form;
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const { fields, append, remove } = useFieldArray({
@@ -907,7 +907,7 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: any, usuarios
             <Button
                 type="button"
                 variant="secondary"
-                onClick={() => append({ usuario: "", ordem: fields.length + 1 })}
+                onClick={() => append({ usuario: "" })}
             >
                 + Adicionar aprovador
             </Button>

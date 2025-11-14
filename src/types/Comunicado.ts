@@ -9,11 +9,11 @@ export type Comunicado = {
 }
 
 export type ComunicadoAprovacao = {
-    id: number,
-    data_aprovacao: string,
-    aprovacao: string,
+    id?: number,
+    data_aprovacao?: string,
+    aprovacao?: string,
     usuario: string,
-    nome: string,
+    nome?: string,
 }
 
 export type ComunicadoAssinar = {

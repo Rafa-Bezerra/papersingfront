@@ -38,7 +38,7 @@ import { safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, createElement, deleteElement, Documento, DocumentoAprovacao, DocumentoAssinar, getAll, updateElement } from '@/services/documentoService';
-import { useForm } from 'react-hook-form';
+import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
     FormControl,
@@ -851,7 +851,7 @@ export default function Page() {
     )
 }
 
-function AprovadoresSection({ form, usuarios }: { form: any, usuarios: Usuario[] }) {
+function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>, usuarios: Usuario[] }) {
     const { control, register } = form;
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const { fields, append, remove } = useFieldArray({
