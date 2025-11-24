@@ -27,6 +27,13 @@ export function safeDate(iso?: string) {
   }
 }
 
+export function toMoney(value: number) {
+  return Number(value).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
 export function safeDateLabel(iso?: string) {
   const dt = safeDate(iso)
   return dt ? format(dt, 'dd/MM/yyyy', { locale: ptBR }) : '—'

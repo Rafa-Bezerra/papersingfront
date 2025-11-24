@@ -565,7 +565,6 @@ export default function Page() {
             // { accessorKey: 'historico_item', header: 'Histórico' }
         ],
         []
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     )
 
     const colunasAprovacoes = useMemo<ColumnDef<Requisicao_aprovacao>[]>(
@@ -607,7 +606,7 @@ export default function Page() {
                 )
             }
         ],
-        [userName]
+        []
     )
 
     return (

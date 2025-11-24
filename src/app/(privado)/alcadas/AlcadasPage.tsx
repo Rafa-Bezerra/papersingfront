@@ -193,7 +193,6 @@ export default function Page() {
         })
         setUpdateAlcadaMode(true)
         setIsFormAlcadaOpen(true)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }
 
     async function handleExcluir () {
@@ -254,7 +253,6 @@ export default function Page() {
         setAprovadorSelecionado(aprovador)
         setUpdateAprovadoresMode(false)
         setIsFormAprovadoresOpen(true)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }
 
     async function handleExcluirAprovador () {

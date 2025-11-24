@@ -18,6 +18,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  TableFooter,
 } from "./table";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
@@ -108,6 +109,22 @@ export function DataTable<TData>({
             </TableRow>
           ))}
         </TableBody>
+        <TableFooter>
+          {table.getFooterGroups().map((footerGroup) => (
+            <TableRow key={footerGroup.id}>
+              {footerGroup.headers.map((header) => (
+                <TableCell key={header.id} className="font-semibold bg-muted">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                      header.column.columnDef.footer,
+                      header.getContext()
+                    )}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableFooter>
       </Table>
       {/* Pagination */}
       <div className="flex items-center justify-between pt-4">

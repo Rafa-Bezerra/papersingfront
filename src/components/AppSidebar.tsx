@@ -95,6 +95,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Outras movimentações': <MoreHorizontal className="w-5 h-5" />,
     'Documentos': <FileText className="w-5 h-5" />,
     'Comunicados': <FileText className="w-5 h-5" />,
+    'Borderô': <FileText className="w-5 h-5" />,
+    'Aprovadores Borderô': <Users className="w-5 h-5" />,
     Alçadas: <Users className="w-5 h-5" />,
     Usuários: <User className="w-5 h-5" />
   }

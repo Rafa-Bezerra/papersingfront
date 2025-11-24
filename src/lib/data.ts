@@ -23,6 +23,8 @@ export const data = {
         { title: "Outras movimentações", url: "/outras" },
         { title: "Documentos", url: "/documentos" },
         { title: "Comunicados", url: "/comunicados" },
+        { title: "Borderô", url: "/bordero" },
+        { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
         { title: "Usuários", url: "/usuarios" },
       ],
