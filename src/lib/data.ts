@@ -24,6 +24,7 @@ export const data = {
         { title: "Documentos", url: "/documentos" },
         { title: "Comunicados", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
+        { title: "Carrinho", url: "/carrinho" },
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
         { title: "Usuários", url: "/usuarios" },
