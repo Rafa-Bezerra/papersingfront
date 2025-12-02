@@ -1,4 +1,5 @@
 import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho } from "@/types/Carrinho";
+import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Solicitacao";
 const elemento_singular = "produto";
@@ -42,6 +43,23 @@ export async function createElement(data: Carrinho): Promise<void> {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
     }
+}
+
+export async function getUltimasRequisicoes(): Promise<RequisicaoDto[]> {
+    const url = new URL(`${API_BASE}/api/${caminho}/ultimasrequisicoes`);
+
+    const res = await fetch(url.toString(), {
+        method: 'GET',
+        headers: headers()
+    });
+
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
+    }
+    
+    const list: RequisicaoDto[] = await res.json();
+    return list;
 }
 
 export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto }

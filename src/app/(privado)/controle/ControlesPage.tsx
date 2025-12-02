@@ -87,7 +87,7 @@ export default function Page() {
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -125,7 +125,7 @@ export default function Page() {
 
     useEffect(() => {
         if (dateFrom === "" && dateTo === "") {
-            setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
+            setDateFrom(new Date().toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
         }
         const storedUser = localStorage.getItem("userData");
@@ -155,7 +155,7 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAllRequisicoes(dateFrom ?? new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10), tipos_movimento)
+            const dados = await getAllRequisicoes(dateFrom ?? new Date().toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10), tipos_movimento, situacaoFiltrada)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())

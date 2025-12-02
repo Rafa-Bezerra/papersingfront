@@ -6,6 +6,7 @@ export type ItemCarrinho = {
     ccusto: string;
     custo?: string;
     quantidade?: number;
+    valor?: number;
     descricao?: string;
 };
 

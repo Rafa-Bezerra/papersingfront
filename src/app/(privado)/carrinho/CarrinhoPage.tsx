@@ -2,6 +2,7 @@
 
 import React, {
     useEffect,
+    useMemo,
     useState,
 } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,33 +12,84 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Loader2, Trash2 } from "lucide-react";
-import { Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, ItemCarrinho, Produto } from '@/services/carrinhoService';
-import { Label } from '@radix-ui/react-label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChevronsUpDown, Loader2, Trash2 } from "lucide-react";
+import { Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { useForm } from "react-hook-form"
+import {
+    Form,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+    FormControl
+} from "@/components/ui/form"
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+    Command,
+    CommandInput,
+    CommandList,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+} from "@/components/ui/command"
+import { Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
+import { safeDateLabel } from '@/utils/functions';
+import { DataTable } from '@/components/ui/data-table';
+import { ColumnDef } from '@tanstack/react-table';
 
 export default function Page() {
     const titulo = 'Carrinho de Compras'
     const [isLoading, setIsLoading] = useState(false)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
+    const [results, setResults] = useState<RequisicaoDto[]>([])
+    const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
+    const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [produtos, setProdutos] = useState<Produto[]>([])
-    const [carrinho, setCarrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [] })
+    const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemCarrinho[]>([])
     const [error, setError] = useState<string | null>(null)
+    const [openTmovSearch, setOpenTmovSearch] = useState(false)
+    const [openProdutoSearch, setOpenProdutoSearch] = useState(false)
+    const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
+    const [openCodcontaSearch, setOpenCodcontaSearch] = useState(false)
+    const [isModalItensOpen, setIsModalItensOpen] = useState(false)
 
-    const [form_centroCusto, setFormCentroCusto] = useState('')
-    const [form_codconta, setFormCodconta] = useState('')
-    const [form_produto, setFormProduto] = useState('')
-    const [form_qtd, setFormQtd] = useState('')
-    const [form_item_desc, setFormItemDesc] = useState('')
+    const form = useForm<Carrinho>({
+        defaultValues: {
+            descricao: "",
+            tipo_movimento: "",
+            itens: []
+        }
+    })
 
+    const formItem = useForm<ItemCarrinho>({
+        defaultValues: {
+            ccusto: "",
+            codconta: "",
+            idprd: undefined,
+            quantidade: 1,
+            valor: 0,
+            descricao: ""
+        }
+    });
+
+    const movimentos = [
+        { value: "1.1.01", label: "1.1.01 - Requisição de compra" },
+        { value: "1.1.02", label: "1.1.02 - Requisições administrativas" },
+        { value: "1.1.04", label: "1.1.04 - Requisição de sistemas - Terceiros" },
+        { value: "1.1.05", label: "1.1.05 - Requisição manutenção" },
+        { value: "1.1.10", label: "1.1.10 - Requisição de adiantamento" },
+        { value: "1.1.11", label: "1.1.11 - Requisição de RDV" },
+        { value: "1.1.12", label: "1.1.12 - Requisição de estoque" },
+    ];
 
     useEffect(() => {
         buscaCentrosDeCusto();
+        buscaUltimasRequisicoes();
     }, [])
 
     async function buscaCentrosDeCusto() {
@@ -48,6 +100,20 @@ export default function Page() {
             setCentrosDeCusto(dados)
             setContasFinanceiras([])
             setProdutos([])
+        } catch (err) {
+            setError((err as Error).message)
+            setCentrosDeCusto([])
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function buscaUltimasRequisicoes() {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getUltimasRequisicoes()
+            setResults(dados)
         } catch (err) {
             setError((err as Error).message)
             setCentrosDeCusto([])
@@ -85,9 +151,11 @@ export default function Page() {
         }
     }
 
-    async function handleSubmit() {
+    async function onSubmit() {
         setIsLoading(true)
         setError(null)
+        carrinho.descricao = form.getValues("descricao")
+        carrinho.tipo_movimento = form.getValues("tipo_movimento")
         carrinho.itens = produtosSubmit
         try {
             await createElement(carrinho)
@@ -101,108 +169,367 @@ export default function Page() {
     }
 
     function adicionarItem() {
-        const item = produtos.find(p => p.idprd.toString() === form_produto)
-        if (!item) return
-        const novo: ItemCarrinho = {
-            idprd: item.idprd,
-            produto: item.produto,
-            codconta: form_codconta,
-            descricao: form_item_desc,
-            ccusto: form_centroCusto,
-            quantidade: Number(form_qtd)
-        }
-        setProdutosSubmit(prev => [...prev, novo])
-        setFormProduto('')
-        setFormQtd('')
-        setFormItemDesc('')
+        console.log('adicionarItem');
+        const item: ItemCarrinho = formItem.getValues()
+        const produto = produtos.find(p => p.idprd === item.idprd)
+        item.produto = produto?.produto ?? "";
+        console.log(item);
+        setProdutosSubmit(prev => [...prev, item])
+        formItem.reset()
     }
 
     function removerItem(index: number) {
         setProdutosSubmit(prev => prev.filter((_, i) => i !== index))
     }
 
+    async function handleItens(requisicao: RequisicaoDto) {
+        setIsModalItensOpen(true)
+        setRequisicaoSelecionada(requisicao)
+        setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+    }
+
+    const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
+        () => [
+            { accessorKey: 'requisicao.idmov', header: 'ID' },
+            { accessorKey: 'requisicao.movimento', header: 'Movimento' },
+            { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    return (
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
+                                Itens
+                            </Button>
+                        </div>
+                    );
+                }
+            }
+        ],
+        []
+    )
+
+    const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
+        () => [
+            { accessorKey: 'centro_custo', header: 'Centro de custo', accessorFn: (row) => row.centro_custo + ' - ' + (row.nome_centro_custo ?? '-') },
+            { accessorKey: 'codigo_item_movimento', header: 'Cod. Item' },
+            { accessorKey: 'item_preco_unitario', header: 'Preço unitário' },
+            { accessorKey: 'item_quantidade', header: 'Quantidade' },
+            { accessorKey: 'item_total', header: 'Total' },
+            // { accessorKey: 'historico_item', header: 'Histórico' }
+        ],
+        []
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    )
+
     return (
         <div className="p-6">
+            <Card className="mb-6">
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-2xl font-bold">Últimas requisições</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col">
+                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                </CardContent>
+            </Card>
+
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div>
-                        <Label>Tipo de movimento</Label>
-                        <Select onValueChange={v => setCarrinho({ ...carrinho, tipo_movimento: v })}>
-                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem key={1} value={"1.1.01"}>{"1.1.01 - Requisição de compra"}</SelectItem>
-                                <SelectItem key={2} value={"1.1.02"}>{"1.1.02 - Requisições administrativas"}</SelectItem>
-                                <SelectItem key={3} value={"1.1.04"}>{"1.1.04 - Requisição de sistemas - Terceiros"}</SelectItem>
-                                <SelectItem key={4} value={"1.1.05"}>{"1.1.05 - Requisição manutenção"}</SelectItem>
-                                <SelectItem key={5} value={"1.1.10"}>{"1.1.10 - Requisição de adiantamento"}</SelectItem>
-                                <SelectItem key={6} value={"1.1.11"}>{"1.1.11 - Requisição de RDV"}</SelectItem>
-                                <SelectItem key={7} value={"1.1.12"}>{"1.1.12 - Requisição de estoque"}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <Label>Descrição do Carrinho</Label>
-                        <Input
-                            value={carrinho.descricao}
-                            onChange={e => setCarrinho({ ...carrinho, descricao: e.target.value })}
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4"></form>
+                        <FormField
+                            control={form.control}
+                            name="tipo_movimento"
+                            rules={{ required: "Tipo obrigatório" }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Tipo de movimento</FormLabel>
+                                    <FormControl>
+                                        <Popover open={openTmovSearch} onOpenChange={setOpenTmovSearch}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-between"
+                                                    onClick={() => setOpenTmovSearch(true)}
+                                                >
+                                                    {field.value
+                                                        ? movimentos.find(m => m.value === field.value)?.label
+                                                        : "Selecione"}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+
+                                            <PopoverContent
+                                                className="p-0 w-[600px]"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Command
+                                                    filter={(value, search) => {
+                                                        const label = movimentos.find(m => m.value === value)?.label || ""
+                                                        const searchLower = search.toLowerCase()
+
+                                                        return (
+                                                            label.toLowerCase().includes(searchLower) ||
+                                                            value.toLowerCase().includes(searchLower)
+                                                        ) ? 1 : 0
+                                                    }}
+                                                >                                                    <CommandInput placeholder="Buscar..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+
+                                                        <CommandGroup>
+                                                            {movimentos.map(m => (
+                                                                <CommandItem
+                                                                    key={m.value}
+                                                                    value={m.value}
+                                                                    onSelect={() => {
+                                                                        field.onChange(m.value)
+                                                                        setOpenTmovSearch(false)
+                                                                    }}
+                                                                >
+                                                                    {m.label}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
                         />
-                    </div>
 
 
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <Label>Centro de Custo</Label>
-                            <Select onValueChange={v => { setFormCentroCusto(v); handleSelectedCentroDeCusto(v); }}>
-                                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                                <SelectContent>
-                                    {centrosDeCusto.map((x, i) => (
-                                        <SelectItem key={i} value={x.ccusto}>{x.ccusto + " - " + x.custo}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            <Label>Conta Financeira</Label>
-                            <Select onValueChange={v => { setFormCodconta(v); handleSelectedContaFinanceira(v); }}>
-                                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                                <SelectContent>
-                                    {contasFinanceiras.map((x, i) => (
-                                        <SelectItem key={i} value={x.codconta}>{x.codconta + " - " + x.contabil}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            <Label>Produto</Label>
-                            <Select onValueChange={setFormProduto}>
-                                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                                <SelectContent>
-                                    {produtos.map((x) => (
-                                        <SelectItem key={x.idprd} value={x.idprd.toString()}>{x.idprd + " - " + x.produto}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label>Qtd</Label>
-                            <Input type="number" value={form_qtd} onChange={e => setFormQtd(e.target.value)} />
-                        </div>
-                        <div>
-                            <Label>Descrição</Label>
-                            <Input value={form_item_desc} onChange={e => setFormItemDesc(e.target.value)} />
-                        </div>
-                    </div>
+                        <FormField
+                            control={form.control}
+                            name="descricao"
+                            rules={{ required: 'Descrição é obrigatório' }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Descrição</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </Form>
 
-                    <Button onClick={adicionarItem}>Adicionar Item</Button>
+                    <Form {...formItem}>
+                        <form onSubmit={formItem.handleSubmit(adicionarItem)} className="grid gap-4">
+                            <FormField
+                                control={formItem.control}
+                                name="ccusto"
+                                rules={{ required: "Centro de custo obrigatório" }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Centro de Custo</FormLabel>
+                                        <FormControl>
+                                            <Popover open={openCcustoSearch} onOpenChange={setOpenCcustoSearch}>
+                                                <PopoverTrigger asChild>
+                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoSearch(true)}>
+                                                        {centrosDeCusto.find(c => c.ccusto === field.value)?.custo ?? "Selecione"}
+                                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                                    </Button>
+                                                </PopoverTrigger>
+
+                                                <PopoverContent className="p-0 w-[600px]">
+                                                    <Command
+                                                        filter={(value, search) => {
+                                                            const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ""
+                                                            const searchLower = search.toLowerCase()
+
+                                                            return (
+                                                                label.toLowerCase().includes(searchLower) ||
+                                                                value.toLowerCase().includes(searchLower)
+                                                            ) ? 1 : 0
+                                                        }}
+                                                    >                                                    <CommandInput placeholder="Buscar centro..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                            <CommandGroup>
+                                                                {centrosDeCusto.map(c => (
+                                                                    <CommandItem
+                                                                        key={c.ccusto}
+                                                                        value={c.ccusto}
+                                                                        onSelect={() => {
+                                                                            field.onChange(c.ccusto)
+                                                                            handleSelectedCentroDeCusto(c.ccusto)
+                                                                            setOpenCcustoSearch(false)
+                                                                        }}
+                                                                    >
+                                                                        {c.ccusto} - {c.custo}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={formItem.control}
+                                name="codconta"
+                                rules={{ required: "Conta financeira obrigatória" }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Conta Financeira</FormLabel>
+                                        <FormControl>
+                                            <Popover open={openCodcontaSearch} onOpenChange={setOpenCodcontaSearch}>
+                                                <PopoverTrigger asChild>
+                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaSearch(true)}>
+                                                        {contasFinanceiras.find(x => x.codconta === field.value)?.contabil ?? "Selecione"}
+                                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                                    </Button>
+                                                </PopoverTrigger>
+
+                                                <PopoverContent className="p-0 w-[600px]">
+                                                    <Command
+                                                        filter={(value, search) => {
+                                                            const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ""
+                                                            const searchLower = search.toLowerCase()
+
+                                                            return (
+                                                                label.toLowerCase().includes(searchLower) ||
+                                                                value.toLowerCase().includes(searchLower)
+                                                            ) ? 1 : 0
+                                                        }}
+                                                    >
+                                                        <CommandInput placeholder="Buscar conta..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                            <CommandGroup>
+                                                                {contasFinanceiras.map(x => (
+                                                                    <CommandItem
+                                                                        key={x.codconta}
+                                                                        value={x.codconta}
+                                                                        onSelect={() => {
+                                                                            field.onChange(x.codconta)
+                                                                            handleSelectedContaFinanceira(x.codconta)
+                                                                            setOpenCodcontaSearch(false)
+                                                                        }}
+                                                                    >
+                                                                        {x.codconta} - {x.contabil}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={formItem.control}
+                                name="idprd"
+                                rules={{ required: "Produto obrigatório" }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Produto</FormLabel>
+                                        <FormControl>
+                                            <Popover open={openProdutoSearch} onOpenChange={setOpenProdutoSearch}>
+                                                <PopoverTrigger asChild>
+                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenProdutoSearch(true)}>
+                                                        {produtos.find(p => p.idprd === field.value)?.produto ?? "Selecione"}
+                                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                                    </Button>
+                                                </PopoverTrigger>
+
+                                                <PopoverContent className="p-0 w-[600px]">
+                                                    <Command>
+                                                        <CommandInput placeholder="Buscar produto..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                            <CommandGroup>
+                                                                {produtos.map(p => (
+                                                                    <CommandItem
+                                                                        key={p.idprd}
+                                                                        value={p.idprd.toString()}
+                                                                        onSelect={() => {
+                                                                            field.onChange(p.idprd)
+                                                                            setOpenProdutoSearch(false)
+                                                                        }}
+                                                                    >
+                                                                        {p.idprd} - {p.produto}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={formItem.control}
+                                name="quantidade"
+                                rules={{ required: "Qtd obrigatória" }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Qtd</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={formItem.control}
+                                name="descricao"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Descrição do item</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {["1.1.10", "1.1.11"].includes(form.watch("tipo_movimento")) && <FormField
+                                control={formItem.control}
+                                name="valor"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Valor</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Adicionando…' : 'Adicionar Item'}
+                            </Button>
+                        </form>
+                    </Form>
                 </CardContent>
             </Card>
 
@@ -219,7 +546,7 @@ export default function Page() {
                             </Button>
                         </div>
                     ))}
-                    <Button onClick={handleSubmit}>Enviar carrinho</Button>
+                    <Button onClick={onSubmit}>Enviar carrinho</Button>
                 </CardContent>
             </Card>
 
@@ -228,6 +555,7 @@ export default function Page() {
                 <DialogContent
                     showCloseButton={false}
                     className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
+                    aria-description='Carregando...'
                 >
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
@@ -238,6 +566,59 @@ export default function Page() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Itens */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+
+                        {requisicaoItensSelecionada?.length > 0 && (
+                            <Card className="p-4 my-4">
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Coligada:</span>
+                                    <span>{requisicaoSelecionada.requisicao.codcoligada}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Natureza Orçamentária:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.codigo_natureza_orcamentaria} - {requisicaoItensSelecionada[0]?.nome_natureza_orcamentaria ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-muted-foreground">Etapa:</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_etapa ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Fornecedor:</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_fornecedor ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Data emissão:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.data_emissao) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Valor bruto:</span>
+                                    <span>{requisicaoSelecionada.requisicao.valor_total.toFixed(2) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Histórico:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.historico_movimento) ?? "-"}</span>
+                                </div>
+                            </Card>
+                        )}
+                        <div className="w-full">
+                            <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={isLoading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
 
             {
                 error && (

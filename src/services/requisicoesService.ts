@@ -4,10 +4,10 @@ const caminho = "Requisicoes";
 const elemento_singular = "requisição";
 const elemento_plural = "requisições";
 
-export async function getAll(dateFrom: string, dateTo: string, movimentos: string[]): Promise<RequisicaoDto[]> {
+export async function getAll(dateFrom: string, dateTo: string, movimentos: string[], situacao: string): Promise<RequisicaoDto[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
     
-    const body = { dateFrom, dateTo, movimentos };
+    const body = { dateFrom, dateTo, movimentos, situacao };
 
     const res = await fetch(url.toString(), {
         method: 'POST',
