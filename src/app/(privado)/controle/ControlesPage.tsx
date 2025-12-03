@@ -367,9 +367,10 @@ export default function Page() {
             });
         }
 
+        const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
         setTimeout(() => {
             iframeAnexoRef.current?.contentWindow?.postMessage(
-                { pdfBase64: anexo.anexo },
+                { pdfBase64: pdfClean },
                 '*'
             );
         }, 500);

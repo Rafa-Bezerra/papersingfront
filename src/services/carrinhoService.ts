@@ -1,4 +1,4 @@
-import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho } from "@/types/Carrinho";
+import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho } from "@/types/Carrinho";
 import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Solicitacao";
@@ -62,4 +62,4 @@ export async function getUltimasRequisicoes(): Promise<RequisicaoDto[]> {
     return list;
 }
 
-export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto }
+export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto, AnexoCarrinho }

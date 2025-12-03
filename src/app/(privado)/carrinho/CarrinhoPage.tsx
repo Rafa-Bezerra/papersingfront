@@ -3,6 +3,7 @@
 import React, {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,8 +13,8 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Loader2, Trash2 } from "lucide-react";
-import { Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { ChevronsUpDown, Eye, Loader2, Trash2 } from "lucide-react";
+import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -36,7 +37,7 @@ import {
     CommandItem,
 } from "@/components/ui/command"
 import { Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
-import { safeDateLabel } from '@/utils/functions';
+import { safeDateLabel, toBase64 } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 
@@ -49,20 +50,33 @@ export default function Page() {
     const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [produtos, setProdutos] = useState<Produto[]>([])
-    const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [] })
+    const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [], anexos: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemCarrinho[]>([])
+    const [anexosSubmit, setAnexosSubmit] = useState<AnexoCarrinho[]>([])
     const [error, setError] = useState<string | null>(null)
     const [openTmovSearch, setOpenTmovSearch] = useState(false)
     const [openProdutoSearch, setOpenProdutoSearch] = useState(false)
     const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
     const [openCodcontaSearch, setOpenCodcontaSearch] = useState(false)
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
+    const [file, setFile] = useState<File | null>(null)
+    const [fileName, setFileName] = useState<string>("")
+    const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
+    const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
+    const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoCarrinho | null>(null)
+    const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
+    const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
 
     const form = useForm<Carrinho>({
         defaultValues: {
             descricao: "",
             tipo_movimento: "",
-            itens: []
+            periodo_de: "",
+            periodo_ate: "",
+            origem: "",
+            destino: "",
+            itens: [],
+            anexos: []
         }
     })
 
@@ -156,7 +170,12 @@ export default function Page() {
         setError(null)
         carrinho.descricao = form.getValues("descricao")
         carrinho.tipo_movimento = form.getValues("tipo_movimento")
+        carrinho.origem = form.getValues("origem")
+        carrinho.destino = form.getValues("destino")
+        carrinho.periodo_de = form.getValues("periodo_de")
+        carrinho.periodo_ate = form.getValues("periodo_ate")
         carrinho.itens = produtosSubmit
+        carrinho.anexos = anexosSubmit
         try {
             await createElement(carrinho)
             toast.success('Carrinho enviado com sucesso!')
@@ -186,6 +205,69 @@ export default function Page() {
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+    }
+
+    async function handleAnexos() {
+        setIsLoading(true)
+        if (!file) return toast.error("Selecione um arquivo primeiro!")
+        const base64 = await toBase64(file)
+        const anexo: AnexoCarrinho = {
+            anexo: base64,
+            descricao: fileName
+        }
+        setAnexosSubmit(prev => [...prev, anexo])
+        setIsLoading(false)
+    }
+
+    function removerAnexo(index: number) {
+        setAnexosSubmit(prev => prev.filter((_, i) => i !== index))
+    }
+
+    async function handleVisualizarAnexo(anexo: AnexoCarrinho) {
+        setIsLoading(true)
+        setTotalPagesAnexo(1);
+        setIsModalVisualizarAnexoOpen(true)
+        setAnexoSelecionado(anexo);
+        const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+
+        if (!window._pdfMessageListener) {
+            window._pdfMessageListener = true;
+
+            window.addEventListener("message", (event) => {
+                if (event.data?.totalPages) {
+                    setTotalPagesAnexo(event.data.totalPages);
+                }
+            });
+        }
+
+        setTimeout(() => {
+            iframeAnexoRef.current?.contentWindow?.postMessage(
+                { pdfBase64: pdfClean },
+                '*'
+            );
+        }, 500);
+        setIsLoading(false)
+    }
+
+    function changePageAnexo(newPage: number) {
+        if (!iframeAnexoRef.current) return;
+        setCurrentPageAnexo(newPage);
+        iframeAnexoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
+
+    function handleImprimirAnexo() {
+        if (!iframeAnexoRef.current) return;
+
+        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
     }
 
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
@@ -227,6 +309,7 @@ export default function Page() {
 
     return (
         <div className="p-6">
+            {/* Título */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">Últimas requisições</CardTitle>
@@ -236,6 +319,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
+            {/* Main */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -323,6 +407,67 @@ export default function Page() {
                                 </FormItem>
                             )}
                         />
+
+                        {["1.1.11"].includes(form.watch("tipo_movimento")) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="periodo_de"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Período de</FormLabel>
+                                            <FormControl>
+                                                <Input type="date" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="periodo_ate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Período até</FormLabel>
+                                            <FormControl>
+                                                <Input type="date" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="origem"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Origem</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="destino"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Destino</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                            </div>
+                        )}
                     </Form>
 
                     <Form {...formItem}>
@@ -485,21 +630,6 @@ export default function Page() {
 
                             <FormField
                                 control={formItem.control}
-                                name="quantidade"
-                                rules={{ required: "Qtd obrigatória" }}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Qtd</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={formItem.control}
                                 name="descricao"
                                 render={({ field }) => (
                                     <FormItem>
@@ -511,20 +641,36 @@ export default function Page() {
                                     </FormItem>
                                 )}
                             />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                    control={formItem.control}
+                                    name="quantidade"
+                                    rules={{ required: "Qtd obrigatória" }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Qtd</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {["1.1.10", "1.1.11"].includes(form.watch("tipo_movimento")) && <FormField
+                                    control={formItem.control}
+                                    name="valor"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Valor</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />}
+                            </div>
 
-                            {["1.1.10", "1.1.11"].includes(form.watch("tipo_movimento")) && <FormField
-                                control={formItem.control}
-                                name="valor"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Valor</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />}
                             <Button type="submit" disabled={isLoading}>
                                 {isLoading ? 'Adicionando…' : 'Adicionar Item'}
                             </Button>
@@ -533,7 +679,58 @@ export default function Page() {
                 </CardContent>
             </Card>
 
-            <Card>
+            {/* Anexos */}
+            {["1.1.11"].includes(form.watch("tipo_movimento")) && (
+                <Card className="mb-6">
+                    <CardHeader>
+                        <CardTitle>Anexos</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Input
+                                type="file"
+                                accept="application/pdf/*"
+                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                                className="w-40"
+                            />
+                            <Input
+                                type="text"
+                                onChange={(e) => setFileName(e.target.value)}
+                                className="w-40"
+                                aria-label='Descrição do anexo'
+                                placeholder='Descrição do anexo'
+                            />
+                            <Button
+                                onClick={handleAnexos}
+                                disabled={!file || isLoading}
+                                className="flex items-center"
+                            >
+                                {isLoading ? "Enviando..." : "Anexar documento"}
+                            </Button>
+                        </div>
+                        {anexosSubmit.map((item, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
+                                <span>{item.descricao}</span>
+                                <div className="flex gap-2 justify-end">
+                                    <Button variant="destructive" size="icon" onClick={() => removerAnexo(i)}>
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleVisualizarAnexo(item)}
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Itens */}
+            <Card className="mb-6">
                 <CardHeader>
                     <CardTitle>Itens Adicionados</CardTitle>
                 </CardHeader>
@@ -567,7 +764,7 @@ export default function Page() {
                 </DialogContent>
             </Dialog>
 
-            {/* Itens */}
+            {/* Itens ultimos movimentos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
@@ -620,13 +817,71 @@ export default function Page() {
                 </Dialog>
             )}
 
-            {
-                error && (
-                    <p className="mb-4 text-center text-sm text-destructive">
-                        Erro: {error}
-                    </p>
-                )
-            }
+            {/* Visualizar anexo */}
+            {anexoSelecionado && (
+                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Anexo ${anexoSelecionado.descricao}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex justify-center bg-gray-50">
+                            {anexoSelecionado ? (
+                                <>
+                                    {/* PDF sem overflow interno */}
+                                    <iframe
+                                        ref={iframeAnexoRef}
+                                        src="/pdf-viewer.html"
+                                        className="relative border-none  cursor-crosshair"
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            maxWidth: '800px',
+                                            aspectRatio: '1/sqrt(2)', // Proporção A4
+                                        }}
+                                    />
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                            <Button
+                                disabled={currentPageAnexo <= 1}
+                                onClick={() => changePageAnexo(currentPageAnexo - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPageAnexo}
+                                {totalPagesAnexo ? ` / ${totalPagesAnexo}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPageAnexo >= (totalPagesAnexo == null ? 1 : totalPagesAnexo)}
+                                onClick={() => changePageAnexo(currentPageAnexo + 1)}
+                            >
+                                Próxima
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimirAnexo()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {error && (<p className="mb-4 text-center text-sm text-destructive"> Erro: {error} </p>)}
         </div >
     )
 }
