@@ -14,6 +14,10 @@ export interface LoginResponse {
   unidade: string;
   nome: string;
   token: string;
+  admin: boolean;
+  documentos: boolean;
+  bordero: boolean;
+  comunicados: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {

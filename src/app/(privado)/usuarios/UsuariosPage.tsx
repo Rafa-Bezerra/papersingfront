@@ -78,6 +78,9 @@ export default function PageUsuarios() {
       datacriacao: '',
       codsistema: '',
       admin: false,
+      documentos: false,
+      bordero: false,
+      comunicados: false,
     }
   })
 
@@ -197,6 +200,9 @@ export default function PageUsuarios() {
         datacriacao: response.datacriacao,
         codsistema: response.codsistema,
         admin: response.admin,
+        documentos: response.documentos,
+        bordero: response.bordero,
+        comunicados: response.comunicados,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -217,6 +223,9 @@ export default function PageUsuarios() {
       datacriacao: '',
       codsistema: '',
       admin: false,
+      documentos: false,
+      bordero: false,
+      comunicados: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -419,24 +428,73 @@ export default function PageUsuarios() {
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
-              <FormField
-                control={form.control}
-                name="admin"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admin</FormLabel>
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+                <FormField
+                  control={form.control}
+                  name="admin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Admin</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="documentos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Documentos</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="bordero"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Borderô</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="comunicados"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comunicados</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}
               </Button>

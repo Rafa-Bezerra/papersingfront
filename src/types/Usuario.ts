@@ -10,6 +10,9 @@ export type Usuario = {
     datacriacao: string,
     codsistema: string,
     admin: boolean,
+    documentos: boolean,
+    bordero: boolean,
+    comunicados: boolean,
 }
 
 export interface LoginPayload {
