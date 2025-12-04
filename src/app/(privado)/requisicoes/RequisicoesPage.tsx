@@ -500,14 +500,17 @@ export default function Page() {
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
-                    const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
-                    );
+                    // const usuarioAprovou = requisicao_aprovacoes.some(ap =>
+                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
+                    // );
 
-                    const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
-
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
-                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
+                    // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
+                    const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
+                    
+                    // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
+                    // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                     return (
                         <div className="flex gap-2">
