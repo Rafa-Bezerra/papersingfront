@@ -408,15 +408,19 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
+                    
+                    const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
+                    const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
                     const status_bloqueado = ['Reprovado'].includes(row.original.situacao);
 
-                    const podeAprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado;
-                    const podeReprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado;
+                    const podeAprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado;
+                    const podeReprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado;
+                    const podeExcluir = usuarioCriador && todasPendentes;
 
                     return (
                         <div className="flex gap-2">
@@ -451,13 +455,13 @@ export default function Page() {
                                     Reprovar
                                 </Button>
                             )}
-                            <Button
+                            {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => { setDeleteComunicadoId(row.original.id); }}
                             >
                                 Excluir
-                            </Button>
+                            </Button>)}
                         </div>
                     );
                 }

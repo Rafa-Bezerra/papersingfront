@@ -5,6 +5,7 @@ export type Comunicado = {
     anexo: string,
     situacao: string,
     nome: string,
+    usuario_criacao: string,
     aprovadores: ComunicadoAprovacao[],
 }
 

@@ -409,20 +409,25 @@ export default function Page() {
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
 
+                    const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
+
                     const nivelUsuario = row.original.aprovadores.find(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     )?.ordem ?? 1;
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
-                    const usuarioAprovou = row.original.aprovadores.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
-                    );
+                    // const usuarioAprovou = row.original.aprovadores.some(ap =>
+                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                    // );
+                    const usuarioAprovou = false;
+                    const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
 
-                    const status_bloqueado = ['Reprovado'].includes(row.original.situacao);
+                    const status_liberado = ['Em Andamento'].includes(row.original.situacao);
 
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
-                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && !status_bloqueado;
+                    const podeAprovar = todasInferioresAprovadas && (usuarioAprovador || usuarioCriador) && !usuarioAprovou && status_liberado;
+                    const podeReprovar = todasInferioresAprovadas && (usuarioAprovador || usuarioCriador) && !usuarioAprovou && status_liberado;
+                    const podeExcluir = usuarioCriador && todasPendentes;
 
                     return (
                         <div className="flex gap-2">
@@ -457,13 +462,13 @@ export default function Page() {
                                     Reprovar
                                 </Button>
                             )}
-                            <Button
+                            {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => { setDeleteDocumentoId(row.original.id); }}
                             >
                                 Excluir
-                            </Button>
+                            </Button>)}
                         </div>
                     );
                 }
