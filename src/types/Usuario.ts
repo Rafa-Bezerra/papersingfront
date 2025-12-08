@@ -13,6 +13,8 @@ export type Usuario = {
     documentos: boolean,
     bordero: boolean,
     comunicados: boolean,
+    rdv: boolean,
+    externo: boolean,
 }
 
 export interface LoginPayload {

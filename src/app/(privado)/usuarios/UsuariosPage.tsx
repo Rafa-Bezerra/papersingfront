@@ -81,6 +81,8 @@ export default function PageUsuarios() {
       documentos: false,
       bordero: false,
       comunicados: false,
+      rdv: false,
+      externo: false,
     }
   })
 
@@ -203,6 +205,8 @@ export default function PageUsuarios() {
         documentos: response.documentos,
         bordero: response.bordero,
         comunicados: response.comunicados,
+        rdv: response.rdv,
+        externo: response.externo,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -226,6 +230,8 @@ export default function PageUsuarios() {
       documentos: false,
       bordero: false,
       comunicados: false,
+      rdv: false,
+      externo: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -429,7 +435,6 @@ export default function PageUsuarios() {
                 )}
               />
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
                 <FormField
                   control={form.control}
                   name="admin"
@@ -484,6 +489,38 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Comunicados</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rdv"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RDV</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="externo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Externo</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

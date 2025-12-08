@@ -24,7 +24,8 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Search
+  Search,
+  Truck
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 
@@ -49,6 +50,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
+  const [userRdv, setUserRdv] = useState(false)
 
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
@@ -68,6 +70,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       setUserDocumentos(user.documentos);
       setUserBordero(user.bordero);
       setUserComunicados(user.comunicados);
+      setUserRdv(user.rdv);
     }
   }, []);
 
@@ -103,6 +106,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Comunicados': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
+    'RDV': <Truck className="w-5 h-5" />,
+    'Aprovação RDV': <Truck className="w-5 h-5" />,
     'Aprovadores Borderô': <Users className="w-5 h-5" />,
     Alçadas: <Users className="w-5 h-5" />,
     Usuários: <User className="w-5 h-5" />
@@ -196,8 +201,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       if (!userAdmin) {
                         if (item.url === "/documentos" && !userDocumentos) return null;
                         if (item.url === "/bordero" && !userBordero) return null;
+                        if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
-                        if (item.url === "/alcadas" || item.url === "/usuarios") return null;
+                        if (["/alcadas","/usuarios","/borderoaprovadores","/rdvaprovadores"].includes(item.url)) return null;
                       }
                       return (
                         <SidebarMenuItem key={item.title}>

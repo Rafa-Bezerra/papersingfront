@@ -97,7 +97,7 @@ export default function Page() {
         { value: "1.1.04", label: "1.1.04 - Requisição de sistemas - Terceiros" },
         { value: "1.1.05", label: "1.1.05 - Requisição manutenção" },
         { value: "1.1.10", label: "1.1.10 - Requisição de adiantamento" },
-        { value: "1.1.11", label: "1.1.11 - Requisição de RDV" },
+        // { value: "1.1.11", label: "1.1.11 - Requisição de RDV" },
         { value: "1.1.12", label: "1.1.12 - Requisição de estoque" },
     ];
 
@@ -407,67 +407,6 @@ export default function Page() {
                                 </FormItem>
                             )}
                         />
-
-                        {["1.1.11"].includes(form.watch("tipo_movimento")) && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="periodo_de"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Período de</FormLabel>
-                                            <FormControl>
-                                                <Input type="date" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="periodo_ate"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Período até</FormLabel>
-                                            <FormControl>
-                                                <Input type="date" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="origem"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Origem</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="destino"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Destino</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                            </div>
-                        )}
                     </Form>
 
                     <Form {...formItem}>
@@ -680,54 +619,52 @@ export default function Page() {
             </Card>
 
             {/* Anexos */}
-            {["1.1.11"].includes(form.watch("tipo_movimento")) && (
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Anexos</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Input
-                                type="file"
-                                accept="application/pdf/*"
-                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                className="w-40"
-                            />
-                            <Input
-                                type="text"
-                                onChange={(e) => setFileName(e.target.value)}
-                                className="w-40"
-                                aria-label='Descrição do anexo'
-                                placeholder='Descrição do anexo'
-                            />
-                            <Button
-                                onClick={handleAnexos}
-                                disabled={!file || isLoading}
-                                className="flex items-center"
-                            >
-                                {isLoading ? "Enviando..." : "Anexar documento"}
-                            </Button>
-                        </div>
-                        {anexosSubmit.map((item, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
-                                <span>{item.descricao}</span>
-                                <div className="flex gap-2 justify-end">
-                                    <Button variant="destructive" size="icon" onClick={() => removerAnexo(i)}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleVisualizarAnexo(item)}
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                    </Button>
-                                </div>
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle>Anexos</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Input
+                            type="file"
+                            accept="application/pdf/*"
+                            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                            className="w-40"
+                        />
+                        <Input
+                            type="text"
+                            onChange={(e) => setFileName(e.target.value)}
+                            className="w-40"
+                            aria-label='Descrição do anexo'
+                            placeholder='Descrição do anexo'
+                        />
+                        <Button
+                            onClick={handleAnexos}
+                            disabled={!file || isLoading}
+                            className="flex items-center"
+                        >
+                            {isLoading ? "Enviando..." : "Anexar documento"}
+                        </Button>
+                    </div>
+                    {anexosSubmit.map((item, i) => (
+                        <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
+                            <span>{item.descricao}</span>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="destructive" size="icon" onClick={() => removerAnexo(i)}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleVisualizarAnexo(item)}
+                                >
+                                    <Eye className="w-4 h-4" />
+                                </Button>
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
 
             {/* Itens */}
             <Card className="mb-6">
