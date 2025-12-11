@@ -13,8 +13,8 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Filter, Loader2 } from "lucide-react";
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv } from '@/services/rdvService';
+import { Check, Filter, Loader2 } from "lucide-react";
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { safeDateLabel, stripDiacritics } from '@/utils/functions';
@@ -43,6 +43,14 @@ export default function Page() {
     const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoRdv | null>(null)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
+
+    const [currentPageDocumento, setCurrentPageDocumento] = useState(1);
+    const [totalPagesDocumento, setTotalPagesDocumento] = useState<number | null>(null);
+    const [documentoSelecionado, setDocumentoSelecionado] = useState<AnexoRdv | null>(null)
+    const [isModalVisualizarDocumentoOpen, setIsModalVisualizarDocumentoOpen] = useState(false)
+    const iframeDocumentoRef = useRef<HTMLIFrameElement>(null);
+    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem("userData");
@@ -132,7 +140,6 @@ export default function Page() {
         iframeAnexoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
 
-
     function handleImprimirAnexo() {
         if (!iframeAnexoRef.current) return;
 
@@ -145,6 +152,100 @@ export default function Page() {
         } else {
             toast.error("Não foi possível acessar o documento para impressão.");
         }
+    }
+
+    async function handleDocumento(aprovacao: Rdv) {
+        setIsLoading(true)
+        setTotalPagesDocumento(1);
+        const anexo: AnexoRdv = {
+            anexo: aprovacao.arquivo!,
+            nome: `Documento RDV n° ${aprovacao.id}`
+        };
+        setDocumentoSelecionado(anexo);
+        setSelectedResult(aprovacao);
+        setIsModalVisualizarDocumentoOpen(true)
+        const pdfClean = aprovacao.arquivo!.replace(/^data:.*;base64,/, '').trim();
+
+        if (!window._pdfMessageListener) {
+            window._pdfMessageListener = true;
+
+            window.addEventListener("message", (event) => {
+                if (event.data?.totalPages) {
+                    setTotalPagesDocumento(event.data.totalPages);
+                }
+            });
+        }
+
+        setTimeout(() => {
+            iframeDocumentoRef.current?.contentWindow?.postMessage(
+                { pdfBase64: pdfClean },
+                '*'
+            );
+        }, 500);
+        setIsLoading(false)
+    }
+
+    function changePageDocumento(newPage: number) {
+        if (!iframeDocumentoRef.current) return;
+        setCurrentPageDocumento(newPage);
+        iframeDocumentoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
+    function handleImprimirDocumento() {
+        if (!iframeDocumentoRef.current) return;
+
+        const iframe = iframeDocumentoRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
+    }
+
+    async function handleAssinar(data: AssinarRdv) {
+        setIsLoading(true)
+        try {
+            await assinar(data)
+            toast.success("Assinatura enviada com sucesso!");
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsModalVisualizarDocumentoOpen(false)
+            setIsLoading(false)
+        }
+    }
+
+    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
+        const overlay = e.currentTarget as HTMLDivElement;
+        const rect = overlay.getBoundingClientRect();
+
+        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
+        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
+        const x2 = e.clientX - rect.left;
+        const y2 = e.clientY - rect.top;
+        const yI = (rect.height - y2) / rect.height;
+
+        setCoords({ x, y, x2, y2, yI });
+    }
+
+    async function confirmarAssinatura() {
+        if (!coords) {
+            toast.error("Clique no local onde deseja assinar o documento.");
+            return;
+        }
+        const dadosAssinatura: AssinarRdv = {
+            idrdv: selectedResult!.id!,
+            arquivo: selectedResult!.arquivo!,
+            pagina: currentPageDocumento,
+            posX: coords.x,
+            posY: coords.yI,
+            largura: 90,
+            altura: 30,
+        };
+        await handleAssinar(dadosAssinatura);
     }
 
     const colunas = useMemo<ColumnDef<Rdv>[]>(
@@ -174,6 +275,11 @@ export default function Page() {
 
                     return (
                         <div className="flex gap-2">
+                            {row.original.arquivo && (
+                                <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                    Documento
+                                </Button>
+                            )}
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
                                 Itens
                             </Button>
@@ -181,7 +287,9 @@ export default function Page() {
                                 Aprovadores
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos
+                                Anexos {row.original.arquivo_assinado! == true && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
                             </Button>
                             {podeAprovar && (
                                 <Button
@@ -198,7 +306,7 @@ export default function Page() {
                                     variant="destructive"
                                     onClick={() => handleAprovar(row.original, "R")}
                                 >
-                                    Aprovar
+                                    Reprovar
                                 </Button>
                             )}
                         </div>
@@ -256,7 +364,7 @@ export default function Page() {
 
     return (
         <div className="p-6">
-            {/* Título */}
+            {/* Main */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -396,6 +504,93 @@ export default function Page() {
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimirAnexo()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Visualizar anexo */}
+            {documentoSelecionado && (
+                <Dialog open={isModalVisualizarDocumentoOpen} onOpenChange={setIsModalVisualizarDocumentoOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Documento ${documentoSelecionado.nome}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex justify-center bg-gray-50">
+                            {documentoSelecionado ? (
+                                <>
+                                    {/* PDF sem overflow interno */}
+                                    <iframe
+                                        ref={iframeDocumentoRef}
+                                        src="/pdf-viewer.html"
+                                        className="relative border-none  cursor-crosshair"
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            maxWidth: '800px',
+                                            aspectRatio: '1/sqrt(2)', // Proporção A4
+                                        }}
+                                        onClick={handleClickPdf}
+                                    />
+
+
+                                    {/* Overlay */}
+                                    <div
+                                        id="assinatura-overlay"
+                                        className="absolute inset-0 cursor-crosshair"
+                                        onClick={handleClickPdf}
+                                    />
+
+                                    {/* Indicador visual */}
+                                    {coords && (
+                                        <div
+                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
+                                            style={{
+                                                left: coords.x2 - 10,
+                                                top: coords.y2 - 10,
+                                            }}
+                                        />
+                                    )}
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                            <Button
+                                disabled={currentPageDocumento <= 1}
+                                onClick={() => changePageDocumento(currentPageDocumento - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPageDocumento}
+                                {totalPagesDocumento ? ` / ${totalPagesDocumento}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPageDocumento >= (totalPagesDocumento == null ? 1 : totalPagesDocumento)}
+                                onClick={() => changePageDocumento(currentPageDocumento + 1)}
+                            >
+                                Próxima
+                            </Button>
+                            {(!selectedResult!.arquivo_assinado && <Button onClick={confirmarAssinatura} className="flex items-center">
+                                Assinar
+                            </Button>)}
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimirDocumento()}
                                 className="flex items-center"
                             >
                                 Imprimir

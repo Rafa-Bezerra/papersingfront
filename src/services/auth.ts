@@ -16,6 +16,7 @@ export interface LoginResponse {
   token: string;
   admin: boolean;
   documentos: boolean;
+  rdv: boolean;
   bordero: boolean;
   comunicados: boolean;
 }

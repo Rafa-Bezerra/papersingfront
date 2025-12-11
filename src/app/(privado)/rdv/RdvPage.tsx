@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronsUpDown, Eye, Loader2, Trash2 } from "lucide-react";
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs } from '@/services/rdvService';
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -69,12 +69,14 @@ export default function Page() {
     const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+    const [openFornecedorSearch, setOpenFornecedorSearch] = useState(false)
     const [openCodcontaSearch, setOpenCodcontaSearch] = useState(false)
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [openProdutoSearch, setOpenProdutoSearch] = useState(false)
     const [produtos, setProdutos] = useState<Produto[]>([])
 
-    const [rdv] = useState<Rdv>({ descricao: '', situacao:'Em andamento', itens: [], anexos: [], aprovadores: [] })
+    const [rdv] = useState<Rdv>({ descricao: '', situacao: 'Em andamento', itens: [], anexos: [], aprovadores: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemRdv[]>([])
     const [anexosSubmit, setAnexosSubmit] = useState<AnexoRdv[]>([])
     const [aprovadoresSubmit, setAprovadoresSubmit] = useState<AprovadoresRdv[]>([])
@@ -83,6 +85,7 @@ export default function Page() {
     useEffect(() => {
         buscaCentrosDeCusto();
         buscaUsuarios();
+        buscaFornecedores();
         buscaUltimosRdvs();
     }, [])
 
@@ -93,6 +96,7 @@ export default function Page() {
             periodo_ate: "",
             origem: "",
             destino: "",
+            codcfo: "",
             itens: [],
             anexos: [],
             aprovadores: [],
@@ -138,6 +142,19 @@ export default function Page() {
         try {
             const dados = await getAll()
             setUsuarios(dados)
+        } catch (err) {
+            setError((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function buscaFornecedores() {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllFornecedores()
+            setFornecedores(dados)
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -195,6 +212,7 @@ export default function Page() {
         rdv.destino = form.getValues("destino")
         rdv.periodo_de = form.getValues("periodo_de")
         rdv.periodo_ate = form.getValues("periodo_ate")
+        rdv.codcfo = form.getValues("codcfo")
         rdv.itens = produtosSubmit
         rdv.anexos = anexosSubmit
         rdv.aprovadores = aprovadoresSubmit
@@ -396,6 +414,65 @@ export default function Page() {
                 <CardContent className="space-y-4">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4"></form>
+                        <FormField
+                            control={form.control}
+                            name={`codcfo`}
+                            rules={{ required: "Fornecedor obrigatório" }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <Popover
+                                            open={openFornecedorSearch}
+                                            onOpenChange={setOpenFornecedorSearch}
+                                        >
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-between"
+                                                >
+                                                    {
+                                                        fornecedores.find(u => u.codcfo === field.value)?.nome ??
+                                                        "Selecione o fornecedor"
+                                                    }
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverPortal>
+                                                <PopoverContent
+                                                    className="p-0 w-[600px] pointer-events-auto overflow-visible z-[9999]"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Command>
+                                                        <CommandInput placeholder="Buscar fornecedor..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
+
+                                                            <CommandGroup>
+                                                                {fornecedores.map((u) => (
+                                                                    <CommandItem
+                                                                        key={u.codcfo}
+                                                                        value={`${u.codcfo} ${u.nome}`.toLowerCase()}
+                                                                        onSelect={() => {
+                                                                            field.onChange(u.codcfo);
+                                                                            setOpenFornecedorSearch(false);
+                                                                        }}
+                                                                    >
+                                                                        {u.nome}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </PopoverPortal>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <FormField
                             control={form.control}
                             name="descricao"

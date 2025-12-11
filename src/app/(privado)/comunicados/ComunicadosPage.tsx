@@ -85,7 +85,6 @@ export default function Page() {
     const [isModalComunicadosOpen, setIsModalComunicadosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
-    const loading = isPending
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
@@ -172,6 +171,7 @@ export default function Page() {
                 else sp.delete('q')
                 router.replace(`?${sp.toString()}`)
             })
+            setIsLoading(isPending)
             handleSearch(query)
         }, 300)
         return () => {
@@ -537,7 +537,7 @@ export default function Page() {
 
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={loading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading} />
                 </CardContent>
             </Card>
 
@@ -552,7 +552,7 @@ export default function Page() {
                             </Button>
                         </DialogHeader>
                         <div className="w-full">
-                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />
+                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={isLoading} />
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -706,8 +706,8 @@ export default function Page() {
 
                             <AprovadoresComunicadosSection form={form} usuarios={usuarios} />
 
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Salvando…' : 'Salvar'}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
                     </Form>
@@ -739,8 +739,8 @@ export default function Page() {
                                     </FormItem>
                                 )}
                             />
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Salvando…' : 'Salvar'}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
                     </Form>
@@ -805,7 +805,7 @@ export default function Page() {
                 </div>
             )}
 
-            {searched && results.length === 0 && !loading && !error && (
+            {searched && results.length === 0 && !isLoading && !error && (
                 <p className="text-center text-sm text-muted-foreground">
                     Nenhum registro encontrado.
                 </p>

@@ -59,18 +59,14 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-export default function Page() {
-    const titulo = 'Aquisição de serviços'
-    const tipos_movimento: string[] = [
-        '1.2.31',
-        '1.2.32',
-        '1.2.33',
-        '1.2.34',
-        '1.2.35',
-    ];
+interface Props {
+    titulo: string;
+    tipos_movimento: string[];
+}
+
+export default function Page({ titulo, tipos_movimento }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
-
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
@@ -106,6 +102,7 @@ export default function Page() {
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
+    const [podeAssinar, setPodeAssinar] = useState(false)
 
     function changePage(newPage: number) {
         if (!iframeRef.current) return;
@@ -126,9 +123,14 @@ export default function Page() {
 
     useEffect(() => {
         if (dateFrom === "" && dateTo === "") {
-            setDateFrom(new Date().toISOString().substring(0, 10));
-            setDateTo(new Date().toISOString().substring(0, 10));
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+
+            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
+            setDateTo(today.toISOString().substring(0, 10));
         }
+
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
@@ -138,25 +140,22 @@ export default function Page() {
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => {
-            startTransition(() => {
-                const sp = new URLSearchParams(Array.from(searchParams.entries()))
-                if (query) sp.set('q', query)
-                else sp.delete('q')
-                router.replace(`?${sp.toString()}`)
-            })
-            handleSearch(query)
+            handleSearch("")
         }, 300)
+
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, situacaoFiltrada, dateFrom, dateTo])
+    }, [dateFrom, dateTo, situacaoFiltrada])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAllRequisicoes(dateFrom ?? new Date().toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10), tipos_movimento, situacaoFiltrada)
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+            const dados = await getAllRequisicoes(dateFrom ?? fiveDaysAgo, dateTo ?? today, tipos_movimento, situacaoFiltrada)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -176,12 +175,13 @@ export default function Page() {
         }
     }
 
-
     async function handleSearchClick() {
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (query) sp.set('q', query)
             else sp.delete('q')
+            console.log(query);
+
             router.replace(`?${sp.toString()}`)
         })
         await handleSearch(query)
@@ -189,6 +189,18 @@ export default function Page() {
 
     async function handleDocumento(requisicao: RequisicaoDto) {
         setIsLoading(true)
+        setPodeAssinar(false);
+        const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        );
+        const nivelUsuario = requisicao.requisicao_aprovacoes.find(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        )?.nivel ?? 1;
+
+        const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+        const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
+        const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+        setPodeAssinar(podeAssinar);
         setTotalPages(1);
         setIsModalDocumentosOpen(true)
         setRequisicaoSelecionada(requisicao)
@@ -197,7 +209,6 @@ export default function Page() {
 
         if (!window._pdfMessageListener) {
             window._pdfMessageListener = true;
-
             window.addEventListener("message", (event) => {
                 if (event.data?.totalPages) {
                     setTotalPages(event.data.totalPages);
@@ -505,7 +516,7 @@ export default function Page() {
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
                     const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
-                    
+
                     // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
@@ -615,6 +626,7 @@ export default function Page() {
 
     return (
         <div className="p-6">
+            {/* Cabeçalho */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -650,18 +662,18 @@ export default function Page() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => setSituacaoFiltrada("Em Andamento")}>Em Andamento</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={() => setSituacaoFiltrada("Concluído a responder")}>Concluído a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={() => setSituacaoFiltrada("Concluído respondido")}>Concluído respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={() => setSituacaoFiltrada("Concluído confirmado")}>Concluído confirmado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={() => setSituacaoFiltrada("Concluído automático(pelo sistema)")}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={() => setSituacaoFiltrada("Avaliado")}>Avaliado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={() => setSituacaoFiltrada("Agendado a responder")}>Agendado a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={() => setSituacaoFiltrada("Agendado respondido")}>Agendado respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={() => setSituacaoFiltrada("Aguardando terceiros")}>Aguardando terceiros</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={() => setSituacaoFiltrada("Cancelado")}>Cancelado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={() => setSituacaoFiltrada("Despertado")}>Despertado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Em Andamento") }}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído a responder") }}>Concluído a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído respondido") }}>Concluído respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído confirmado") }}>Concluído confirmado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído automático(pelo sistema)") }}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Avaliado") }}>Avaliado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado a responder") }}>Agendado a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado respondido") }}>Agendado respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Aguardando terceiros") }}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Cancelado") }}>Cancelado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Despertado") }}>Despertado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -693,6 +705,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
+            {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={loading} />
@@ -837,7 +850,7 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
-                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && <Button onClick={confirmarAssinatura} className="flex items-center">
+                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && podeAssinar && <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
                             </Button>)}
                             <Button

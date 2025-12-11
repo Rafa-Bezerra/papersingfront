@@ -99,6 +99,7 @@ export default function Page() {
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
+    const [podeAssinar, setPodeAssinar] = useState(false)
 
     function changePage(newPage: number) {
         if (!iframeRef.current) return;
@@ -119,8 +120,12 @@ export default function Page() {
 
     useEffect(() => {
         if (dateFrom === "" && dateTo === "") {
-            setDateFrom(new Date().toISOString().substring(0, 10));
-            setDateTo(new Date().toISOString().substring(0, 10));
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+
+            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
+            setDateTo(today.toISOString().substring(0, 10));
         }
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
@@ -133,26 +138,22 @@ export default function Page() {
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => {
-            startTransition(() => {
-                const sp = new URLSearchParams(Array.from(searchParams.entries()))
-                if (query) sp.set('q', query)
-                else sp.delete('q')
-                router.replace(`?${sp.toString()}`)
-            })
-            handleSearch(query)
+            handleSearch("")
         }, 300)
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, situacaoFiltrada, dateFrom, dateTo])
+    }, [situacaoFiltrada, dateFrom, dateTo])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
         setError(null)
         try {
-            console.log("Buscando dados com filtro:", { filtroDashboard });
-            const dados = await getAllRequisicoes(dateFrom ?? new Date().toISOString().substring(0, 10), dateTo ?? new Date().toISOString().substring(0, 10), [], situacaoFiltrada)
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+            const dados = await getAllRequisicoes(dateFrom ?? fiveDaysAgo, dateTo ?? today, [], situacaoFiltrada)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -198,6 +199,19 @@ export default function Page() {
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
+        setPodeAssinar(false);
+        const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        );
+        const nivelUsuario = requisicao.requisicao_aprovacoes.find(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        )?.nivel ?? 1;
+
+        const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+        const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
+        const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+        setPodeAssinar(podeAssinar);
+        
         setIsLoading(true)
         setTotalPages(1);
         setIsModalDocumentosOpen(true)
@@ -516,7 +530,7 @@ export default function Page() {
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
                     const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
-                    
+
                     // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
@@ -849,7 +863,7 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
-                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && <Button onClick={confirmarAssinatura} className="flex items-center">
+                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && podeAssinar && <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
                             </Button>)}
                             <Button

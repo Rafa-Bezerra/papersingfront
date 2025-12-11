@@ -50,7 +50,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
-  const [userRdv, setUserRdv] = useState(false)
 
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
@@ -70,7 +69,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       setUserDocumentos(user.documentos);
       setUserBordero(user.bordero);
       setUserComunicados(user.comunicados);
-      setUserRdv(user.rdv);
     }
   }, []);
 
@@ -201,7 +199,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       if (!userAdmin) {
                         if (item.url === "/documentos" && !userDocumentos) return null;
                         if (item.url === "/bordero" && !userBordero) return null;
-                        if (item.url === "/aprovacaordv" && !userRdv) return null;
+                        // if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
                         if (["/alcadas","/usuarios","/borderoaprovadores","/rdvaprovadores"].includes(item.url)) return null;
                       }

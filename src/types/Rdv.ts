@@ -16,7 +16,10 @@ export type Rdv = {
     periodo_ate?: string;
     origem?: string;
     destino?: string;
+    codcfo?: string;
     situacao: string;
+    arquivo?: string;
+    arquivo_assinado?: boolean;
     itens: ItemRdv[];
     anexos: AnexoRdv[];
     aprovadores: AprovadoresRdv[];
@@ -31,3 +34,17 @@ export type AprovadoresRdv = {
     data_aprovacao?: string;
     aprovacao?: string;
 };
+export type Fornecedor = {
+    codcfo: string;
+    usuario: string;
+    nome: string;
+};
+export type AssinarRdv = {
+    idrdv: number
+    arquivo: string
+    pagina: number
+    posX: number
+    posY: number
+    largura: number
+    altura: number
+}

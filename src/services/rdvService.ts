@@ -1,4 +1,4 @@
-import { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv } from "@/types/Rdv";
+import { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv, Fornecedor, AssinarRdv } from "@/types/Rdv";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Rdv";
 const elemento_singular = "rdv";
@@ -57,4 +57,24 @@ export async function aprovarRdv(id: number, aprovacao: string): Promise<void> {
     }
 }
 
-export type { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv }
+export async function getAllFornecedores(): Promise<Fornecedor[]> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/fornecedores`, {
+        headers: headers(),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
+    }
+    const list: Fornecedor[] = await res.json();
+    return list;
+}
+
+export async function assinar(data: AssinarRdv): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/assinar/${data.idrdv}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+    }
+}
+
+export type { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv, Fornecedor, AssinarRdv }

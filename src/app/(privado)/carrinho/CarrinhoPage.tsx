@@ -680,7 +680,9 @@ export default function Page() {
                             </Button>
                         </div>
                     ))}
-                    <Button onClick={onSubmit}>Enviar carrinho</Button>
+                    <Button onClick={onSubmit} disabled={isLoading}>
+                        {isLoading ? 'Enviando…' : 'Enviar carrinho'}
+                    </Button>
                 </CardContent>
             </Card>
 

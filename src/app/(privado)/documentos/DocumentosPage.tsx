@@ -85,7 +85,6 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
-    const loading = isPending
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
@@ -175,6 +174,7 @@ export default function Page() {
                 else sp.delete('q')
                 router.replace(`?${sp.toString()}`)
             })
+            setIsLoading(isPending)
             handleSearch(query)
         }, 300)
         return () => {
@@ -341,6 +341,7 @@ export default function Page() {
     }
 
     async function submitDocumento(data: Documento) {
+        setIsLoading(true)
         if (!file) return toast.error("Selecione um arquivo primeiro!")
         const base64 = await toBase64(file)
         data.anexo = base64;
@@ -354,6 +355,7 @@ export default function Page() {
             form.reset()
             await handleSearchClick()
             setIsFormDocumentoOpen(false)
+            setIsLoading(false)
         }
     }
 
@@ -490,6 +492,7 @@ export default function Page() {
 
     return (
         <div className="p-6">
+            {/* Header */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -542,10 +545,11 @@ export default function Page() {
                     </Button>
                 </CardContent>
             </Card>
-
+            
+            {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={loading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading} />
                 </CardContent>
             </Card>
 
@@ -560,7 +564,7 @@ export default function Page() {
                             </Button>
                         </DialogHeader>
                         <div className="w-full">
-                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />
+                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={isLoading} />
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -668,7 +672,7 @@ export default function Page() {
                 </DialogContent>
             </Dialog>
 
-            {/* Modal Documento */}
+            {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
                 <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
                     <DialogHeader>
@@ -733,15 +737,15 @@ export default function Page() {
                             {/* --- Aprovadores (useFieldArray) --- */}
                             <AprovadoresSection form={form} usuarios={usuarios} />
 
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Salvando…' : 'Salvar'}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
                     </Form>
                 </DialogContent>
             </Dialog>
 
-            {/* Modal */}
+            {/* Form aprovadores */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
                 <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
@@ -781,8 +785,8 @@ export default function Page() {
                                 )}
                             />
 
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Salvando…' : 'Salvar'}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
                     </Form>
@@ -811,7 +815,7 @@ export default function Page() {
                 </div>
             )}
 
-            {/* Confirmação de exclusão (simples) */}
+            {/* Confirmação de exclusão aprovadores (simples) */}
             {deleteAprovadorId !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
@@ -847,7 +851,7 @@ export default function Page() {
                 </div>
             )}
 
-            {searched && results.length === 0 && !loading && !error && (
+            {searched && results.length === 0 && !isLoading && !error && (
                 <p className="text-center text-sm text-muted-foreground">
                     Nenhum registro encontrado.
                 </p>
