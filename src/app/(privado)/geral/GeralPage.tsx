@@ -187,8 +187,8 @@ export default function Page() {
         }
     }
 
-
     async function handleSearchClick() {
+        setIsLoading(true)
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (query) sp.set('q', query)
@@ -196,9 +196,11 @@ export default function Page() {
             router.replace(`?${sp.toString()}`)
         })
         await handleSearch(query)
+        setIsLoading(false)
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setPodeAssinar(false);
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
             ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
@@ -211,8 +213,7 @@ export default function Page() {
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
         const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
         setPodeAssinar(podeAssinar);
-        
-        setIsLoading(true)
+
         setTotalPages(1);
         setIsModalDocumentosOpen(true)
         setRequisicaoSelecionada(requisicao)
@@ -274,6 +275,7 @@ export default function Page() {
         }
         const dadosAssinatura: Assinar = {
             idmov: requisicaoSelecionada!.requisicao.idmov,
+            atendimento: requisicaoSelecionada!.requisicao.codigo_atendimento,
             arquivo: requisicaoSelecionada!.requisicao.arquivo,
             pagina: currentPage,
             posX: coords.x,
@@ -299,21 +301,25 @@ export default function Page() {
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+        setIsLoading(false)
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
+        setIsLoading(false)
     }
 
-    async function handleAprovar(id: number) {
+    async function handleAprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await aprovar(id)
+            await aprovar(id, atendimento)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
@@ -322,10 +328,10 @@ export default function Page() {
         }
     }
 
-    async function handleReprovar(id: number) {
+    async function handleReprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await reprovar(id)
+            await reprovar(id, atendimento)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
@@ -403,6 +409,7 @@ export default function Page() {
     }
 
     async function handleExcluirAnexo() {
+        setIsLoading(true)
         if (!deleteAnexoId) return
         try {
             await deleteAnexo(deleteAnexoId)
@@ -412,6 +419,7 @@ export default function Page() {
             toast.error((err as Error).message)
         } finally {
             toast.success(`Anexo excluído`)
+            setIsLoading(false)
         }
     }
 
@@ -445,6 +453,7 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo() {
+        setIsLoading(true)
         if (!coordsAnexo) {
             toast.error("Clique no local onde deseja assinar o documento.");
             return;
@@ -504,6 +513,7 @@ export default function Page() {
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
+            { accessorKey: 'requisicao.data_emissao', header: 'Emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
             { accessorKey: 'rotina', header: 'Rotina', accessorFn: (row) => rotinaTipoMovimento(row.requisicao.tipo_movimento) },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
@@ -557,11 +567,11 @@ export default function Page() {
                                 Aprovações
                             </Button>
 
-                            {podeAprovar && (
+                            {podeAprovar && requisicao.documento_assinado == 1 && (
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
-                                    onClick={() => handleAprovar(requisicao.idmov)}
+                                    onClick={() => handleAprovar(requisicao.idmov, requisicao.codigo_atendimento)}
                                 >
                                     Aprovar
                                 </Button>
@@ -571,7 +581,7 @@ export default function Page() {
                                 <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleReprovar(requisicao.idmov)}
+                                    onClick={() => handleReprovar(requisicao.idmov, requisicao.codigo_atendimento)}
                                 >
                                     Reprovar
                                 </Button>
@@ -796,7 +806,7 @@ export default function Page() {
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
                             </DialogTitle>

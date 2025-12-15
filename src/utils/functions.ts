@@ -34,6 +34,10 @@ export function toMoney(value: number) {
   });
 }
 
+export function dateToIso(data: Date) {
+  return data.toISOString().split('T')[0]
+}
+
 export function safeDateLabel(iso?: string) {
   const dt = safeDate(iso)
   return dt ? format(dt, 'dd/MM/yyyy', { locale: ptBR }) : '—'

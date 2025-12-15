@@ -24,16 +24,16 @@ export async function getAll(dateFrom: string, dateTo: string, movimentos: strin
     return list;
 }
 
-export async function aprovar(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/aprovar/${id}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
+export async function aprovar(id: number, atendimento: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/aprovar/${id}/${atendimento}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao aprovar ${elemento_singular}: ${msg}`);
     }
 }
 
-export async function reprovar(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/reprovar/${id}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
+export async function reprovar(id: number, atendimento: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/reprovar/${id}/${atendimento}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao reprovar ${elemento_singular}: ${msg}`);

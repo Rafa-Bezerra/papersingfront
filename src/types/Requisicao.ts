@@ -8,7 +8,7 @@ export type Requisicao = {
     codcoligada: number,
     idmov: number,
     documento_assinado: number,
-    codigo_atendimento: string,
+    codigo_atendimento: number,
     movimento: string,
     tipo_movimento: string,
     nome_solicitante: string,

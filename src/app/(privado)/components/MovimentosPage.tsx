@@ -4,6 +4,11 @@ declare global {
     interface Window {
         _pdfMessageListener?: boolean;
     }
+
+    interface Props {
+        titulo: string;
+        tipos_movimento: string[];
+    }
 }
 
 import React, {
@@ -34,7 +39,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { dateToIso, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -58,11 +63,6 @@ import {
 } from '@/services/anexoService';
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-
-interface Props {
-    titulo: string;
-    tipos_movimento: string[];
-}
 
 export default function Page({ titulo, tipos_movimento }: Props) {
     const router = useRouter()
@@ -155,7 +155,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
-            const dados = await getAllRequisicoes(dateFrom ?? fiveDaysAgo, dateTo ?? today, tipos_movimento, situacaoFiltrada)
+            const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
+            const to = dateTo ? dateTo : dateToIso(today)
+            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -164,7 +166,6 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
                 return matchQuery && matchTipos && matchSituacao
             })
-
             setResults(filtrados)
         } catch (err) {
             setError((err as Error).message)
@@ -176,15 +177,15 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleSearchClick() {
+        setIsLoading(true)
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (query) sp.set('q', query)
             else sp.delete('q')
-            console.log(query);
-
             router.replace(`?${sp.toString()}`)
         })
         await handleSearch(query)
+        setIsLoading(false)
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
@@ -261,6 +262,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         }
         const dadosAssinatura: Assinar = {
             idmov: requisicaoSelecionada!.requisicao.idmov,
+            atendimento: requisicaoSelecionada!.requisicao.codigo_atendimento,
             arquivo: requisicaoSelecionada!.requisicao.arquivo,
             pagina: currentPage,
             posX: coords.x,
@@ -286,21 +288,25 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+        setIsLoading(false)
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {
+        setIsLoading(true)
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
+        setIsLoading(false)
     }
 
-    async function handleAprovar(id: number) {
+    async function handleAprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await aprovar(id)
+            await aprovar(id, atendimento)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
@@ -309,10 +315,10 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         }
     }
 
-    async function handleReprovar(id: number) {
+    async function handleReprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await reprovar(id)
+            await reprovar(id, atendimento)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
@@ -390,6 +396,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleExcluirAnexo() {
+        setIsLoading(true)
         if (!deleteAnexoId) return
         try {
             await deleteAnexo(deleteAnexoId)
@@ -398,6 +405,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
+            setIsLoading(false)
             toast.success(`Anexo excluído`)
         }
     }
@@ -491,6 +499,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
+            { accessorKey: 'requisicao.data_emissao', header: 'Emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
@@ -543,11 +552,11 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 Aprovações
                             </Button>
 
-                            {podeAprovar && (
+                            {podeAprovar && requisicao.documento_assinado == 1 && (
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
-                                    onClick={() => handleAprovar(requisicao.idmov)}
+                                    onClick={() => handleAprovar(requisicao.idmov, requisicao.codigo_atendimento)}
                                 >
                                     Aprovar
                                 </Button>
@@ -557,7 +566,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleReprovar(requisicao.idmov)}
+                                    onClick={() => handleReprovar(requisicao.idmov, requisicao.codigo_atendimento)}
                                 >
                                     Reprovar
                                 </Button>
@@ -783,7 +792,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
                             </DialogTitle>

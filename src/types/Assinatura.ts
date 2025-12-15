@@ -4,6 +4,7 @@ export type Assinatura = {
 
 export type Assinar = {
     idmov: number
+    atendimento: number
     arquivo: string
     pagina: number
     posX: number

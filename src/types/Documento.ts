@@ -1,12 +1,10 @@
 export type Documento = {
     id: number,
     data_criacao: string,
-    data_prazo: string,
-    documento_assinado: number,
-    anexo: string,
     situacao: string,
     nome: string,
     usuario_criacao: string,
+    anexos: DocumentoAnexo[],
     aprovadores: DocumentoAprovacao[],
 }
 
@@ -18,8 +16,24 @@ export type DocumentoAprovacao = {
     usuario: string,
 }
 
+export type DocumentoAnexo = {
+    id?: number,
+    anexo: string,
+    nome: string,
+    documento_assinado?: number,
+}
+
 export type DocumentoAssinar = {
     id: number
+    pagina: number
+    posX: number
+    posY: number
+    largura: number
+    altura: number
+}
+
+export type DocumentoAnexoAssinar = {
+    id?: number
     anexo: string
     pagina: number
     posX: number
