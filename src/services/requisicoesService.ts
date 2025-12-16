@@ -1,4 +1,4 @@
-import { RequisicaoDto, Requisicao_aprovacao, Requisicao_item } from "@/types/Requisicao";
+import { AnexoMovimento, RequisicaoDto, Requisicao_aprovacao, Requisicao_item } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Requisicoes";
 const elemento_singular = "requisição";
@@ -40,4 +40,14 @@ export async function reprovar(id: number, atendimento: number): Promise<void> {
     }
 }
 
-export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao }
+export async function getAnexoByIdmov(id: number, atendimento: number): Promise<AnexoMovimento> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/anexo/${id}/${atendimento}`, { headers: headers(), });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_singular}: ${msg}`);
+    }
+    const apiData: AnexoMovimento = await res.json();
+    return apiData;
+}
+
+export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao, AnexoMovimento }

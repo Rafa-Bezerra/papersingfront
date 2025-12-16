@@ -41,6 +41,7 @@ import {
     Requisicao_item,
     aprovar,
     getAll as getAllRequisicoes,
+    getAnexoByIdmov,
     reprovar
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
@@ -65,6 +66,7 @@ export default function Page() {
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
+    const [userAdmin, setUserAdmin] = useState(false);
     const [filtroDashboard, setFiltroDashboard] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
@@ -130,6 +132,7 @@ export default function Page() {
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
+            setUserAdmin(user.admin);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
         }
@@ -159,7 +162,11 @@ export default function Page() {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
-                return matchQuery && matchSituacao
+                let usuarioAprovador = d.requisicao_aprovacoes.some(
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                );
+                if (userAdmin) { usuarioAprovador = true; }
+                return matchQuery && matchSituacao && usuarioAprovador
             })
 
             const dashboardfiltrado = filtroDashboard ? filtrados.filter(d => {
@@ -213,36 +220,41 @@ export default function Page() {
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
         const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
         setPodeAssinar(podeAssinar);
-
         setTotalPages(1);
-        setIsModalDocumentosOpen(true)
         setRequisicaoSelecionada(requisicao)
-        const arquivoBase64 = requisicao.requisicao.arquivo;
-        setRequisicaoDocumentoSelecionada(arquivoBase64);
+        try {
+            const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
+            const arquivoBase64 = data.arquivo;
+            setRequisicaoDocumentoSelecionada(arquivoBase64);
 
-        if (!window._pdfMessageListener) {
-            window._pdfMessageListener = true;
+            if (!window._pdfMessageListener) {
+                window._pdfMessageListener = true;
+                window.addEventListener("message", (event) => {
+                    if (event.data?.totalPages) {
+                        setTotalPages(event.data.totalPages);
+                    }
+                });
+            }
 
-            window.addEventListener("message", (event) => {
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-            });
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: arquivoBase64 },
+                    '*'
+                );
+            }, 500);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalDocumentosOpen(true)
         }
-
-        setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-                { pdfBase64: arquivoBase64 },
-                '*'
-            );
-        }, 500);
-        setIsLoading(false)
     }
 
     async function handleAssinar(data: Assinar) {
         setIsLoading(true)
         setSearched(false)
         try {
+            data.arquivo = requisicaoDocumentoSelecionada;
             await assinar(data)
             handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
@@ -548,13 +560,11 @@ export default function Page() {
 
                     return (
                         <div className="flex gap-2">
-                            {requisicao.arquivo && (
-                                <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
-                                    Documento {requisicao.documento_assinado == 1 && (
-                                        <Check className="w-4 h-4 text-green-500" />
-                                    )}
-                                </Button>
-                            )}
+                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                Documento {requisicao.documento_assinado == 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>
                             {requisicao && (
                                 <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
                                     Anexos {row.original.requisicao.quantidade_anexos > 0 ? `(${row.original.requisicao.quantidade_anexos})` : ''}

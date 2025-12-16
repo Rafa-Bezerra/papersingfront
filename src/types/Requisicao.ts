@@ -45,3 +45,7 @@ export type Requisicao_aprovacao = {
     situacao: string,
     data_aprovacao: string
 }
+
+export type AnexoMovimento = {
+    arquivo: string,
+}
