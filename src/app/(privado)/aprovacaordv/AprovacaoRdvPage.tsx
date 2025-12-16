@@ -14,7 +14,7 @@ import {
     DialogTitle
 } from '@/components/ui/dialog'
 import { Check, Filter, Loader2 } from "lucide-react";
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar } from '@/services/rdvService';
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { safeDateLabel, stripDiacritics } from '@/utils/functions';
@@ -111,27 +111,34 @@ export default function Page() {
     async function handleVisualizarAnexo(anexo: AnexoRdv) {
         setIsLoading(true)
         setTotalPagesAnexo(1);
-        setIsModalVisualizarAnexoOpen(true)
-        setAnexoSelecionado(anexo);
-        const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+        try {
+            const data = await getAnexoById(anexo.id!)
+            setAnexoSelecionado(data);
+            const pdfClean = data.anexo.replace(/^data:.*;base64,/, '').trim();
 
-        if (!window._pdfMessageListener) {
-            window._pdfMessageListener = true;
+            if (!window._pdfMessageListener) {
+                window._pdfMessageListener = true;
 
-            window.addEventListener("message", (event) => {
-                if (event.data?.totalPages) {
-                    setTotalPagesAnexo(event.data.totalPages);
-                }
-            });
+                window.addEventListener("message", (event) => {
+                    if (event.data?.totalPages) {
+                        setTotalPagesAnexo(event.data.totalPages);
+                    }
+                });
+            }
+
+            setTimeout(() => {
+                iframeAnexoRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: pdfClean },
+                    '*'
+                );
+            }, 500);
+
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalVisualizarAnexoOpen(true)
         }
-
-        setTimeout(() => {
-            iframeAnexoRef.current?.contentWindow?.postMessage(
-                { pdfBase64: pdfClean },
-                '*'
-            );
-        }, 500);
-        setIsLoading(false)
     }
 
     function changePageAnexo(newPage: number) {
@@ -323,7 +330,7 @@ export default function Page() {
             { accessorKey: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.ccusto + ' - ' + (row.custo ?? '-') },
             { accessorKey: 'codconta', header: 'Conta financeira', accessorFn: (row) => row.codconta + ' - ' + (row.contabil ?? '-') },
             { accessorKey: 'idprd', header: 'Produto', accessorFn: (row) => row.idprd + ' - ' + (row.produto ?? '-') },
-            { accessorKey: 'valor', header: 'Valor' },
+            { accessorKey: 'valor', header: 'Valor', accessorFn: (row) => row.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '' },
             { accessorKey: 'descricao', header: 'Descrição' },
         ],
         []
@@ -348,13 +355,13 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => (
                     <div className="flex gap-2">
-                        {row.original.anexo && (<Button
+                        <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleVisualizarAnexo(row.original)}
                         >
                             Visualizar
-                        </Button>)}
+                        </Button>
                     </div>
                 )
             }

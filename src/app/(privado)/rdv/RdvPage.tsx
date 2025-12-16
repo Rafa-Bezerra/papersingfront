@@ -370,7 +370,7 @@ export default function Page() {
             { accessorKey: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.ccusto + ' - ' + (row.custo ?? '-') },
             { accessorKey: 'codconta', header: 'Conta financeira', accessorFn: (row) => row.codconta + ' - ' + (row.contabil ?? '-') },
             { accessorKey: 'idprd', header: 'Produto', accessorFn: (row) => row.idprd + ' - ' + (row.produto ?? '-') },
-            { accessorKey: 'valor', header: 'Valor' },
+            { accessorKey: 'valor', header: 'Valor', accessorFn: (row) => row.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '' },
             { accessorKey: 'descricao', header: 'Descrição' },
         ],
         []

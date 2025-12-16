@@ -193,7 +193,10 @@ export default function Page() {
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.nome ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.situacao == situacaoFiltrada
-                return matchQuery && matchSituacao
+                const usuarioAprovador = d.aprovadores.some(
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                );
+                return matchQuery && matchSituacao && usuarioAprovador
             })
 
             setResults(filtrados)
@@ -440,25 +443,21 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
-
                     const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
-
                     const nivelUsuario = row.original.aprovadores.find(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     )?.ordem ?? 1;
-
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
-                    // const usuarioAprovou = row.original.aprovadores.some(ap =>
-                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
-                    // );
-                    const usuarioAprovou = false;
+                    const usuarioAprovou = row.original.aprovadores.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                    );
+
                     const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
 
-                    const status_liberado = ['Em Andamento'].includes(row.original.situacao);
+                    const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
 
-                    const podeAprovar = todasInferioresAprovadas && (usuarioAprovador || usuarioCriador) && !usuarioAprovou && status_liberado;
-                    const podeReprovar = todasInferioresAprovadas && (usuarioAprovador || usuarioCriador) && !usuarioAprovou && status_liberado;
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
                     return (
@@ -481,7 +480,7 @@ export default function Page() {
                                 </Button>
                             )}
 
-                            {podeReprovar && (
+                            {podeAprovar && (
                                 <Button
                                     size="sm"
                                     variant="destructive"
@@ -490,6 +489,7 @@ export default function Page() {
                                     Reprovar
                                 </Button>
                             )}
+
                             {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
@@ -508,7 +508,7 @@ export default function Page() {
     const colunasAprovacoes = useMemo<ColumnDef<DocumentoAprovacao>[]>(
         () => [
             { accessorKey: 'id', header: 'Id' },
-            { accessorKey: 'usuario', header: 'Usuário' },
+            { accessorKey: 'usuario_nome', header: 'Usuário' },
             { accessorKey: 'ordem', header: 'Ordem' },
             { accessorKey: 'aprovacao', header: 'Situação' },
             { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }

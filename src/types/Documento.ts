@@ -14,6 +14,7 @@ export type DocumentoAprovacao = {
     aprovacao?: string,
     ordem: number,
     usuario: string,
+    usuario_nome?: string,
 }
 
 export type DocumentoAnexo = {

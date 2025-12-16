@@ -164,7 +164,16 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
                 const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
-                return matchQuery && matchTipos && matchSituacao
+
+                const usuarioAprovador = d.requisicao_aprovacoes.some(
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                );
+                const nivelUsuario = d.requisicao_aprovacoes.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    )?.nivel ?? 1;
+                const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && todasInferioresAprovadas
             })
             setResults(filtrados)
         } catch (err) {

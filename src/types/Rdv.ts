@@ -25,6 +25,7 @@ export type Rdv = {
     aprovadores: AprovadoresRdv[];
 };
 export type AnexoRdv = {
+    id?: number;
     anexo: string;
     nome: string;
 };
