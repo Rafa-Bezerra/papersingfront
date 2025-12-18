@@ -78,7 +78,7 @@ export default function HomePage() {
           icon={FileText}
           color="blue"
           description="Total de documentos"
-          href="/geral"
+          href="/geral?status=Todos"
           className="w-full"
         />
         

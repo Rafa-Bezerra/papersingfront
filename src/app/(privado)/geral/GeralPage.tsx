@@ -121,78 +121,148 @@ export default function Page() {
     }
 
     useEffect(() => {
-        if (dateFrom === "" && dateTo === "") {
-            const today = new Date();
-            const fiveDaysAgo = new Date();
-            fiveDaysAgo.setDate(today.getDate() - 5);
+        // Datas padrão (últimos 5 dias)
+        const today = new Date();
+        const fiveDaysAgo = new Date();
+        fiveDaysAgo.setDate(today.getDate() - 5);
 
-            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
-            setDateTo(today.toISOString().substring(0, 10));
-        }
+        setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
+        setDateTo(prev => prev || today.toISOString().substring(0, 10));
+
+        // Usuário
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
-            setUserName(user.nome.toUpperCase());
-            setCodusuario(user.codusuario.toUpperCase());
+            setUserName(user.nome?.toUpperCase() ?? "");
+            setCodusuario(user.codusuario?.toUpperCase() ?? "");
         }
-        handleSearch(searchParams.get('q') ?? '')
-        setFiltroDashboard((searchParams.get('status') ?? ''));
 
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        debounceRef.current = setTimeout(() => {
-            handleSearch("")
-        }, 300)
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current)
+
+        const status = searchParams.get("status") ?? "";
+        setFiltroDashboard(status);
+        switch (status) {
+            case "Aprovados":
+                setSituacaoFiltrada("Em Andamento");
+                break;
+            case "Pendentes":
+                setSituacaoFiltrada("Em Andamento");
+                break;
+            case "Andamento":
+                setSituacaoFiltrada("Em Andamento");
+                break;
+            case "Finalizados":
+                setSituacaoFiltrada("Concluído confirmado");
+                break;
+            default:
+                setSituacaoFiltrada("");
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [situacaoFiltrada, dateFrom, dateTo])
+    }, []);
+
+    useEffect(() => {
+        if (!dateFrom || !dateTo) return;
+
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+
+        debounceRef.current = setTimeout(() => {
+            handleSearch(searchParams.get("q") ?? "");
+        }, 300);
+
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, [
+        dateFrom,
+        dateTo,
+        situacaoFiltrada,
+        filtroDashboard,
+        userAdmin,
+        userCodusuario
+    ]);
+
 
     async function handleSearch(q: string) {
-        setIsLoading(true)
-        setError(null)
+        setIsLoading(true);
+        setError(null);
+
         try {
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
-            const dados = await getAllRequisicoes(dateFrom ?? fiveDaysAgo, dateTo ?? today, [], situacaoFiltrada)
-            const qNorm = stripDiacritics(q.toLowerCase().trim())
-            const filtrados = dados.filter(d => {
-                const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
-                const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
-                const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
-                let usuarioAprovador = d.requisicao_aprovacoes.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                );
-                if (userAdmin) { usuarioAprovador = true; }
-                return matchQuery && matchSituacao && usuarioAprovador
-            })
 
-            const dashboardfiltrado = filtroDashboard ? filtrados.filter(d => {
+            const from = dateFrom && dateFrom !== ""
+                ? dateFrom
+                : fiveDaysAgo.toISOString().substring(0, 10);
+
+            const to = dateTo && dateTo !== ""
+                ? dateTo
+                : today.toISOString().substring(0, 10);
+
+            const dados = await getAllRequisicoes(
+                from,
+                to,
+                [],
+                situacaoFiltrada
+            );
+
+            const qNorm = stripDiacritics(q.toLowerCase().trim());
+            const usuarioLogado = stripDiacritics(
+                (userCodusuario ?? "").toLowerCase().trim()
+            );
+
+            const filtrados = dados.filter(d => {
+                const movimento = stripDiacritics(
+                    (d.requisicao.movimento ?? "").toLowerCase()
+                );
+
+                const matchQuery =
+                    qNorm === "" ||
+                    movimento.includes(qNorm) ||
+                    String(d.requisicao.idmov ?? "").includes(qNorm);
+
+                const matchSituacao =
+                    !situacaoFiltrada ||
+                    d.requisicao.status_movimento === situacaoFiltrada;
+
+                const usuarioAprovador =
+                    userAdmin ||
+                    d.requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado
+                    );
+
+                return matchQuery && matchSituacao && usuarioAprovador;
+            });
+            const fitradosStatus = filtrados.filter(d => {
                 switch (filtroDashboard) {
-                    case 'Aprovados':
-                        return d.requisicao_aprovacoes.some(a => a.usuario == stripDiacritics((userCodusuario ?? '').toLowerCase()) && a.situacao == 'A') === true;
-                    case 'Andamento':
-                        return d.requisicao.status_movimento !== 'Concluído confirmado' && d.requisicao.status_movimento !== 'Cancelado';
-                    case 'Finalizados':
-                        return d.requisicao.status_movimento === 'Concluído confirmado';
-                    case 'Pendentes':
-                        return d.requisicao_aprovacoes.some(a => a.usuario == stripDiacritics((userCodusuario ?? '').toLowerCase()) && a.situacao == 'P') === true;
+                    case "Aprovados":
+                        return d.requisicao_aprovacoes.some(a =>
+                            stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
+                            a.situacao === "A"
+                        );
+
+                    case "Pendentes":
+                        return d.requisicao_aprovacoes.some(a =>
+                            stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
+                            a.situacao === "P"
+                        );
                     default:
                         return true;
-                }
-            }) : filtrados;
-
-            setResults(dashboardfiltrado)
+                };
+            });
+            setResults(fitradosStatus);
         } catch (err) {
-            setError((err as Error).message)
-            setResults([])
+            setError((err as Error).message);
+            setResults([]);
         } finally {
-            setSearched(true)
-            setIsLoading(false)
+            setSearched(true);
+            setIsLoading(false);
         }
     }
+
 
     async function handleSearchClick() {
         setIsLoading(true)
