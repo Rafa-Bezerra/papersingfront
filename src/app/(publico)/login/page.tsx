@@ -200,8 +200,10 @@ export default function LoginPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="WAY 112">WAY 112</SelectItem>
+                              <SelectItem value="WAY 153">WAY 153</SelectItem>
                               <SelectItem value="WAY 262">WAY 262</SelectItem>
                               <SelectItem value="WAY 306">WAY 306</SelectItem>
+                              <SelectItem value="WAY 364">WAY 364</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
