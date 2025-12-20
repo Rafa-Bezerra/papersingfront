@@ -6,6 +6,7 @@ import React, {
     useRef,
     useState,
 } from 'react'
+import { NumericFormat } from "react-number-format";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
     Dialog,
@@ -219,7 +220,7 @@ export default function Page() {
         try {
             await createElement(rdv)
             toast.success('RDV enviado com sucesso!')
-            // window.location.reload()
+            window.location.reload()
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -798,7 +799,19 @@ export default function Page() {
                                             <FormItem>
                                                 <FormLabel>Valor</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <NumericFormat
+                                                        value={field.value}
+                                                        onValueChange={(values) => {
+                                                            field.onChange(values.floatValue ?? 0);
+                                                        }}
+                                                        thousandSeparator="."
+                                                        decimalSeparator=","
+                                                        decimalScale={2}
+                                                        fixedDecimalScale
+                                                        allowNegative={false}
+                                                        customInput={Input}
+                                                        placeholder="0,00"
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

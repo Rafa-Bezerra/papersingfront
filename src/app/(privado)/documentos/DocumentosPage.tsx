@@ -226,6 +226,7 @@ export default function Page() {
     }
 
     async function handleAnexos(requisicao: Documento) {
+        console.log('requisicao', requisicao);        
         setIsModalAnexosOpen(true)
         setRequisicaoSelecionada(requisicao)
         setSelectedAnexosResult(requisicao.anexos)
@@ -525,7 +526,7 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => (
                     <div className="flex gap-2">
-                        {row.original.anexo && (<Button
+                        <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleVisualizarAnexo(row.original)}
@@ -533,7 +534,7 @@ export default function Page() {
                             Visualizar {row.original.documento_assinado == 1 && (
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
-                        </Button>)}
+                        </Button>
                     </div>
                 )
             }
@@ -626,10 +627,7 @@ export default function Page() {
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
                     <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
-                            <Button onClick={handleInserirAprovador} className="flex items-center">
-                                <SquarePlus className="mr-1 h-4 w-4" /> Novo aprovador
-                            </Button>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>
                         <div className="w-full">
                             <DataTable columns={colunasAnexos} data={selectedAnexosResult} loading={isLoading} />
@@ -1001,13 +999,13 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                                                 {usuarios.map((u) => (
                                                                     <CommandItem
                                                                         key={u.codusuario}
-                                                                        value={u.codusuario}
+                                                                        value={`${u.codusuario} ${u.nome}`} 
                                                                         onSelect={() => {
                                                                             field.onChange(u.codusuario)
                                                                             setOpenIndex(null)
                                                                         }}
                                                                     >
-                                                                        {u.nome}
+                                                                        {`${u.codusuario} ${u.nome}`}
                                                                     </CommandItem>
                                                                 ))}
                                                             </CommandGroup>

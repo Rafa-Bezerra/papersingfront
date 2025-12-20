@@ -953,7 +953,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {anexoSelecionado && (
                 <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}`}
                             </DialogTitle>
