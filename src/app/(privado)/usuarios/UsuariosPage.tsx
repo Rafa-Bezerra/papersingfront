@@ -83,6 +83,7 @@ export default function PageUsuarios() {
       comunicados: false,
       rdv: false,
       externo: false,
+      restrito: false,
     }
   })
 
@@ -523,6 +524,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Externo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="restrito"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Restrito</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

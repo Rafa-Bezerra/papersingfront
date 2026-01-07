@@ -33,7 +33,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
+import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
 import { Loader2 } from "lucide-react";
 import {
     aprovar,
@@ -42,8 +42,11 @@ import {
     BorderoItem,
     getAll,
     getAllAprovadores,
-    getAllItens
+    getAllItens,
+    getAnexoById
 } from '@/services/borderoService';
+import { Label } from '@radix-ui/react-label';
+import { toast } from 'sonner';
 
 export default function Page() {
     const titulo = 'Borderôs'
@@ -69,6 +72,12 @@ export default function Page() {
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("AGUARDANDO APROVAÇÃO")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
+    const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
+    const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
 
     function clearQuery() { setQuery('') }
 
@@ -130,7 +139,12 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAll()
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+            const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
+            const to = dateTo ? dateTo : dateToIso(today)
+            const dados = await getAll(from, to)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.descricao ?? '').includes(qNorm)
@@ -207,7 +221,7 @@ export default function Page() {
     const colunas = useMemo<ColumnDef<Bordero>[]>(
         () => [
             { accessorKey: 'id_bordero', header: 'ID' },
-            { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao)  },
+            { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
             { accessorKey: 'descricao', header: 'Descrição' },
             { accessorKey: 'cod_conta_caixa', header: 'Conta caixa' },
             { accessorKey: 'nome_banco', header: 'Banco' },
@@ -283,6 +297,58 @@ export default function Page() {
         return data.reduce((acc, item) => acc + (Number(item[key]) || 0), 0);
     }
 
+    async function handleDocumento(item: BorderoItem) {
+        setIsLoading(true)
+        setTotalPages(1);
+        setItemSelecionado(item)
+        try {
+            const data = await getAnexoById(item.id_movimento_ligacao);
+            const arquivoBase64 = data.arquivo;
+            setDocumentoItemSelecionado(arquivoBase64);
+
+            if (!window._pdfMessageListener) {
+                window._pdfMessageListener = true;
+                window.addEventListener("message", (event) => {
+                    if (event.data?.totalPages) {
+                        setTotalPages(event.data.totalPages);
+                    }
+                });
+            }
+
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: arquivoBase64 },
+                    '*'
+                );
+            }, 500);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalDocumentosOpen(true)
+        }
+    }
+
+    function handleImprimir() {
+        if (!iframeRef.current) return;
+
+        const iframe = iframeRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
+    }
+
+    function changePage(newPage: number) {
+        if (!iframeRef.current) return;
+        setCurrentPage(newPage);
+        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
     const colunasItens = useMemo<ColumnDef<BorderoItem>[]>(
         () => [
             // { accessorKey: 'id_bordero', header: 'Id' },
@@ -339,17 +405,53 @@ export default function Page() {
             { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
             { accessorKey: 'validade_bordero', header: 'Validade', accessorFn: (row) => safeDateLabel(row.validade_bordero) },
             { accessorKey: 'data_criacao_lan', header: 'Data criação lanc.', accessorFn: (row) => safeDateLabel(row.data_criacao_lan) },
-            { accessorKey: 'data_vencimento_lan', header: 'Data venc. lanc.', accessorFn: (row) => safeDateLabel(row.data_vencimento_lan) }
+            { accessorKey: 'data_vencimento_lan', header: 'Data venc. lanc.', accessorFn: (row) => safeDateLabel(row.data_vencimento_lan) },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    return (
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                Documento
+                            </Button>
+                        </div>
+                    );
+                }
+            }
         ],
         []
     )
 
     return (
         <div className="p-6">
+            {/* Filtros e Busca */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex justify-end items-end gap-4">
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateFrom">Data de</Label>
+                            <Input
+                                id="dateFrom"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateTo">Data até</Label>
+                            <Input
+                                id="dateTo"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+
                         {/* Botão de Filtros - Dropdown com checkboxes */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -395,6 +497,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
+            {/* Borderos */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={loading} />
@@ -432,6 +535,70 @@ export default function Page() {
                         )}
                         <div className="w-full">
                             <DataTable columns={colunasItens} data={itensResults} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Documento */}
+            {itemSelecionado && (
+                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Documento item n° ${itemSelecionado.id_movimento_ligacao}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex justify-center bg-gray-50">
+                            {documentoItemSelecionado ? (
+                                <>
+                                    {/* PDF sem overflow interno */}
+                                    <iframe
+                                        ref={iframeRef}
+                                        src="/pdf-viewer.html"
+                                        className="relative border-none  cursor-crosshair"
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            maxWidth: '800px',
+                                            aspectRatio: '1/sqrt(2)', // Proporção A4
+                                        }}
+                                    />
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                            <Button
+                                disabled={currentPage <= 1}
+                                onClick={() => changePage(currentPage - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPage}
+                                {totalPages ? ` / ${totalPages}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
+                                onClick={() => changePage(currentPage + 1)}
+                            >
+                                Próxima
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimir()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>

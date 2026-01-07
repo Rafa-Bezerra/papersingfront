@@ -29,17 +29,37 @@ export default function PdfViewerClient({ base64Pdf, handleClickPdf, coords }: P
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+
+    window.parent.postMessage(
+      { totalPages: numPages },
+      '*'
+    );
   };
 
+  const onDocumentLoadError = (error: Error) => {
+    console.error('Erro ao carregar PDF:', error);
+
+    window.parent.postMessage(
+      { totalPages: 0, error: error.message },
+      '*'
+    );
+  };
+  
   return (
     <div ref={containerRef} className="relative flex-1 flex flex-col overflow-auto">
       <Document
         file={`data:application/pdf;base64,${base64Pdf}`}
         onLoadSuccess={onDocumentLoadSuccess}
+        onLoadError={onDocumentLoadError}
       >
-        {Array.from(new Array(numPages), (_, i) => (
-          <Page key={i} pageNumber={i + 1} width={pageWidth} />
-        ))}
+        {numPages &&
+          Array.from({ length: numPages }, (_, i) => (
+            <Page
+              key={i}
+              pageNumber={i + 1}
+              width={pageWidth}
+            />
+          ))}
       </Document>
 
       {/* Overlay para clique */}

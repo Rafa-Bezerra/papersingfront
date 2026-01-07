@@ -1,14 +1,21 @@
 import type { Bordero, BorderoItem, BorderoAprovacao } from "@/types/Bordero";
 import { API_BASE, headers } from "@/utils/constants";
+import { AnexoMovimento } from "./requisicoesService";
 const caminho = "Bordero";
 const elemento_singular = "borderô";
 const elemento_plural = "borderôs";
 
-export async function getAll(): Promise<Bordero[]> {
-    const url = new URL(`${API_BASE}/api/${caminho}`);       
+export async function getAll(dateFrom: string, dateTo: string): Promise<Bordero[]> {
+    const url = new URL(`${API_BASE}/api/${caminho}`);
+    
+    const body = { dateFrom, dateTo };
+
     const res = await fetch(url.toString(), {
+        method: 'POST',
         headers: headers(),
+        body: JSON.stringify(body),
     });
+
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
@@ -65,6 +72,16 @@ export async function aprovar(id: number, aprovado: number): Promise<void> {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
     }
+}
+
+export async function getAnexoById(id: number): Promise<AnexoMovimento> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/anexo/${id}`, { headers: headers(), });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_singular}: ${msg}`);
+    }
+    const apiData: AnexoMovimento = await res.json();
+    return apiData;
 }
 
 export type { Bordero, BorderoItem, BorderoAprovacao }

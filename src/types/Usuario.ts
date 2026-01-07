@@ -15,6 +15,7 @@ export type Usuario = {
     comunicados: boolean,
     rdv: boolean,
     externo: boolean,
+    restrito: boolean,
 }
 
 export interface LoginPayload {

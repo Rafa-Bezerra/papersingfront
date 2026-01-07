@@ -39,7 +39,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { dateToIso, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -597,7 +597,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         () => [
             { accessorKey: 'centro_custo', header: 'Centro de custo', accessorFn: (row) => row.centro_custo + ' - ' + (row.nome_centro_custo ?? '-') },
             { accessorKey: 'codigo_item_movimento', header: 'Cod. Item' },
-            { accessorKey: 'item_preco_unitario', header: 'Preço unitário' },
+            { accessorKey: 'item_preco_unitario', header: 'Preço unitário', accessorFn: (row) => toMoney(row.item_preco_unitario) },
             { accessorKey: 'item_quantidade', header: 'Quantidade' },
             { accessorKey: 'item_total', header: 'Total' },
             // { accessorKey: 'historico_item', header: 'Histórico' }
@@ -772,7 +772,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
                                 <div className="flex justify-between border-b border-muted pb-1">
                                     <span className="font-semibold text-muted-foreground">Valor bruto:</span>
-                                    <span>{requisicaoSelecionada.requisicao.valor_total.toFixed(2) ?? "-"}</span>
+                                    <span>{toMoney(requisicaoSelecionada.requisicao.valor_total.toFixed(2)) ?? "-"}</span>
                                 </div>
 
                                 <div className="flex justify-between border-b border-muted pb-1">

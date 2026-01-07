@@ -27,7 +27,7 @@ export function safeDate(iso?: string) {
   }
 }
 
-export function toMoney(value: number) {
+export function toMoney(value: number | string): string {
   return Number(value).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL"
