@@ -22,7 +22,7 @@ export const data = {
         { title: "Aquisição de serviços", url: "/aquisicoes" },
         { title: "Outras movimentações", url: "/outras" },
         { title: "Documentos", url: "/documentos" },
-        { title: "Comunicados", url: "/comunicados" },
+        { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },
         { title: "RDV", url: "/rdv" },

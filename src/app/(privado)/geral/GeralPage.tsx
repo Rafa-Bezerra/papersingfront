@@ -121,7 +121,6 @@ export default function Page() {
     }
 
     useEffect(() => {
-        // Datas padrão (últimos 5 dias)
         const today = new Date();
         const fiveDaysAgo = new Date();
         fiveDaysAgo.setDate(today.getDate() - 5);
@@ -129,7 +128,6 @@ export default function Page() {
         setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
         setDateTo(prev => prev || today.toISOString().substring(0, 10));
 
-        // Usuário
         const storedUser = localStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
@@ -157,6 +155,7 @@ export default function Page() {
             default:
                 setSituacaoFiltrada("");
         }
+        console.log("setou status: "+status);        
     }, []);
 
     useEffect(() => {
@@ -189,7 +188,8 @@ export default function Page() {
         setIsLoading(true);
         setError(null);
 
-        try {
+        try {            
+            console.log("buscou status: "+situacaoFiltrada);
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);

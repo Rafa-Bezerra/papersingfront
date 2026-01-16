@@ -64,7 +64,7 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover';
 
 export default function Page() {
-    const titulo = 'Comunicados para Assinatura'
+    const titulo = 'Pagamentos CI'
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -256,7 +256,7 @@ export default function Page() {
     async function confirmarAssinatura() {
         setIsLoading(true)
         if (!coords) {
-            toast.error("Clique no local onde deseja assinar o Comunicado.");
+            toast.error("Clique no local onde deseja assinar o Pagamento.");
             return;
         }
         try {
@@ -271,7 +271,7 @@ export default function Page() {
             };
             await updateElement(dadosAssinatura);
             handleSearchClick()
-            toast.success("Comunicado assinado com sucesso!");
+            toast.success("Pagamento assinado com sucesso!");
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -290,7 +290,7 @@ export default function Page() {
             iframeWindow.focus();
             iframeWindow.print();
         } else {
-            toast.error("Não foi possível acessar o Comunicado para impressão.");
+            toast.error("Não foi possível acessar o Pagamento para impressão.");
         }
     }
 
@@ -330,7 +330,7 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            toast.success(`Comunicado excluído`)
+            toast.success(`Pagamento excluído`)
             setDeleteComunicadoId(null)
             await handleSearchClick()
         }
@@ -564,7 +564,7 @@ export default function Page() {
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
-                                {`Comunicado movimentação n° ${requisicaoSelecionada.id}`}
+                                {`Pagamento movimentação n° ${requisicaoSelecionada.id}`}
                             </DialogTitle>
                         </DialogHeader>
 
