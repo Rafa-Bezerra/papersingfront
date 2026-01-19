@@ -290,7 +290,6 @@ export default function Page() {
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
         const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
         setPodeAssinar(podeAssinar);
-        setTotalPages(1);
         setRequisicaoSelecionada(requisicao)
         try {
             const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
@@ -466,7 +465,6 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: Anexo) {
         setIsLoading(true)
-        setTotalPagesAnexo(1);
         setIsModalVisualizarAnexoOpen(true)
         setAnexoSelecionado(anexo);
 

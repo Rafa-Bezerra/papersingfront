@@ -340,7 +340,6 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
-        setTotalPagesAnexo(1);
         setIsModalVisualizarAnexoOpen(true)
         setAnexoSelecionado(anexo);
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();

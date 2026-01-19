@@ -225,7 +225,6 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: AnexoCarrinho) {
         setIsLoading(true)
-        setTotalPagesAnexo(1);
         setIsModalVisualizarAnexoOpen(true)
         setAnexoSelecionado(anexo);
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();

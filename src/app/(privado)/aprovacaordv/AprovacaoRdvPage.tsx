@@ -110,7 +110,6 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: AnexoRdv) {
         setIsLoading(true)
-        setTotalPagesAnexo(1);
         try {
             const data = await getAnexoById(anexo.id!)
             setAnexoSelecionado(data);
@@ -163,7 +162,6 @@ export default function Page() {
 
     async function handleDocumento(aprovacao: Rdv) {
         setIsLoading(true)
-        setTotalPagesDocumento(1);
         const anexo: AnexoRdv = {
             anexo: aprovacao.arquivo!,
             nome: `Documento RDV n° ${aprovacao.id}`

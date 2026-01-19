@@ -211,7 +211,6 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
         const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
         setPodeAssinar(podeAssinar);
-        setTotalPages(1);
         setRequisicaoSelecionada(requisicao)
         try {
             const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
@@ -387,8 +386,6 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
     async function handleVisualizarAnexo(anexo: Anexo) {
         setIsLoading(true)
-        setTotalPagesAnexo(1);
-        setIsModalVisualizarAnexoOpen(true)
         setAnexoSelecionado(anexo);
 
         if (!window._pdfMessageListener) {
@@ -408,6 +405,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 '*'
             );
         }, 500);
+
+        setIsModalVisualizarAnexoOpen(true)
         setIsLoading(false)
     }
 

@@ -215,7 +215,6 @@ export default function Page() {
 
     async function handleComunicado(requisicao: Comunicado) {
         setIsLoading(true)
-        setTotalPages(1);
         setIsModalComunicadosOpen(true)
         setRequisicaoSelecionada(requisicao)
         const arquivoBase64 = requisicao.anexo;

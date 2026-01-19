@@ -31,7 +31,8 @@ export type BorderoItem = {
     cod_fornecedor: string,
     tipo_documento_lan: string,
     conta_de_centrocusto: string,
-    nat_financeira: string
+    nat_financeira: string,
+    possui_anexo: boolean,
 }
 export type BorderoAprovacao = {
     id?: number,

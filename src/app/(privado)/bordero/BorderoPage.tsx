@@ -251,7 +251,6 @@ export default function Page() {
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
                                 Itens
                             </Button>
-
                             <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
                                 Aprovações
                             </Button>
@@ -299,7 +298,6 @@ export default function Page() {
 
     async function handleDocumento(item: BorderoItem) {
         setIsLoading(true)
-        setTotalPages(1);
         setItemSelecionado(item)
         try {
             const data = await getAnexoById(item.id_movimento_ligacao);
@@ -412,9 +410,13 @@ export default function Page() {
                 cell: ({ row }) => {
                     return (
                         <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
-                                Documento
-                            </Button>
+                            {row.original.possui_anexo ? (
+                                <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                    Documento
+                                </Button>
+                            ) : (
+                                <span>Nenhum anexo</span>
+                            )}
                         </div>
                     );
                 }

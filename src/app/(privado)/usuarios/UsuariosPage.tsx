@@ -208,6 +208,7 @@ export default function PageUsuarios() {
         comunicados: response.comunicados,
         rdv: response.rdv,
         externo: response.externo,
+        restrito: response.restrito,
       })
       setIsModalOpen(true)
     } catch (err) {
