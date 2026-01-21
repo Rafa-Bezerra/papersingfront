@@ -20,14 +20,22 @@ import { toast } from 'sonner';
 import { safeDateLabel, stripDiacritics } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@radix-ui/react-dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export default function Page() {
     const titulo = 'Aprovação de RDV';
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [userCodusuario, setCodusuario] = useState("");
-    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em andamento")
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
 
     const [results, setResults] = useState<Rdv[]>([])
     const [selectedResult, setSelectedResult] = useState<Rdv>()
@@ -60,8 +68,11 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setCodusuario(user.codusuario.toUpperCase());
         }
-        buscaAprovacoesRdv();
     }, [])
+
+    useEffect(() => {
+        buscaAprovacoesRdv();
+    }, [situacaoFiltrada])
 
     async function buscaAprovacoesRdv() {
         setIsLoading(true)
@@ -421,33 +432,41 @@ export default function Page() {
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    {/* Botão de Filtros - Dropdown com checkboxes */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" aria-label="Abrir filtros">
-                                <Filter className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Filtros</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64" align="end">
-                            <DropdownMenuLabel>Status</DropdownMenuLabel>
-                            <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => setSituacaoFiltrada("Em Andamento")}>Em Andamento</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"Aprovado"} checked={situacaoFiltrada == "Aprovado"} onCheckedChange={() => setSituacaoFiltrada("Aprovado")}>Aprovado</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"Reprovado"} checked={situacaoFiltrada == "Reprovado"} onCheckedChange={() => setSituacaoFiltrada("Reprovado")}>Reprovado</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex justify-end items-end gap-4">
+                        {/* Botão de Filtros - Dropdown com checkboxes */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Filtros</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                                <DropdownMenuRadioGroup value={situacaoFiltrada} onValueChange={setSituacaoFiltrada}>
+                                    <DropdownMenuRadioItem value="Em Andamento">Em Andamento</DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="Aprovado">Aprovado</DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="Reprovado">Reprovado</DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="">Todos</DropdownMenuRadioItem>
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </CardHeader>
+            </Card>
+
+            <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={isLoading} />
                 </CardContent>
             </Card>
 
             {/* Loading */}
-            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+            <Dialog open={isLoading} modal={false}>
                 <DialogContent
                     showCloseButton={false}
-                    className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
+                    className="pointer-events-none flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                     aria-description='Carregando...'
                 >
                     <DialogHeader>
