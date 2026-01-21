@@ -28,6 +28,7 @@ import {
   Truck
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface AppSidebarProps {
   navMain: NavSection[]
@@ -50,7 +51,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
-
+  const isMobileDevice = useIsMobile()
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
   const toggleMobile = onMobileToggle || (() => setIsMobileOpen(!isMobileOpen))
@@ -62,18 +63,23 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   useEffect(() => {
     const storedUser = localStorage.getItem("userData");
     if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setUserName(user.nome);
-      setUserEmail(user.email);
-      setUserAdmin(user.admin);
-      setUserDocumentos(user.documentos);
-      setUserBordero(user.bordero);
-      setUserComunicados(user.comunicados);
+      try {
+        const user = JSON.parse(storedUser);
+        setUserName(user.nome);
+        setUserEmail(user.email);
+        setUserAdmin(user.admin);
+        setUserDocumentos(user.documentos);
+        setUserBordero(user.bordero);
+        setUserComunicados(user.comunicados);
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error);
+      }
     }
   }, []);
 
   // Função para lidar com cliques duplos
   const handleMobileToggle = () => {
+    if (!isMobileDevice) return
     const now = Date.now()
     if (now - lastMobileClickTime < 300) { // 300ms de debounce
       return
@@ -201,7 +207,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/bordero" && !userBordero) return null;
                         // if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
-                        if (["/alcadas","/usuarios","/borderoaprovadores","/rdvaprovadores"].includes(item.url)) return null;
+                        if (["/alcadas", "/usuarios", "/borderoaprovadores", "/rdvaprovadores"].includes(item.url)) return null;
                       }
                       return (
                         <SidebarMenuItem key={item.title}>

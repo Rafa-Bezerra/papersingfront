@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { KeyboardEvent } from "react";
 
 // Card do dashboard que mostra estatísticas
 // Pode clicar para navegar, tem cores diferentes e ícones
@@ -51,6 +52,7 @@ const colorVariants = {
   },
 };
 
+
 export function DashboardCard({
   title,
   count,
@@ -62,6 +64,12 @@ export function DashboardCard({
 }: DashboardCardProps) {
   const router = useRouter();
   const colors = colorVariants[color];
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleClick();
+    }
+  };
 
   const handleClick = () => {
     router.push(href);
@@ -71,22 +79,26 @@ export function DashboardCard({
     <Card
       className={cn(
         "cursor-pointer transition-all duration-200 hover:shadow-md w-full dashboard-card-full",
+        "cursor-pointer transition-all duration-200 hover:shadow-md w-full dashboard-card-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         colors.bg,
         colors.border,
         colors.hover,
         className
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium text-foreground/70">
           {title}
         </CardTitle>
         <Icon className={cn("h-4 w-4", colors.icon)} />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold text-foreground">{count}</div>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        <p className="text-xs text-foreground/60 mt-1">{description}</p>
         {/* <Badge variant="secondary" className="mt-2 text-xs">
           Clique para ver detalhes
         </Badge> */}

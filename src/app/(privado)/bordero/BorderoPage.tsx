@@ -34,7 +34,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
-import { Loader2 } from "lucide-react";
+import { Loader2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
 import {
     aprovar,
     Bordero,
@@ -78,6 +78,7 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
     const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
+    const [zoomDocumento, setZoomDocumento] = useState(1.5);
 
     function clearQuery() { setQuery('') }
 
@@ -319,12 +320,34 @@ export default function Page() {
                     '*'
                 );
             }, 500);
+
+            setZoomDocumento(1.5);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
             setIsModalDocumentosOpen(true)
         }
+    }
+
+    function handleZoomInDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.min(5, zoomDocumento + 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomResetDocumento() {
+        if (!iframeRef.current) return;
+        setZoomDocumento(1.5);
+        iframeRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
     }
 
     function handleImprimir() {
@@ -577,7 +600,7 @@ export default function Page() {
                         </div>
 
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
                             <Button
                                 disabled={currentPage <= 1}
                                 onClick={() => changePage(currentPage - 1)}
@@ -594,6 +617,42 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutDocumento}
+                                    disabled={zoomDocumento <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomDocumento * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInDocumento}
+                                    disabled={zoomDocumento >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomResetDocumento}
+                                    title="Resetar zoom"
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            </div>
+
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimir()}

@@ -13,7 +13,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, Loader2 } from "lucide-react";
+import { Check, Filter, Loader2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -50,6 +50,8 @@ export default function Page() {
     const [isModalVisualizarDocumentoOpen, setIsModalVisualizarDocumentoOpen] = useState(false)
     const iframeDocumentoRef = useRef<HTMLIFrameElement>(null);
     const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [zoomAnexo, setZoomAnexo] = useState(1.5)
+    const [zoomDocumento, setZoomDocumento] = useState(1.5);
 
 
     useEffect(() => {
@@ -131,13 +133,33 @@ export default function Page() {
                     '*'
                 );
             }, 500);
-
+            setZoomAnexo(1.5);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
             setIsModalVisualizarAnexoOpen(true)
         }
+    }
+
+    function handleZoomInAnexo() {
+        if (!iframeAnexoRef.current) return;
+        const newZoom = Math.min(5, zoomAnexo + 0.25);
+        setZoomAnexo(newZoom);
+        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutAnexo() {
+        if (!iframeAnexoRef.current) return;
+        const newZoom = Math.max(0.5, zoomAnexo - 0.25);
+        setZoomAnexo(newZoom);
+        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomResetAnexo() {
+        if (!iframeAnexoRef.current) return;
+        setZoomAnexo(1.5);
+        iframeAnexoRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
     }
 
     function changePageAnexo(newPage: number) {
@@ -168,26 +190,52 @@ export default function Page() {
         };
         setDocumentoSelecionado(anexo);
         setSelectedResult(aprovacao);
-        setIsModalVisualizarDocumentoOpen(true)
-        const pdfClean = aprovacao.arquivo!.replace(/^data:.*;base64,/, '').trim();
+        try {
+            const pdfClean = aprovacao.arquivo!.replace(/^data:.*;base64,/, '').trim();
+            if (!window._pdfMessageListener) {
+                window._pdfMessageListener = true;
 
-        if (!window._pdfMessageListener) {
-            window._pdfMessageListener = true;
+                window.addEventListener("message", (event) => {
+                    if (event.data?.totalPages) {
+                        setTotalPagesDocumento(event.data.totalPages);
+                    }
+                });
+            }
 
-            window.addEventListener("message", (event) => {
-                if (event.data?.totalPages) {
-                    setTotalPagesDocumento(event.data.totalPages);
-                }
-            });
+            setTimeout(() => {
+                iframeDocumentoRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: pdfClean },
+                    '*'
+                );
+            }, 500);
+
+            setZoomDocumento(1.5);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalVisualizarDocumentoOpen(true)
         }
+    }
 
-        setTimeout(() => {
-            iframeDocumentoRef.current?.contentWindow?.postMessage(
-                { pdfBase64: pdfClean },
-                '*'
-            );
-        }, 500);
-        setIsLoading(false)
+    function handleZoomInDocumento() {
+        if (!iframeDocumentoRef.current) return;
+        const newZoom = Math.min(5, zoomDocumento + 0.25);
+        setZoomDocumento(newZoom);
+        iframeDocumentoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutDocumento() {
+        if (!iframeDocumentoRef.current) return;
+        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
+        setZoomDocumento(newZoom);
+        iframeDocumentoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomResetDocumento() {
+        if (!iframeDocumentoRef.current) return;
+        setZoomDocumento(1.5);
+        iframeDocumentoRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
     }
 
     function changePageDocumento(newPage: number) {
@@ -489,7 +537,7 @@ export default function Page() {
                         </div>
 
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
                             <Button
                                 disabled={currentPageAnexo <= 1}
                                 onClick={() => changePageAnexo(currentPageAnexo - 1)}
@@ -506,6 +554,42 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutAnexo}
+                                    disabled={zoomAnexo <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomAnexo * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInAnexo}
+                                    disabled={zoomAnexo >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomResetAnexo}
+                                    title="Resetar zoom"
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            </div>
+
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimirAnexo()}
@@ -518,7 +602,7 @@ export default function Page() {
                 </Dialog>
             )}
 
-            {/* Visualizar anexo */}
+            {/* Visualizar documento */}
             {documentoSelecionado && (
                 <Dialog open={isModalVisualizarDocumentoOpen} onOpenChange={setIsModalVisualizarDocumentoOpen}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
@@ -573,7 +657,7 @@ export default function Page() {
                         </div>
 
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
                             <Button
                                 disabled={currentPageDocumento <= 1}
                                 onClick={() => changePageDocumento(currentPageDocumento - 1)}
@@ -590,6 +674,42 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutDocumento}
+                                    disabled={zoomDocumento <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomDocumento * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInDocumento}
+                                    disabled={zoomDocumento >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomResetDocumento}
+                                    title="Resetar zoom"
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            </div>
+
                             {(!selectedResult!.arquivo_assinado && <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
                             </Button>)}

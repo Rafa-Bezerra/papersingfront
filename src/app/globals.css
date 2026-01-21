@@ -166,6 +166,37 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+.base-logo-image {
+  transition: filter 0.3s ease, opacity 0.3s ease;
+  will-change: filter, opacity;
+}
+
+/* Em tema claro: mantém imagem original */
+:root .base-logo-image {
+  filter: none;
+}
+
+/* Em tema escuro: ajusta imagens para melhor visibilidade e integração */
+.dark .base-logo-image {
+  /* 
+   * Ajusta brilho, contraste e saturação para melhorar visibilidade 
+   * em fundos escuros. Funciona bem tanto para imagens com fundo branco 
+   * quanto para aquelas com fundo escuro.
+   */
+  filter: brightness(1.25) contrast(1.2) saturate(1.15);
+  /* Sutil redução de opacidade para integração melhor com o tema escuro */
+  opacity: 0.98;
+}
+
+/* Hover state para melhor interatividade */
+.base-logo-image:hover {
+  filter: brightness(1.3) contrast(1.25);
+}
+
+.dark .base-logo-image:hover {
+  filter: brightness(1.35) contrast(1.3) saturate(1.2);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

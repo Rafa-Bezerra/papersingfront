@@ -21,7 +21,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { login, LoginPayload } from '@/services/auth'
-// import { forgotPassword } from '@/services/senhasService'
 import Image from "next/image"
 import { Eye, EyeOff } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -40,58 +39,28 @@ export default function LoginPage() {
     control,
     handleSubmit,
     formState: { isSubmitting },
-    // setError,
     clearErrors
   } = form
   const router = useRouter()
-  // const [showForgotPassword, setShowForgotPassword] = useState(false)
-  // const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-
-  // Função para enviar email de recuperação de senha
-  // const handleForgotPassword = async () => {
-  //   if (!forgotPasswordEmail) {
-  //     alert('Por favor, digite seu email')
-  //     return
-  //   }
-
-  //   if (!forgotPasswordEmail.includes('@')) {
-  //     alert('Por favor, digite um email válido com @ e domínio')
-  //     return
-  //   }
-
-  //   try {
-  //     const response = await forgotPassword(forgotPasswordEmail)
-  //     alert(response.message)
-  //     setShowForgotPassword(false)
-  //     setForgotPasswordEmail('')
-  //   } catch (error) {
-  //     const message = error instanceof Error ? error.message : 'Erro ao enviar email de recuperação'
-  //     alert(message)
-  //   }
-  // }
-
-  // Função de submit do login simplificada
+  
   const onSubmit: SubmitHandler<LoginFormValues> = async values => {
     try {
-      // Validação básica - apenas verificar se os campos não estão vazios
       if (!values.usuario || !values.password) {
         alert('Por favor, preencha todos os campos')
         return;
       }
-
-      // Limpa erros anteriores
+      
       clearErrors()
 
-      // Payload para o backend (corrigido para formato original)
       const payload: LoginPayload = {
         username: values.usuario,
         password: values.password,
         base: values.base
       }
-      
+
       const usuario = await login(payload)
-      
+
       localStorage.setItem('authToken', usuario.token)
       localStorage.setItem('userData', JSON.stringify(usuario))
       router.push('/home')
@@ -187,39 +156,30 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
-  <FormField
-                    control={control}
-                    name="base"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Base</FormLabel>
-                        <FormControl>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione a base" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="WAY 112">WAY 112</SelectItem>
-                              <SelectItem value="WAY 153">WAY 153</SelectItem>
-                              <SelectItem value="WAY 262">WAY 262</SelectItem>
-                              <SelectItem value="WAY 306">WAY 306</SelectItem>
-                              <SelectItem value="WAY 364">WAY 364</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                {/* <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
-                  >
-                    Esqueci minha senha
-                  </button>
-                </div> */}
+                <FormField
+                  control={control}
+                  name="base"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Base</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a base" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="WAY 112">WAY 112</SelectItem>
+                            <SelectItem value="WAY 153">WAY 153</SelectItem>
+                            <SelectItem value="WAY 262">WAY 262</SelectItem>
+                            <SelectItem value="WAY 306">WAY 306</SelectItem>
+                            <SelectItem value="WAY 364">WAY 364</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Button
                   type="submit"
@@ -240,45 +200,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Modal de Esqueci Senha */}
-      {/* {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-700">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">
-              Recuperar Senha
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-              Digite seu email para receber instruções de recuperação de senha.
-            </p>
-            <Input
-              type="email"
-              placeholder="seu@email.com"
-              value={forgotPasswordEmail}
-              onChange={(e) => setForgotPasswordEmail(e.target.value)}
-              className="mb-6 h-12 border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
-            />
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowForgotPassword(false)
-                  setForgotPasswordEmail('')
-                }}
-                className="flex-1 h-12 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleForgotPassword} 
-                className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg"
-              >
-                Enviar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )} */}
     </main>
   )
 }
