@@ -62,7 +62,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   })
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("userData");
+    const storedUser = sessionStorage.getItem("userData");
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);

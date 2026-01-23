@@ -62,7 +62,7 @@ export default function Page() {
 
 
     useEffect(() => {
-        const storedUser = localStorage.getItem("userData");
+        const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setCodusuario(user.codusuario.toUpperCase());

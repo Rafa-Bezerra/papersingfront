@@ -27,7 +27,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("userData");
+    const storedUser = sessionStorage.getItem("userData");
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserName(user.nome);
@@ -55,7 +55,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("userData");
+    sessionStorage.removeItem("userData");
     router.push("/login");
   };
 

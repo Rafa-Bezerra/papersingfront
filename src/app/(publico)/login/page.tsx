@@ -62,6 +62,8 @@ export default function LoginPage() {
       const usuario = await login(payload)
 
       // Sessão apenas enquanto a aba estiver aberta (evita login “fantasma”).
+      // console.log(usuario);
+      
       sessionStorage.setItem('authToken', usuario.token)
       sessionStorage.setItem('userData', JSON.stringify(usuario))
       router.push('/home')

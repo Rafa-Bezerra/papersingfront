@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, SearchIcon, SquarePlus, X } from 'lucide-react'
+import { ChevronsUpDown, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,18 +33,6 @@ import {
 } from '@/components/ui/command'
 import { stripDiacritics } from '@/utils/functions'
 import { cn } from '@/lib/utils'
-import {
-  Alcada,
-  getAll as getAlcadas,
-  createElement as createAlcada,
-  updateElement as updateAlcada
-} from '@/services/alcadasService'
-import {
-  CentroDeCusto,
-  ContaFinanceira,
-  getAllCentrosDeCusto,
-  getAllContasFinanceiras
-} from '@/services/carrinhoService'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -55,18 +43,21 @@ import {
   FormMessage
 } from '@/components/ui/form'
 import { toast } from 'sonner'
+import { CentroDeCusto, ContaFinanceira, createElement, deleteElement, getAll, getAllCentrosDeCusto, getAllContasFinanceiras, MgoFinanceiro } from '@/services/mgoFinanceiroService'
 
 // Popover sem portal para evitar o overlay do Dialog bloquear clique/scroll.
 const PopoverContentNoPortal = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 4, ...props }, ref) => (
+>(({ className, align = 'start', sideOffset = 4, ...props }, ref) => (
   <PopoverPrimitive.Content
     ref={ref}
+    side="bottom"
     align={align}
     sideOffset={sideOffset}
+    avoidCollisions={false}
     className={cn(
-      "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+      "bg-popover text-popover-foreground z-50 w-72 rounded-md border p-4 shadow-md outline-hidden",
       className
     )}
     {...props}
@@ -76,31 +67,27 @@ PopoverContentNoPortal.displayName = 'PopoverContentNoPortal'
 
 export default function Page() {
   const titulo = 'Centros de custos'
-  const tituloUpdate = 'Editar centro de custo'
   const tituloInsert = 'Novo centro de custo'
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
-  const [results, setResults] = useState<Alcada[]>([])
-  const [alcadaSelecionada, setAlcadaSelecionada] = useState<Alcada>()
+  const [results, setResults] = useState<MgoFinanceiro[]>([])
   const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
   const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [updateAlcadaMode, setUpdateAlcadaMode] = useState(false)
-  const [isFormAlcadaOpen, setIsFormAlcadaOpen] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [openCentroSearch, setOpenCentroSearch] = useState(false)
   const [openContaSearch, setOpenContaSearch] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [itemParaExcluir, setItemParaExcluir] = useState<MgoFinanceiro | null>(null)
 
-  const form = useForm<Alcada>({
+  const form = useForm<MgoFinanceiro>({
     defaultValues: {
-      id: 0,
       centro_custo: '',
-      centro_custo_nome: '',
-      conta_contabel: '',
-      conta_contabel_nome: ''
+      conta_contabil: '',
     }
   })
 
@@ -121,6 +108,7 @@ export default function Page() {
   useEffect(() => {
     handleSearch(searchParams.get('q') ?? '')
     buscaCentrosDeCusto()
+    buscaContasFinanceiras()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -141,28 +129,21 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
-  // Busca todos os centros disponíveis para preencher o dropdown.
   async function buscaCentrosDeCusto() {
     setError(null)
     try {
       const dados = await getAllCentrosDeCusto()
-      // Log para confirmar retorno por base/ambiente.
-      console.log('[Centros de custos] Centros recebidos:', dados?.length ?? 0, dados)
       setCentrosDeCusto(dados)
-      setContasFinanceiras([])
     } catch (err) {
       setError((err as Error).message)
       setCentrosDeCusto([])
     }
   }
-
-  // Busca contas contábeis vinculadas ao centro selecionado.
-  async function loadContasFinanceiras(centro: string) {
+  
+  async function buscaContasFinanceiras() {
     setError(null)
     try {
-      const dados = await getAllContasFinanceiras(centro)
-      // Log para confirmar retorno por centro.
-      console.log('[Centros de custos] Contas contabeis para centro:', centro, '->', dados?.length ?? 0, dados)
+      const dados = await getAllContasFinanceiras()
       setContasFinanceiras(dados)
     } catch (err) {
       setError((err as Error).message)
@@ -173,19 +154,21 @@ export default function Page() {
   async function handleSearch(q: string) {
     setError(null)
     try {
-      const dados = await getAlcadas()
+      const dados = await getAll()
       const qNorm = stripDiacritics(q.toLowerCase().trim())
       const filtrados = dados.filter(d => {
         const centro_custo = stripDiacritics((d.centro_custo ?? '').toLowerCase())
         const centro_custo_nome = stripDiacritics((d.centro_custo_nome ?? '').toLowerCase())
+        const conta_contabil = stripDiacritics((d.conta_contabil ?? '').toLowerCase())
+        const conta_contabil_nome = stripDiacritics((d.conta_contabil_nome ?? '').toLowerCase())
         const matchQuery =
           qNorm === '' ||
-          centro_custo.includes(qNorm) ||
+          conta_contabil_nome.includes(qNorm) ||
           centro_custo_nome.includes(qNorm) ||
-          String(d.id ?? '').includes(qNorm)
+          centro_custo.includes(qNorm) ||
+          conta_contabil.includes(qNorm)
         return matchQuery
       })
-
       setResults(filtrados)
     } catch (err) {
       setError((err as Error).message)
@@ -205,89 +188,71 @@ export default function Page() {
     await handleSearch(query)
   }
 
-  // Abre o modal já com os dados do registro.
-  async function handleEditar(alcada: Alcada) {
-    const contaContabel = alcada.conta_contabel ?? ''
-    const contaContabelNome = alcada.conta_contabel_nome ?? ''
-    form.reset({
-      id: alcada.id,
-      centro_custo: alcada.centro_custo,
-      centro_custo_nome: alcada.centro_custo_nome,
-      conta_contabel: contaContabel,
-      conta_contabel_nome: contaContabelNome
-    })
-    if (alcada.centro_custo) {
-      await loadContasFinanceiras(alcada.centro_custo)
-    }
-    setUpdateAlcadaMode(true)
-    setIsFormAlcadaOpen(true)
-  }
-
-  // Abre o modal de criação zerando os campos.
   async function handleInserir() {
     form.reset({
-      id: 0,
       centro_custo: '',
-      centro_custo_nome: '',
-      conta_contabel: '',
-      conta_contabel_nome: ''
+      conta_contabil: '',
     })
-    setContasFinanceiras([])
-    setUpdateAlcadaMode(false)
-    setIsFormAlcadaOpen(true)
+    setIsFormOpen(true)
   }
 
-  // Salva o registro (criar/editar).
-  async function submitAlcada(data: Alcada) {
+  async function submit(data: MgoFinanceiro) {
     setError(null)
     try {
-      if (data.id && data.id !== 0) {
-        await updateAlcada(data)
-      } else {
-        await createAlcada(data)
-      }
+      await createElement(data)
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
-      toast.success(data.id && data.id !== 0 ? 'Centro de custo atualizado' : 'Centro de custo criado')
+      toast.success('Centro de custo criado')
       form.reset()
       await handleSearchClick()
-      setIsFormAlcadaOpen(false)
+      setIsFormOpen(false)
     }
   }
 
-  const colunas = useMemo<ColumnDef<Alcada>[]>(
+  async function handleExcluir(data: MgoFinanceiro) {
+    setError(null)
+    try {
+      await deleteElement(data)
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      toast.success('Centro de custo excluído')
+      await handleSearchClick()
+    }
+  }
+
+  const colunas = useMemo<ColumnDef<MgoFinanceiro>[]>(
     () => [
-      { accessorKey: 'id', header: 'ID' },
       { accessorKey: 'centro_custo', header: 'Centro de custo' },
       { accessorKey: 'centro_custo_nome', header: 'Descrição' },
-      {
-        accessorKey: 'conta_contabel',
-        header: 'Conta contábil',
-        accessorFn: row => row.conta_contabel ?? '-'
-      },
-      {
-        accessorKey: 'conta_contabel_nome',
-        header: 'Descrição conta contábil',
-        accessorFn: row => row.conta_contabel_nome ?? '-'
-      },
+      { accessorKey: 'conta_contabil', header: 'Conta contábil' },
+      { accessorKey: 'conta_contabil_nome', header: 'Descrição conta contábil', },
       {
         id: 'actions',
         header: 'Ações',
         cell: ({ row }) => (
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => handleEditar(row.original)}>
-              Editar
+            <Button
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setItemParaExcluir(row.original)
+                setConfirmOpen(true)
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
           </div>
         )
       }
     ],
-    [handleEditar]
+    [handleExcluir]
   )
 
   return (
     <div className="p-6">
+      {/* Filtros */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -326,6 +291,7 @@ export default function Page() {
         </CardContent>
       </Card>
 
+      {/* Tabela */}
       <Card className="mb-6">
         <CardContent className="flex flex-col">
           <DataTable
@@ -334,29 +300,33 @@ export default function Page() {
             loading={loading}
             searchPlaceholder="Pesquisar..."
             globalFilterAccessorKey={[
-              'id',
               'centro_custo',
               'centro_custo_nome',
-              'conta_contabel',
-              'conta_contabel_nome'
+              'conta_contabil',
+              'conta_contabil_nome'
             ]}
           />
         </CardContent>
       </Card>
 
-      {/* Modal */}
-      <Dialog open={isFormAlcadaOpen} onOpenChange={setIsFormAlcadaOpen}>
-        <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+      {/* Formulário */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent
+          className="
+            max-w-md
+            min-w-[800px]
+            max-h-[90vh]
+            overflow-y-auto
+          "
+        >
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-center">
-              {updateAlcadaMode
-                ? `Editar centro de custo${alcadaSelecionada?.centro_custo ? `: ${alcadaSelecionada.centro_custo}` : ''}`
-                : 'Novo centro de custo'}
+              {tituloInsert}
             </DialogTitle>
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(submitAlcada)} className="grid gap-4">
+            <form onSubmit={form.handleSubmit(submit)} className="grid gap-4">
               {/* Centro de custo com busca igual ao carrinho */}
               <FormField
                 control={form.control}
@@ -395,11 +365,7 @@ export default function Page() {
                             }}
                           >
                             <CommandInput placeholder="Buscar centro..." />
-                            {/* Scroll do dropdown: fallback prático, essa merda não rola */}
-                            <CommandList
-                              className="max-h-[280px] overflow-y-auto"
-                              style={{ maxHeight: 280, overflowY: "auto" }}
-                            >
+                            <CommandList className="max-h-[280px] overflow-y-auto">
                               <CommandEmpty>Nenhum encontrado</CommandEmpty>
                               <CommandGroup>
                                 {centrosDeCusto.map(c => (
@@ -408,10 +374,6 @@ export default function Page() {
                                     value={c.ccusto}
                                     onSelect={() => {
                                       field.onChange(c.ccusto)
-                                      form.setValue('centro_custo_nome', c.custo)
-                                      form.setValue('conta_contabel', '')
-                                      form.setValue('conta_contabel_nome', '')
-                                      loadContasFinanceiras(c.ccusto)
                                       setOpenCentroSearch(false)
                                     }}
                                   >
@@ -428,24 +390,11 @@ export default function Page() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="centro_custo_nome"
-                rules={{ required: 'Descrição é obrigatória' }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
               {/* Conta contábil com busca e lista rolável */}
               <FormField
                 control={form.control}
-                name="conta_contabel"
+                name="conta_contabil"
                 rules={{ required: 'Conta contábil é obrigatória' }}
                 render={({ field }) => (
                   <FormItem>
@@ -458,7 +407,6 @@ export default function Page() {
                             variant="outline"
                             className="w-full justify-between"
                             onClick={() => setOpenContaSearch(true)}
-                            disabled={contasFinanceiras.length === 0}
                           >
                             {contasFinanceiras.find(x => x.codconta === field.value)
                               ? `${contasFinanceiras.find(x => x.codconta === field.value)?.codconta} - ${contasFinanceiras.find(x => x.codconta === field.value)?.contabil}`
@@ -481,11 +429,7 @@ export default function Page() {
                             }}
                           >
                             <CommandInput placeholder="Buscar conta..." />
-                            {/* Scroll do dropdown: fallback prático, essa merda não rola */}
-                            <CommandList
-                              className="max-h-[280px] overflow-y-auto"
-                              style={{ maxHeight: 280, overflowY: "auto" }}
-                            >
+                            <CommandList className="max-h-[280px] overflow-y-auto">
                               <CommandEmpty>Nenhum encontrado</CommandEmpty>
                               <CommandGroup>
                                 {contasFinanceiras.map((x, index) => (
@@ -494,7 +438,6 @@ export default function Page() {
                                     value={x.codconta}
                                     onSelect={() => {
                                       field.onChange(x.codconta)
-                                      form.setValue('conta_contabel_nome', x.contabil)
                                       setOpenContaSearch(false)
                                     }}
                                   >
@@ -511,26 +454,61 @@ export default function Page() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="conta_contabel_nome"
-                rules={{ required: 'Descrição da conta contábil é obrigatória' }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição da conta contábil</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}
               </Button>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de exclusão */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir este vínculo de centro de custo?
+            </p>
+
+            {itemParaExcluir && (
+              <div className="rounded-md border p-3 text-sm bg-muted/50">
+                <p>
+                  <strong>Centro:</strong> {itemParaExcluir.centro_custo} – {itemParaExcluir.centro_custo_nome}
+                </p>
+                <p>
+                  <strong>Conta:</strong> {itemParaExcluir.conta_contabil} – {itemParaExcluir.conta_contabil_nome}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+            >
+              Cancelar
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!itemParaExcluir) return
+                await handleExcluir(itemParaExcluir)
+                setConfirmOpen(false)
+                setItemParaExcluir(null)
+              }}
+            >
+              Excluir
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

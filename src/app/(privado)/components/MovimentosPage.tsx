@@ -135,7 +135,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             setDateTo(today.toISOString().substring(0, 10));
         }
 
-        const storedUser = localStorage.getItem("userData");
+        const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);

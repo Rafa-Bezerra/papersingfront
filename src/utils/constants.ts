@@ -10,5 +10,5 @@ export const API_BASE = isDev
 
 export const headers = () => ({
   "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+  Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
 })

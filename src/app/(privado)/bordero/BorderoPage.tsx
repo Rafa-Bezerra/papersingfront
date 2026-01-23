@@ -112,7 +112,7 @@ export default function Page() {
             setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
         }
-        const storedUser = localStorage.getItem("userData");
+        const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());

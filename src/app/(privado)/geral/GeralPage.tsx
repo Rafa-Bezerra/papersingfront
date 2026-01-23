@@ -130,7 +130,7 @@ export default function Page() {
         setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
         setDateTo(prev => prev || today.toISOString().substring(0, 10));
 
-        const storedUser = localStorage.getItem("userData");
+        const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
