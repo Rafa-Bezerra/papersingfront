@@ -14,6 +14,8 @@ export type Usuario = {
     bordero: boolean,
     comunicados: boolean,
     rdv: boolean,
+    // Permissão para acessar Centros de custos.
+    centros_custos: boolean,
     externo: boolean,
     restrito: boolean,
 }

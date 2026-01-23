@@ -82,6 +82,8 @@ export default function PageUsuarios() {
       bordero: false,
       comunicados: false,
       rdv: false,
+      // Controle de acesso ao menu/rota de Centros de custos.
+      centros_custos: false,
       externo: false,
       restrito: false,
     }
@@ -207,6 +209,7 @@ export default function PageUsuarios() {
         bordero: response.bordero,
         comunicados: response.comunicados,
         rdv: response.rdv,
+        centros_custos: response.centros_custos,
         externo: response.externo,
         restrito: response.restrito,
       })
@@ -233,6 +236,7 @@ export default function PageUsuarios() {
       bordero: false,
       comunicados: false,
       rdv: false,
+      centros_custos: false,
       externo: false,
     })
     setUpdateMode(false)
@@ -509,6 +513,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>RDV</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="centros_custos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Centros de custo</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

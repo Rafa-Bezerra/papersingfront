@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import MovimentosPage from "../components/MovimentosPage";
+import LoadingFallback from "@/components/LoadingFallback"
 
 const titulo: string = 'Aquisição de serviços'
 const tipos_movimento: string[] = [
@@ -11,8 +12,9 @@ const tipos_movimento: string[] = [
 ];
 
 export default function Page() {
+  // Loading padrão (spinner + texto).
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <MovimentosPage 
         titulo={titulo} 
         tipos_movimento={tipos_movimento}

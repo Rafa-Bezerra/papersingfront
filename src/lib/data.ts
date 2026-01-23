@@ -29,6 +29,8 @@ export const data = {
         { title: "Aprovação RDV", url: "/aprovacaordv" },
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
+        // Novo módulo de administração de centros de custos.
+        { title: "Centros de custos", url: "/centros-custos" },
         { title: "Usuários", url: "/usuarios" },
       ],
     },

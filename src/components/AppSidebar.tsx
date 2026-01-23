@@ -51,6 +51,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
+  const [userCentrosCustos, setUserCentrosCustos] = useState(false)
   const isMobileDevice = useIsMobile()
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
@@ -71,6 +72,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserDocumentos(user.documentos);
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
+        // Permissão específica para mostrar o menu de centros de custos.
+        setUserCentrosCustos(user.centros_custos);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }
@@ -114,6 +117,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Aprovação RDV': <Truck className="w-5 h-5" />,
     'Aprovadores Borderô': <Users className="w-5 h-5" />,
     Alçadas: <Users className="w-5 h-5" />,
+    'Centros de custos': <Settings className="w-5 h-5" />,
     Usuários: <User className="w-5 h-5" />
   }
 
@@ -207,6 +211,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/bordero" && !userBordero) return null;
                         // if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
+                        if (item.url === "/centros-custos" && !userCentrosCustos) return null;
                         if (["/alcadas", "/usuarios", "/borderoaprovadores", "/rdvaprovadores"].includes(item.url)) return null;
                       }
                       return (
