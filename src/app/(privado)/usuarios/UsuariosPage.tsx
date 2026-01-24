@@ -82,8 +82,7 @@ export default function PageUsuarios() {
       bordero: false,
       comunicados: false,
       rdv: false,
-      // Controle de acesso ao menu/rota de Centros de custos.
-      centros_custos: false,
+      ccusto: false,
       externo: false,
       restrito: false,
     }
@@ -209,7 +208,7 @@ export default function PageUsuarios() {
         bordero: response.bordero,
         comunicados: response.comunicados,
         rdv: response.rdv,
-        centros_custos: response.centros_custos,
+        ccusto: response.ccusto,
         externo: response.externo,
         restrito: response.restrito,
       })
@@ -236,7 +235,7 @@ export default function PageUsuarios() {
       bordero: false,
       comunicados: false,
       rdv: false,
-      centros_custos: false,
+      ccusto: false,
       externo: false,
     })
     setUpdateMode(false)
@@ -525,7 +524,7 @@ export default function PageUsuarios() {
                 />
                 <FormField
                   control={form.control}
-                  name="centros_custos"
+                  name="ccusto"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Centros de custo</FormLabel>

@@ -43,7 +43,11 @@ import {
   FormMessage
 } from '@/components/ui/form'
 import { toast } from 'sonner'
-import { CentroDeCusto, ContaFinanceira, createElement, deleteElement, getAll, getAllCentrosDeCusto, getAllContasFinanceiras, MgoFinanceiro } from '@/services/mgoFinanceiroService'
+import { CentroDeCusto, ContaFinanceira, createElement, createUsuario, deleteElement, deleteUsuario, getAll, getAllCentrosDeCusto, getAllContasFinanceiras, getUsuariosCentrosDeCusto, MgoFinanceiro, UsuarioCcusto } from '@/services/mgoFinanceiroService'
+import {
+  Usuario,
+  getAll as getAllUsuarios
+} from '@/services/usuariosService'
 
 // Popover sem portal para evitar o overlay do Dialog bloquear clique/scroll.
 const PopoverContentNoPortal = React.forwardRef<
@@ -67,13 +71,14 @@ PopoverContentNoPortal.displayName = 'PopoverContentNoPortal'
 
 export default function Page() {
   const titulo = 'Centros de custos'
-  const tituloInsert = 'Novo centro de custo'
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
   const [results, setResults] = useState<MgoFinanceiro[]>([])
   const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
+  const [usuariosCcusto, setUsuariosCcusto] = useState<UsuarioCcusto[]>([])
+  const [ccustoSelecionado, setCcustoSelecionado] = useState<CentroDeCusto | null>(null)
   const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,13 +86,29 @@ export default function Page() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [openCentroSearch, setOpenCentroSearch] = useState(false)
   const [openContaSearch, setOpenContaSearch] = useState(false)
+  const [openUsuarioSearch, setOpenUsuarioSearch] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [itemParaExcluir, setItemParaExcluir] = useState<MgoFinanceiro | null>(null)
+  const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<UsuarioCcusto | null>(null)
+  const [confirmUsuarioOpen, setConfirmUsuarioOpen] = useState(false)
+  const [isModalUsuarioOpen, setIsModalUsuarioOpen] = useState(false)
+  const [isModalUsuarioFormOpen, setIsModalUsuarioFormOpen] = useState(false)
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
   const form = useForm<MgoFinanceiro>({
     defaultValues: {
       centro_custo: '',
       conta_contabil: '',
+    }
+  })
+
+  const formUsuario = useForm<UsuarioCcusto>({
+    defaultValues: {
+      usuario: '',
+      ccusto: '',
+      diretoria: '',
+      custo: '',
+      idccusto: ''
     }
   })
 
@@ -109,6 +130,7 @@ export default function Page() {
     handleSearch(searchParams.get('q') ?? '')
     buscaCentrosDeCusto()
     buscaContasFinanceiras()
+    buscaUsuarios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -139,7 +161,7 @@ export default function Page() {
       setCentrosDeCusto([])
     }
   }
-  
+
   async function buscaContasFinanceiras() {
     setError(null)
     try {
@@ -148,6 +170,19 @@ export default function Page() {
     } catch (err) {
       setError((err as Error).message)
       setContasFinanceiras([])
+    }
+  }
+
+  async function buscaUsuarios() {
+    setError(null)
+    try {
+      const dados = await getAllUsuarios()
+      setUsuarios(dados)
+    } catch (err) {
+      setError((err as Error).message)
+      setUsuarios([])
+    } finally {
+      setSearched(true)
     }
   }
 
@@ -210,6 +245,20 @@ export default function Page() {
     }
   }
 
+  async function onSubmitUsuario(data: UsuarioCcusto) {
+    setError(null)
+    try {
+      await createUsuario(data)
+      await handleUsuarios(ccustoSelecionado as CentroDeCusto)
+      setIsModalUsuarioFormOpen(false)
+      formUsuario.reset()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      toast.success('Usuário criado')
+    }
+  }
+
   async function handleExcluir(data: MgoFinanceiro) {
     setError(null)
     try {
@@ -222,23 +271,110 @@ export default function Page() {
     }
   }
 
-  const colunas = useMemo<ColumnDef<MgoFinanceiro>[]>(
+  async function handleExcluirUsuario(data: UsuarioCcusto) {
+    setError(null)
+    try {
+      await deleteUsuario(data)
+      await handleUsuarios(ccustoSelecionado as CentroDeCusto)
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      toast.success('Usuário excluído')
+      
+    }
+  }
+
+  async function handleUsuarios(centro: CentroDeCusto) {
+    setCcustoSelecionado(centro)
+    try {
+      const dados = await getUsuariosCentrosDeCusto(centro)
+      setUsuariosCcusto(dados)
+      setIsModalUsuarioOpen(true)
+    } catch (err) {
+      setError((err as Error).message)
+      setUsuariosCcusto([])
+    }
+  }
+
+  function handleInsertUsuario() {
+    formUsuario.reset({
+      usuario: '',
+      ccusto: ccustoSelecionado?.ccusto || '',
+      diretoria: ccustoSelecionado?.diretoria || '',
+      custo: ccustoSelecionado?.custo || '',
+      idccusto: ccustoSelecionado?.idccusto || '',
+    })
+    setIsModalUsuarioFormOpen(true)
+  }
+
+  const colunas = useMemo<ColumnDef<MgoFinanceiro>[]>(() => [
+    { accessorKey: 'centro_custo', header: 'Centro de custo' },
+    { accessorKey: 'centro_custo_nome', header: 'Descrição' },
+    { accessorKey: 'conta_contabil', header: 'Conta contábil' },
+    { accessorKey: 'conta_contabil_nome', header: 'Descrição conta contábil', },
+    {
+      id: 'actions',
+      header: 'Ações',
+      cell: ({ row }) => (
+        <div className="flex gap-2">
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={() => {
+              setItemParaExcluir(row.original)
+              setConfirmOpen(true)
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      )
+    }
+  ],
+    [handleExcluir]
+  )
+
+  const colunasCcusto = useMemo<ColumnDef<CentroDeCusto>[]>(
     () => [
-      { accessorKey: 'centro_custo', header: 'Centro de custo' },
-      { accessorKey: 'centro_custo_nome', header: 'Descrição' },
-      { accessorKey: 'conta_contabil', header: 'Conta contábil' },
-      { accessorKey: 'conta_contabil_nome', header: 'Descrição conta contábil', },
+      { accessorKey: 'ccusto', header: 'Centro de custo' },
+      { accessorKey: 'custo', header: 'Descrição' },
       {
         id: 'actions',
         header: 'Ações',
         cell: ({ row }) => (
           <div className="flex gap-2">
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleUsuarios(row.original)
+              }}
+            >
+              Usuários
+            </Button>
+          </div>
+        )
+      }
+    ],
+    []
+  )
+
+  const colunasUsuarios = useMemo<ColumnDef<UsuarioCcusto>[]>(
+    () => [
+      { accessorKey: 'usuario', header: 'Usuário' },
+      { accessorKey: 'nome', header: 'Nome' },
+      {
+        id: 'actions',
+        header: 'Ações',
+        cell: ({ row }) => (
+          <div className="flex gap-2">
+
+            <Button
               variant="destructive"
               size="icon"
               onClick={() => {
-                setItemParaExcluir(row.original)
-                setConfirmOpen(true)
+                setUsuarioParaExcluir(row.original)
+                setConfirmUsuarioOpen(true)
               }}
             >
               <Trash2 className="w-4 h-4" />
@@ -247,7 +383,7 @@ export default function Page() {
         )
       }
     ],
-    [handleExcluir]
+    [handleExcluirUsuario]
   )
 
   return (
@@ -284,15 +420,37 @@ export default function Page() {
             Buscar
           </Button>
 
-          <Button onClick={handleInserir} className="flex items-center">
-            <SquarePlus className="mr-1 h-4 w-4" />
-            Novo
-          </Button>
         </CardContent>
       </Card>
 
-      {/* Tabela */}
+      {/* Centro de custo vs usuários */}
       <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-2xl font-bold">Centro de custo vs Usuários</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col">
+          <DataTable
+            columns={colunasCcusto}
+            data={centrosDeCusto}
+            loading={loading}
+            searchPlaceholder="Pesquisar..."
+            globalFilterAccessorKey={[
+              'ccusto',
+              'custo',
+            ]}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Centro de custo vs conta contábil */}
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-2xl font-bold">Centro de custo vs Conta contábil</CardTitle>
+          <Button onClick={handleInserir} className="flex items-center">
+            <SquarePlus className="mr-1 h-4 w-4" />
+            Novo vínculo
+          </Button>
+        </CardHeader>
         <CardContent className="flex flex-col">
           <DataTable
             columns={colunas}
@@ -321,7 +479,7 @@ export default function Page() {
         >
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-center">
-              {tituloInsert}
+              Novo vínculo Centro de custo vs Conta contábil
             </DialogTitle>
           </DialogHeader>
 
@@ -463,6 +621,29 @@ export default function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* Usuários */}
+      <Dialog open={isModalUsuarioOpen} onOpenChange={setIsModalUsuarioOpen}>
+        <DialogContent className="flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Usuários CCUSTO: {ccustoSelecionado?.ccusto + " - " + ccustoSelecionado?.custo}</DialogTitle>
+            <Button onClick={handleInsertUsuario} className="flex items-center">
+              <SquarePlus className="mr-1 h-4 w-4" />
+              Novo
+            </Button>
+          </DialogHeader>
+          <DataTable
+            columns={colunasUsuarios}
+            data={usuariosCcusto}
+            loading={loading}
+            searchPlaceholder="Pesquisar..."
+            globalFilterAccessorKey={[
+              'usuario',
+              'nome',
+            ]}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmação de exclusão */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-md">
@@ -509,6 +690,134 @@ export default function Page() {
               Excluir
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de exclusão usuários */}
+      <Dialog open={confirmUsuarioOpen} onOpenChange={setConfirmUsuarioOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              Confirmar exclusão
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir este vínculo de usuário?
+            </p>
+
+            {usuarioParaExcluir && (
+              <div className="rounded-md border p-3 text-sm bg-muted/50">
+                <p>
+                  <strong>Usuário:</strong> {usuarioParaExcluir.usuario} – {usuarioParaExcluir.nome}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmUsuarioOpen(false)}
+            >
+              Cancelar
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!usuarioParaExcluir) return
+                await handleExcluirUsuario(usuarioParaExcluir)
+                setConfirmUsuarioOpen(false)
+                setUsuarioParaExcluir(null)
+              }}
+            >
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Novo usuário */}
+      <Dialog open={isModalUsuarioFormOpen} onOpenChange={setIsModalUsuarioFormOpen}>
+        <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-center">
+              Novo usuário
+            </DialogTitle>
+          </DialogHeader>
+
+          <Form {...formUsuario}>
+            <form onSubmit={formUsuario.handleSubmit(onSubmitUsuario)} className="grid gap-4">
+              <FormField
+                control={formUsuario.control}
+                name={`usuario`}
+                rules={{ required: "Usuário obrigatório" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Popover open={openUsuarioSearch} onOpenChange={setOpenUsuarioSearch}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-between"
+                            onClick={() => setOpenUsuarioSearch(true)}
+                          >
+                            {
+                              usuarios.find(u => u.codusuario === field.value)?.nome ??
+                              "Selecione o usuário"
+                            }
+                            <ChevronsUpDown className="opacity-50 size-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContentNoPortal className="p-0 w-[600px] z-[60] pointer-events-auto">
+                          <Command
+                            className="max-h-[320px] overflow-hidden"
+                            filter={(value, search) => {
+                              const label = usuarios.find(m => m.codusuario === value)?.nome || ''
+                              const searchLower = search.toLowerCase()
+                              return (
+                                label.toLowerCase().includes(searchLower) ||
+                                value.toLowerCase().includes(searchLower)
+                              )
+                                ? 1
+                                : 0
+                            }}
+                          >
+                            <CommandInput placeholder="Buscar usuário..." />
+                            <CommandList className="max-h-[280px] overflow-y-auto">
+                              <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                              <CommandGroup>
+                                {usuarios.map(u => (
+                                  <CommandItem
+                                    key={u.codusuario}
+                                    value={u.codusuario}
+                                    onSelect={() => {
+                                      field.onChange(u.codusuario)
+                                      setOpenUsuarioSearch(false)
+                                    }}
+                                  >
+                                    {u.codusuario} - {u.nome}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContentNoPortal>
+                      </Popover>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

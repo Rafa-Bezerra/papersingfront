@@ -72,8 +72,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserDocumentos(user.documentos);
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
-        // Permissão específica para mostrar o menu de centros de custos.
-        setUserCentrosCustos(user.centros_custos);
+        setUserCentrosCustos(user.ccusto);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }

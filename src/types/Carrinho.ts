@@ -24,6 +24,8 @@ export type Carrinho = {
 export type CentroDeCusto = {
     ccusto: string;
     custo: string;
+    idccusto?: string;
+    diretoria?: string;
 };
 
 export type ContaFinanceira = {

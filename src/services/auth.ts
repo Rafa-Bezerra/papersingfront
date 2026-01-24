@@ -19,8 +19,7 @@ export interface LoginResponse {
   rdv: boolean;
   bordero: boolean;
   comunicados: boolean;
-  // Flag para habilitar o módulo de centros de custos.
-  centros_custos: boolean;
+  ccusto: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
