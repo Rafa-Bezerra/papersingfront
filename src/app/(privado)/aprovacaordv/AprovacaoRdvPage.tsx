@@ -63,6 +63,7 @@ export default function Page() {
 
     useEffect(() => {
         const storedUser = sessionStorage.getItem("userData");
+        // console.log("storedUser: " + storedUser);
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setCodusuario(user.codusuario.toUpperCase());
@@ -71,7 +72,10 @@ export default function Page() {
 
     useEffect(() => {
         buscaAprovacoesRdv();
-    }, [situacaoFiltrada])
+        console.log("situacaoFiltrada: " + situacaoFiltrada);
+        console.log("userCodusuario: " + userCodusuario);
+
+    }, [situacaoFiltrada, userCodusuario])
 
     async function buscaAprovacoesRdv() {
         setIsLoading(true)
@@ -326,12 +330,17 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
+                    console.log(row.original.aprovadores);
+                    console.log(userCodusuario);
+                    console.log("usuarioAprovador: " + usuarioAprovador);
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
+                    console.log("usuarioAprovou: " + usuarioAprovou);
 
-                    const status_liberado = ['Em Andamento'].includes(row.original.situacao);
+                    const status_liberado = ['Em andamento'].includes(row.original.situacao);
+                    console.log("status_liberado: " + status_liberado);
 
                     const podeAprovar = usuarioAprovador && status_liberado && !usuarioAprovou;
                     // const podeAprovar = true;
@@ -340,7 +349,9 @@ export default function Page() {
                         <div className="flex gap-2">
                             {row.original.arquivo && (
                                 <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
-                                    Documento
+                                    Documento {row.original.arquivo_assinado! == true && (
+                                        <Check className="w-4 h-4 text-green-500" />
+                                    )}
                                 </Button>
                             )}
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
@@ -350,9 +361,7 @@ export default function Page() {
                                 Aprovadores
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos {row.original.arquivo_assinado! == true && (
-                                    <Check className="w-4 h-4 text-green-500" />
-                                )}
+                                Anexos
                             </Button>
                             {podeAprovar && (
                                 <Button
