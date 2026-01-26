@@ -386,7 +386,7 @@ export default function Page() {
                 }
             }
         ],
-        []
+        [userCodusuario]
     )
 
     const colunasItens = useMemo<ColumnDef<ItemRdv>[]>(
@@ -466,7 +466,9 @@ export default function Page() {
 
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    {userCodusuario && (
+                        <DataTable columns={colunas} data={results} loading={isLoading} />
+                    )}
                 </CardContent>
             </Card>
 
