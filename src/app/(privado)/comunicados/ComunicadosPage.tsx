@@ -35,7 +35,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { htmlToPdfBase64, safeDateLabel, stripDiacritics } from '@/utils/functions'
-import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
+import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement } from '@/services/comunicadoService';
@@ -89,9 +89,9 @@ export default function Page() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
-    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
     const pdfStyle = pdfViewport
@@ -618,7 +618,7 @@ export default function Page() {
                                         {!isPreviewLocked && previewCoords && (
                                             <div
                                                 className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
+                                                style={getSignaturePreviewStyle(previewCoords, pdfViewport) ?? undefined}
                                             />
                                         )}
                                         {signatureCoords && (

@@ -40,7 +40,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
-import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
+import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -93,9 +93,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
-    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
     const [anexos, setAnexos] = useState<Anexo[]>([])
@@ -107,9 +107,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
-    const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [coordsAnexo, setCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<PdfClickCoords | null>(null);
     const [isPreviewAnexoLocked, setIsPreviewAnexoLocked] = useState(false);
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
@@ -920,7 +920,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         {!isPreviewLocked && previewCoords && (
                                             <div
                                                 className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
+                                                style={getSignaturePreviewStyle(previewCoords, pdfViewport) ?? undefined}
                                             />
                                         )}
                                         {signatureCoords && (
@@ -1099,7 +1099,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         {!isPreviewAnexoLocked && previewCoordsAnexo && (
                                             <div
                                                 className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyleFromPointer(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                                style={getSignaturePreviewStyle(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
                                             />
                                         )}
                                         {signatureCoordsAnexo && (

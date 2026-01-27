@@ -18,7 +18,7 @@ import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, A
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { safeDateLabel, stripDiacritics } from '@/utils/functions';
-import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
+import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -57,9 +57,9 @@ export default function Page() {
     const [documentoSelecionado, setDocumentoSelecionado] = useState<AnexoRdv | null>(null)
     const [isModalVisualizarDocumentoOpen, setIsModalVisualizarDocumentoOpen] = useState(false)
     const iframeDocumentoRef = useRef<HTMLIFrameElement>(null);
-    const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [pdfViewportDocumento, setPdfViewportDocumento] = useState<PdfViewport | null>(null);
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
@@ -254,8 +254,8 @@ export default function Page() {
                         if (event.data?.pdfViewport) {
                             setPdfViewportAnexo({
                                 width: event.data.pdfViewport.width,
-                            height: event.data.pdfViewport.height,
-                            scale: event.data.pdfViewport.scale
+                                height: event.data.pdfViewport.height,
+                                scale: event.data.pdfViewport.scale
                             });
                         }
                     }
@@ -266,8 +266,8 @@ export default function Page() {
                         if (event.data?.pdfViewport) {
                             setPdfViewportDocumento({
                                 width: event.data.pdfViewport.width,
-                            height: event.data.pdfViewport.height,
-                            scale: event.data.pdfViewport.scale
+                                height: event.data.pdfViewport.height,
+                                scale: event.data.pdfViewport.scale
                             });
                         }
                     }
@@ -688,38 +688,38 @@ export default function Page() {
                                 <>
                                     <div className="relative" style={pdfDocumentoStyle}>
                                         {/* PDF */}
-                                    <iframe
+                                        <iframe
                                             ref={iframeDocumentoRef}
                                             src="/pdf-viewer.html"
-                                        className="relative border-none cursor-default"
+                                            className="relative border-none cursor-default"
                                             style={{ width: '100%', height: '100%' }}
                                         />
 
                                         {/* Overlay */}
-                                    <div
-                                        id="assinatura-overlay"
-                                        className="absolute inset-0 cursor-default"
-                                        onClick={handleClickPdf}
-                                        onMouseMove={handleHoverPdf}
+                                        <div
+                                            id="assinatura-overlay"
+                                            className="absolute inset-0 cursor-default"
+                                            onClick={handleClickPdf}
+                                            onMouseMove={handleHoverPdf}
                                             onMouseLeave={() => {
                                                 if (!isPreviewLocked) setPreviewCoords(null);
                                             }}
-                                        onWheel={handlePdfOverlayWheel}
-                                    />
+                                            onWheel={handlePdfOverlayWheel}
+                                        />
 
                                         {/* Pré-visualização da assinatura */}
-                                    {!isPreviewLocked && previewCoords && (
+                                        {!isPreviewLocked && previewCoords && (
                                             <div
                                                 className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                            style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewportDocumento) ?? undefined}
+                                                style={getSignaturePreviewStyle(previewCoords, pdfViewportDocumento) ?? undefined}
                                             />
                                         )}
-                                    {signatureCoords && (
-                                        <div
-                                            className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
-                                            style={getSignaturePreviewStyle(signatureCoords, pdfViewportDocumento) ?? undefined}
-                                        />
-                                    )}
+                                        {signatureCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewportDocumento) ?? undefined}
+                                            />
+                                        )}
                                     </div>
                                 </>
                             ) : (

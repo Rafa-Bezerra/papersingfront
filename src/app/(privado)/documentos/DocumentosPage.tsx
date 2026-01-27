@@ -63,7 +63,7 @@ import {
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
 import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
-import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
+import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 
 export default function Page() {
     const titulo = 'Documentos para Assinatura'
@@ -103,9 +103,9 @@ export default function Page() {
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [anexosSubmit, setAnexosSubmit] = useState<DocumentoAnexo[]>([])
-    const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
-    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [coordsAnexo, setCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<PdfClickCoords | null>(null);
     const [isPreviewAnexoLocked, setIsPreviewAnexoLocked] = useState(false);
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const pdfAnexoStyle = pdfViewportAnexo
@@ -892,7 +892,7 @@ export default function Page() {
                                         {!isPreviewAnexoLocked && previewCoordsAnexo && (
                                             <div
                                                 className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyleFromPointer(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                                style={getSignaturePreviewStyle(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
                                             />
                                         )}
                                         {signatureCoordsAnexo && (
