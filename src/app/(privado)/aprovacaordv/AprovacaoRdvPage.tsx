@@ -13,11 +13,12 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, Loader2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
+import { Check, Filter, Loader2, ZoomIn, ZoomOut, Search } from "lucide-react";
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { safeDateLabel, stripDiacritics } from '@/utils/functions';
+import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -57,8 +58,19 @@ export default function Page() {
     const [isModalVisualizarDocumentoOpen, setIsModalVisualizarDocumentoOpen] = useState(false)
     const iframeDocumentoRef = useRef<HTMLIFrameElement>(null);
     const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
+    const [pdfViewportDocumento, setPdfViewportDocumento] = useState<PdfViewport | null>(null);
+    const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const [zoomAnexo, setZoomAnexo] = useState(1.5)
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const pdfDocumentoStyle = pdfViewportDocumento
+        ? { width: `${pdfViewportDocumento.width}px`, height: `${pdfViewportDocumento.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
+    const pdfAnexoStyle = pdfViewportAnexo
+        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
 
     useEffect(() => {
@@ -129,14 +141,38 @@ export default function Page() {
         try {
             const data = await getAnexoById(anexo.id!)
             setAnexoSelecionado(data);
+            setCurrentPageAnexo(1);
+            setTotalPagesAnexo(null);
+            setPdfViewportAnexo(null);
             const pdfClean = data.anexo.replace(/^data:.*;base64,/, '').trim();
 
             if (!window._pdfMessageListener) {
                 window._pdfMessageListener = true;
 
                 window.addEventListener("message", (event) => {
-                    if (event.data?.totalPages) {
-                        setTotalPagesAnexo(event.data.totalPages);
+                    if (event.source === iframeAnexoRef.current?.contentWindow) {
+                        if (event.data?.totalPages) {
+                            setTotalPagesAnexo(event.data.totalPages);
+                        }
+                        if (event.data?.pdfViewport) {
+                            setPdfViewportAnexo({
+                                width: event.data.pdfViewport.width,
+                                height: event.data.pdfViewport.height,
+                                scale: event.data.pdfViewport.scale
+                            });
+                        }
+                    }
+                    if (event.source === iframeDocumentoRef.current?.contentWindow) {
+                        if (event.data?.totalPages) {
+                            setTotalPagesDocumento(event.data.totalPages);
+                        }
+                        if (event.data?.pdfViewport) {
+                            setPdfViewportDocumento({
+                                width: event.data.pdfViewport.width,
+                                height: event.data.pdfViewport.height,
+                                scale: event.data.pdfViewport.scale
+                            });
+                        }
                     }
                 });
             }
@@ -170,12 +206,6 @@ export default function Page() {
         iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
-    function handleZoomResetAnexo() {
-        if (!iframeAnexoRef.current) return;
-        setZoomAnexo(1.5);
-        iframeAnexoRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
-    }
-
     function changePageAnexo(newPage: number) {
         if (!iframeAnexoRef.current) return;
         setCurrentPageAnexo(newPage);
@@ -198,6 +228,13 @@ export default function Page() {
 
     async function handleDocumento(aprovacao: Rdv) {
         setIsLoading(true)
+        setCurrentPageDocumento(1);
+        setTotalPagesDocumento(null);
+        setCoords(null);
+        setSignatureCoords(null);
+        setPreviewCoords(null);
+        setIsPreviewLocked(false);
+        setPdfViewportDocumento(null);
         const anexo: AnexoRdv = {
             anexo: aprovacao.arquivo!,
             nome: `Documento RDV n° ${aprovacao.id}`
@@ -210,8 +247,29 @@ export default function Page() {
                 window._pdfMessageListener = true;
 
                 window.addEventListener("message", (event) => {
-                    if (event.data?.totalPages) {
-                        setTotalPagesDocumento(event.data.totalPages);
+                    if (event.source === iframeAnexoRef.current?.contentWindow) {
+                        if (event.data?.totalPages) {
+                            setTotalPagesAnexo(event.data.totalPages);
+                        }
+                        if (event.data?.pdfViewport) {
+                            setPdfViewportAnexo({
+                                width: event.data.pdfViewport.width,
+                            height: event.data.pdfViewport.height,
+                            scale: event.data.pdfViewport.scale
+                            });
+                        }
+                    }
+                    if (event.source === iframeDocumentoRef.current?.contentWindow) {
+                        if (event.data?.totalPages) {
+                            setTotalPagesDocumento(event.data.totalPages);
+                        }
+                        if (event.data?.pdfViewport) {
+                            setPdfViewportDocumento({
+                                width: event.data.pdfViewport.width,
+                            height: event.data.pdfViewport.height,
+                            scale: event.data.pdfViewport.scale
+                            });
+                        }
                     }
                 });
             }
@@ -244,12 +302,6 @@ export default function Page() {
         const newZoom = Math.max(0.5, zoomDocumento - 0.25);
         setZoomDocumento(newZoom);
         iframeDocumentoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomResetDocumento() {
-        if (!iframeDocumentoRef.current) return;
-        setZoomDocumento(1.5);
-        iframeDocumentoRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
     }
 
     function changePageDocumento(newPage: number) {
@@ -286,16 +338,16 @@ export default function Page() {
     }
 
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const overlay = e.currentTarget as HTMLDivElement;
-        const rect = overlay.getBoundingClientRect();
+        const nextCoords = getPdfClickCoords(e, pdfViewportDocumento);
+        setCoords(nextCoords);
+        setSignatureCoords(nextCoords);
+        setPreviewCoords(null);
+        setIsPreviewLocked(true);
+    }
 
-        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
-        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
-        const x2 = e.clientX - rect.left;
-        const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2) / rect.height;
-
-        setCoords({ x, y, x2, y2, yI });
+    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
+        if (isPreviewLocked) return;
+        setPreviewCoords(getPdfClickCoords(e, pdfViewportDocumento));
     }
 
     async function confirmarAssinatura() {
@@ -542,21 +594,18 @@ export default function Page() {
                         </DialogHeader>
 
                         {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
                             {anexoSelecionado ? (
                                 <>
-                                    {/* PDF sem overflow interno */}
-                                    <iframe
-                                        ref={iframeAnexoRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
-                                    />
+                                    <div className="relative" style={pdfAnexoStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeAnexoRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-crosshair"
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+                                    </div>
                                 </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">
@@ -609,14 +658,6 @@ export default function Page() {
                                 >
                                     <ZoomIn className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomResetAnexo}
-                                    title="Resetar zoom"
-                                >
-                                    <RotateCcw className="h-4 w-4" />
-                                </Button>
                             </div>
 
                             <Button
@@ -642,41 +683,44 @@ export default function Page() {
                         </DialogHeader>
 
                         {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
                             {documentoSelecionado ? (
                                 <>
-                                    {/* PDF sem overflow interno */}
+                                    <div className="relative" style={pdfDocumentoStyle}>
+                                        {/* PDF */}
                                     <iframe
-                                        ref={iframeDocumentoRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
-                                        onClick={handleClickPdf}
-                                    />
+                                            ref={iframeDocumentoRef}
+                                            src="/pdf-viewer.html"
+                                        className="relative border-none cursor-default"
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
 
-
-                                    {/* Overlay */}
+                                        {/* Overlay */}
                                     <div
                                         id="assinatura-overlay"
-                                        className="absolute inset-0 cursor-crosshair"
+                                        className="absolute inset-0 cursor-default"
                                         onClick={handleClickPdf}
+                                        onMouseMove={handleHoverPdf}
+                                            onMouseLeave={() => {
+                                                if (!isPreviewLocked) setPreviewCoords(null);
+                                            }}
+                                        onWheel={handlePdfOverlayWheel}
                                     />
 
-                                    {/* Indicador visual */}
-                                    {coords && (
+                                        {/* Pré-visualização da assinatura */}
+                                    {!isPreviewLocked && previewCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
+                                            style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewportDocumento) ?? undefined}
+                                            />
+                                        )}
+                                    {signatureCoords && (
                                         <div
-                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
-                                            style={{
-                                                left: coords.x2 - 10,
-                                                top: coords.y2 - 10,
-                                            }}
+                                            className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                            style={getSignaturePreviewStyle(signatureCoords, pdfViewportDocumento) ?? undefined}
                                         />
                                     )}
+                                    </div>
                                 </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">
@@ -728,14 +772,6 @@ export default function Page() {
                                     title="Aumentar zoom"
                                 >
                                     <ZoomIn className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomResetDocumento}
-                                    title="Resetar zoom"
-                                >
-                                    <RotateCcw className="h-4 w-4" />
                                 </Button>
                             </div>
 

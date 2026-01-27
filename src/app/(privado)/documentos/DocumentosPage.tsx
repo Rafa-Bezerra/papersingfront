@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
 import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
+import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
 
 export default function Page() {
     const titulo = 'Documentos para Assinatura'
@@ -103,6 +104,13 @@ export default function Page() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [anexosSubmit, setAnexosSubmit] = useState<DocumentoAnexo[]>([])
     const [coordsAnexo, setCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [isPreviewAnexoLocked, setIsPreviewAnexoLocked] = useState(false);
+    const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
+    const pdfAnexoStyle = pdfViewportAnexo
+        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     const form = useForm<Documento>({
         defaultValues: {
@@ -342,14 +350,29 @@ export default function Page() {
         setIsLoading(true)
         setIsModalVisualizarAnexoOpen(true)
         setAnexoSelecionado(anexo);
+        setCurrentPageAnexo(1);
+        setTotalPagesAnexo(null);
+        setCoordsAnexo(null);
+        setSignatureCoordsAnexo(null);
+        setPreviewCoordsAnexo(null);
+        setIsPreviewAnexoLocked(false);
+        setPdfViewportAnexo(null);
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
 
         if (!window._pdfMessageListener) {
             window._pdfMessageListener = true;
 
             window.addEventListener("message", (event) => {
+                if (event.source !== iframeRef.current?.contentWindow) return;
                 if (event.data?.totalPages) {
                     setTotalPagesAnexo(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewportAnexo({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
                 }
             });
         }
@@ -401,16 +424,16 @@ export default function Page() {
     }
 
     function handleClickPdfAnexo(e: React.MouseEvent<HTMLDivElement>) {
-        const overlay = e.currentTarget as HTMLDivElement;
-        const rect = overlay.getBoundingClientRect();
+        const nextCoords = getPdfClickCoords(e, pdfViewportAnexo);
+        setCoordsAnexo(nextCoords);
+        setSignatureCoordsAnexo(nextCoords);
+        setPreviewCoordsAnexo(null);
+        setIsPreviewAnexoLocked(true);
+    }
 
-        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
-        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
-        const x2 = e.clientX - rect.left;
-        const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2) / rect.height;
-
-        setCoordsAnexo({ x, y, x2, y2, yI });
+    function handleHoverPdfAnexo(e: React.MouseEvent<HTMLDivElement>) {
+        if (isPreviewAnexoLocked) return;
+        setPreviewCoordsAnexo(getPdfClickCoords(e, pdfViewportAnexo));
     }
 
     async function confirmarAssinaturaAnexo() {
@@ -841,40 +864,44 @@ export default function Page() {
                         </DialogHeader>
 
                         {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
                             {anexoSelecionado ? (
                                 <>
-                                    {/* PDF sem overflow interno */}
-                                    <iframe
-                                        ref={iframeRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
-                                        onClick={handleClickPdfAnexo}
-                                    />
-
-                                    {/* Overlay */}
-                                    <div
-                                        id="assinatura-overlay"
-                                        className="absolute inset-0 cursor-crosshair"
-                                        onClick={handleClickPdfAnexo}
-                                    />
-
-                                    {/* Indicador visual */}
-                                    {coordsAnexo && (
-                                        <div
-                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
-                                            style={{
-                                                left: coordsAnexo.x2 - 10,
-                                                top: coordsAnexo.y2 - 10,
-                                            }}
+                                    <div className="relative" style={pdfAnexoStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-default"
+                                            style={{ width: '100%', height: '100%' }}
                                         />
-                                    )}
+
+                                        {/* Overlay */}
+                                        <div
+                                            id="assinatura-overlay"
+                                            className="absolute inset-0 cursor-default"
+                                            onClick={handleClickPdfAnexo}
+                                            onMouseMove={handleHoverPdfAnexo}
+                                            onMouseLeave={() => {
+                                                if (!isPreviewAnexoLocked) setPreviewCoordsAnexo(null);
+                                            }}
+                                            onWheel={handlePdfOverlayWheel}
+                                        />
+
+                                        {/* Pré-visualização da assinatura */}
+                                        {!isPreviewAnexoLocked && previewCoordsAnexo && (
+                                            <div
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                            />
+                                        )}
+                                        {signatureCoordsAnexo && (
+                                            <div
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                                style={getSignaturePreviewStyle(signatureCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                            />
+                                        )}
+                                    </div>
                                 </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">

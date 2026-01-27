@@ -13,7 +13,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, Search } from "lucide-react";
 import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -267,12 +267,6 @@ export default function Page() {
         const newZoom = Math.max(0.5, zoomAnexo - 0.25);
         setZoomAnexo(newZoom);
         iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomResetAnexo() {
-        if (!iframeAnexoRef.current) return;
-        setZoomAnexo(1.5);
-        iframeAnexoRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
     }
 
     function changePageAnexo(newPage: number) {
@@ -858,14 +852,6 @@ export default function Page() {
                                     title="Aumentar zoom"
                                 >
                                     <ZoomIn className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomResetAnexo}
-                                    title="Resetar zoom"
-                                >
-                                    <RotateCcw className="h-4 w-4" />
                                 </Button>
                             </div>
 

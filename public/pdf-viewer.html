@@ -10,7 +10,7 @@
             margin: 0;
             padding: 0;
             height: 100%;
-            overflow: hidden !important;
+            overflow: hidden;
             background: #fff;
         }
 
@@ -22,7 +22,7 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            overflow: hidden !important;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -44,6 +44,18 @@
                 uint8Array[i] = raw.charCodeAt(i);
             }
             return uint8Array;
+        }
+
+        function postViewportInfo(viewport) {
+            if (!viewport) return;
+            window.parent.postMessage({
+                pdfViewport: {
+                    width: Math.floor(viewport.width),
+                    height: Math.floor(viewport.height),
+                    scale: currentScale,
+                    page: currentPage
+                }
+            }, "*");
         }
 
         function renderPage(pageNum, scale = currentScale) {
@@ -72,6 +84,8 @@
                 container.appendChild(canvas);
 
                 context.scale(outputScale, outputScale);
+
+                postViewportInfo(scaledViewport);
 
                 const renderContext = {
                     canvasContext: context,

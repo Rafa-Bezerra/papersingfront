@@ -35,6 +35,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { htmlToPdfBase64, safeDateLabel, stripDiacritics } from '@/utils/functions'
+import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement } from '@/services/comunicadoService';
@@ -89,6 +90,13 @@ export default function Page() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
     const [coords, setCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number; x2: number; y2: number; yI: number } | null>(null);
+    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
+    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
+    const pdfStyle = pdfViewport
+        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
     const [isFormComunicadoOpen, setIsFormComunicadoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateComunicadoMode, setUpdateComunicadoMode] = useState(false)
@@ -217,6 +225,12 @@ export default function Page() {
         setIsLoading(true)
         setIsModalComunicadosOpen(true)
         setRequisicaoSelecionada(requisicao)
+        setCurrentPage(1);
+        setTotalPages(null);
+        setCoords(null);
+        setSignatureCoords(null);
+        setPreviewCoords(null);
+        setIsPreviewLocked(false);
         const arquivoBase64 = requisicao.anexo;
         setRequisicaoComunicadoSelecionada(arquivoBase64);
 
@@ -224,8 +238,16 @@ export default function Page() {
             window._pdfMessageListener = true;
 
             window.addEventListener("message", (event) => {
+                if (event.source !== iframeRef.current?.contentWindow) return;
                 if (event.data?.totalPages) {
                     setTotalPages(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewport({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
                 }
             });
         }
@@ -240,16 +262,16 @@ export default function Page() {
     }
 
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const overlay = e.currentTarget as HTMLDivElement;
-        const rect = overlay.getBoundingClientRect();
+        const nextCoords = getPdfClickCoords(e, pdfViewport);
+        setCoords(nextCoords);
+        setSignatureCoords(nextCoords);
+        setPreviewCoords(null);
+        setIsPreviewLocked(true);
+    }
 
-        const x = (e.clientX - rect.left) / rect.width;  // 0 a 1
-        const y = (e.clientY - rect.top) / rect.height;  // 0 a 1        
-        const x2 = e.clientX - rect.left;
-        const y2 = e.clientY - rect.top;
-        const yI = (rect.height - y2) / rect.height;
-
-        setCoords({ x, y, x2, y2, yI });
+    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
+        if (isPreviewLocked) return;
+        setPreviewCoords(getPdfClickCoords(e, pdfViewport));
     }
 
     async function confirmarAssinatura() {
@@ -568,40 +590,44 @@ export default function Page() {
                         </DialogHeader>
 
                         {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
                             {requisicaoComunicadoSelecionada ? (
                                 <>
-                                    {/* PDF sem overflow interno */}
-                                    <iframe
-                                        ref={iframeRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
-                                        onClick={handleClickPdf}
-                                    />
-
-                                    {/* Overlay */}
-                                    <div
-                                        id="assinatura-overlay"
-                                        className="absolute inset-0 cursor-crosshair"
-                                        onClick={handleClickPdf}
-                                    />
-
-                                    {/* Indicador visual */}
-                                    {coords && (
-                                        <div
-                                            className="absolute w-5 h-5 bg-blue-500/40 border-2 border-blue-700 rounded-full pointer-events-none"
-                                            style={{
-                                                left: coords.x2 - 10,
-                                                top: coords.y2 - 10,
-                                            }}
+                                    <div className="relative" style={pdfStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-default"
+                                            style={{ width: '100%', height: '100%' }}
                                         />
-                                    )}
+
+                                        {/* Overlay */}
+                                        <div
+                                            id="assinatura-overlay"
+                                            className="absolute inset-0 cursor-default"
+                                            onClick={handleClickPdf}
+                                            onMouseMove={handleHoverPdf}
+                                            onMouseLeave={() => {
+                                                if (!isPreviewLocked) setPreviewCoords(null);
+                                            }}
+                                            onWheel={handlePdfOverlayWheel}
+                                        />
+
+                                        {/* Pré-visualização da assinatura */}
+                                        {!isPreviewLocked && previewCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
+                                            />
+                                        )}
+                                        {signatureCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
+                                            />
+                                        )}
+                                    </div>
                                 </>
                             ) : (
                                 <p className="flex items-center justify-center h-full py-10">
