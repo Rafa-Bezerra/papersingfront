@@ -15,7 +15,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Eye, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Eye, Filter, Search, SearchIcon, SquarePlus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -108,8 +108,9 @@ export default function Page() {
     const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<PdfClickCoords | null>(null);
     const [isPreviewAnexoLocked, setIsPreviewAnexoLocked] = useState(false);
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
+    const [zoom, setZoom] = useState(1.5);
     const pdfAnexoStyle = pdfViewportAnexo
-        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
+        ? { width: pdfViewportAnexo.width * zoom, height: pdfViewportAnexo.height * zoom }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     const form = useForm<Documento>({
@@ -234,7 +235,7 @@ export default function Page() {
     }
 
     async function handleAnexos(requisicao: Documento) {
-        console.log('requisicao', requisicao);        
+        console.log('requisicao', requisicao);
         setIsModalAnexosOpen(true)
         setRequisicaoSelecionada(requisicao)
         setSelectedAnexosResult(requisicao.anexos)
@@ -384,6 +385,7 @@ export default function Page() {
             );
         }, 500);
         setIsLoading(false)
+        setZoom(1.5);
     }
 
     function changePageAnexo(newPage: number) {
@@ -451,6 +453,20 @@ export default function Page() {
             altura: 30,
         };
         await handleAssinarAnexo(dadosAssinatura);
+    }
+
+    function handleZoomIn() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.min(5, zoom + 0.25);
+        setZoom(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOut() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.max(0.5, zoom - 0.25);
+        setZoom(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     const colunas = useMemo<ColumnDef<Documento>[]>(
@@ -873,7 +889,7 @@ export default function Page() {
                                             ref={iframeRef}
                                             src="/pdf-viewer.html"
                                             className="relative border-none cursor-default"
-                                            style={{ width: '100%', height: '100%' }}
+                                            style={pdfAnexoStyle}
                                         />
 
                                         {/* Overlay */}
@@ -928,6 +944,33 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOut}
+                                    disabled={zoom <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoom * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomIn}
+                                    disabled={zoom >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                            </div>
                             {(anexoSelecionado.documento_assinado == 0 && <Button onClick={confirmarAssinaturaAnexo} className="flex items-center">
                                 Assinar
                             </Button>)}
@@ -1025,7 +1068,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                                                 {usuarios.map((u) => (
                                                                     <CommandItem
                                                                         key={u.codusuario}
-                                                                        value={`${u.codusuario} ${u.nome}`} 
+                                                                        value={`${u.codusuario} ${u.nome}`}
                                                                         onSelect={() => {
                                                                             field.onChange(u.codusuario)
                                                                             setOpenIndex(null)

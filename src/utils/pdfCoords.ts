@@ -66,29 +66,38 @@ export function getPdfClickCoords(
   e: MouseEvent<HTMLDivElement>,
   viewport?: PdfViewport | null
 ): PdfClickCoords {
-  const rect = e.currentTarget.getBoundingClientRect();
+  const overlay = e.currentTarget
+  const rect = overlay.getBoundingClientRect()
 
-  // posição do clique dentro do overlay
-  const clickX = e.clientX - rect.left;
-  const clickY = e.clientY - rect.top;
+  // container que realmente faz o scroll
+  const scrollContainer = overlay.closest(
+    '[data-pdf-scroll="true"]'
+  ) as HTMLElement | null
 
-  // segurança contra zero
-  const safeWidth = rect.width > 0 ? rect.width : viewport?.width || 1;
-  const safeHeight = rect.height > 0 ? rect.height : viewport?.height || 1;
+  const scrollLeft = scrollContainer?.scrollLeft ?? 0
+  const scrollTop = scrollContainer?.scrollTop ?? 0
 
-  // limita dentro da área visível
-  const clampedX = Math.min(Math.max(clickX, 0), safeWidth);
-  const clampedY = Math.min(Math.max(clickY, 0), safeHeight);
+  // posição do mouse dentro do overlay
+  const clickX = e.clientX - rect.left
+  const clickY = e.clientY - rect.top
+
+  // posição REAL no PDF (remove zoom + soma scroll)
+  const pdfX = (clickX + scrollLeft) / (viewport?.scale ?? 1)
+  const pdfY = (clickY + scrollTop) / (viewport?.scale ?? 1)
+
+  const pdfWidth = viewport?.width ?? 1
+  const pdfHeight = viewport?.height ?? 1
 
   // normalização
-  const x = clampedX / safeWidth;
-  const y = clampedY / safeHeight;
+  const x = pdfX / pdfWidth
+  const y = pdfY / pdfHeight
 
-  // eixo Y invertido (origem no rodapé → compatível com PDF/iText)
-  const yI = (safeHeight - clampedY) / safeHeight;
+  // eixo Y invertido (PDF / iText)
+  const yI = 1 - y
 
-  return { x, y, yI };
+  return { x, y, yI }
 }
+
 
 /**
  * Permite scroll do PDF usando o mouse wheel no overlay

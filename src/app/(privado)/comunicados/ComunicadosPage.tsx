@@ -15,7 +15,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Filter, Search, SearchIcon, SquarePlus, X, ZoomIn, ZoomOut } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -94,8 +94,9 @@ export default function Page() {
     const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
+    const [zoom, setZoom] = useState(1.5);
     const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        ? { width: pdfViewport.width * zoom, height: pdfViewport.height * zoom }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
     const [isFormComunicadoOpen, setIsFormComunicadoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
@@ -259,6 +260,7 @@ export default function Page() {
             );
         }, 500);
         setIsLoading(false)
+        setZoom(1.5);
     }
 
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
@@ -399,6 +401,20 @@ export default function Page() {
             setDeleteAprovadorId(null)
             await handleSearchClick()
         }
+    }    
+
+    function handleZoomIn() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.min(5, zoom + 0.25);
+        setZoom(newZoom);
+        // iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOut() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.max(0.5, zoom - 0.25);
+        setZoom(newZoom);
+        // iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     async function submitAprovador(data: ComunicadoAprovacao) {
@@ -599,7 +615,7 @@ export default function Page() {
                                             ref={iframeRef}
                                             src="/pdf-viewer.html"
                                             className="relative border-none cursor-default"
-                                            style={{ width: '100%', height: '100%' }}
+                                            style={pdfStyle}
                                         />
 
                                         {/* Overlay */}
@@ -654,6 +670,33 @@ export default function Page() {
                             >
                                 Próxima
                             </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOut}
+                                    disabled={zoom <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoom * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomIn}
+                                    disabled={zoom >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                            </div>
                             {(requisicaoSelecionada.documento_assinado == 0 && <Button onClick={confirmarAssinatura} className="flex items-center">
                                 Assinar
                             </Button>)}

@@ -66,10 +66,10 @@ export default function Page() {
     const [zoomAnexo, setZoomAnexo] = useState(1.5)
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
     const pdfDocumentoStyle = pdfViewportDocumento
-        ? { width: `${pdfViewportDocumento.width}px`, height: `${pdfViewportDocumento.height}px` }
+        ? { width: pdfViewportDocumento.width * zoomDocumento, height: pdfViewportDocumento.height * zoomDocumento }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
     const pdfAnexoStyle = pdfViewportAnexo
-        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
+        ? { width: pdfViewportAnexo.width * zoomAnexo, height: pdfViewportAnexo.height * zoomAnexo }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
 
@@ -603,7 +603,7 @@ export default function Page() {
                                             ref={iframeAnexoRef}
                                             src="/pdf-viewer.html"
                                             className="relative border-none cursor-crosshair"
-                                            style={{ width: '100%', height: '100%' }}
+                                            style={pdfAnexoStyle}
                                         />
                                     </div>
                                 </>
@@ -692,7 +692,7 @@ export default function Page() {
                                             ref={iframeDocumentoRef}
                                             src="/pdf-viewer.html"
                                             className="relative border-none cursor-default"
-                                            style={{ width: '100%', height: '100%' }}
+                                            style={pdfDocumentoStyle}
                                         />
 
                                         {/* Overlay */}
