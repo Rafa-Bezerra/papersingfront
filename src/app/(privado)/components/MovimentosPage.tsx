@@ -34,7 +34,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
-import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
+import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -894,14 +894,14 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         <iframe
                                             ref={iframeRef}
                                             src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default"
+                                            className="relative border-none cursor-default pointer-events-none"
                                             style={{ width: '100%', height: '100%' }}
                                         />
 
                                         {/* Overlay */}
                                         <div
                                             id="assinatura-overlay"
-                                            className="absolute inset-0 cursor-default"
+                                            className="absolute inset-0 cursor-default pointer-events-auto z-10"
                                             onClick={handleClickPdf}
                                             onMouseMove={handleHoverPdf}
                                             onMouseLeave={() => {
@@ -913,13 +913,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         {/* Pré-visualização da assinatura */}
                                         {!isPreviewLocked && previewCoords && (
                                             <div
-                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(previewCoords, pdfViewport) ?? undefined}
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
                                             />
                                         )}
                                         {signatureCoords && (
                                             <div
-                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none z-20"
                                                 style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
                                             />
                                         )}
@@ -1073,14 +1073,14 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         <iframe
                                             ref={iframeAnexoRef}
                                             src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default"
+                                            className="relative border-none cursor-default pointer-events-none"
                                             style={{ width: '100%', height: '100%' }}
                                         />
 
                                         {/* Overlay */}
                                         <div
                                             id="assinatura-overlay"
-                                            className="absolute inset-0 cursor-default"
+                                            className="absolute inset-0 cursor-default pointer-events-auto z-10"
                                             onClick={handleClickPdfAnexo}
                                             onMouseMove={handleHoverPdfAnexo}
                                             onMouseLeave={() => {
@@ -1092,13 +1092,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                         {/* Pré-visualização da assinatura */}
                                         {!isPreviewAnexoLocked && previewCoordsAnexo && (
                                             <div
-                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
                                             />
                                         )}
                                         {signatureCoordsAnexo && (
                                             <div
-                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none z-20"
                                                 style={getSignaturePreviewStyle(signatureCoordsAnexo, pdfViewportAnexo) ?? undefined}
                                             />
                                         )}
