@@ -1,14 +1,8 @@
 'use client'
 
-declare global {
-    interface Window {
-        _pdfMessageListener?: boolean;
-    }
-
-    interface Props {
-        titulo: string;
-        tipos_movimento: string[];
-    }
+interface Props {
+    titulo: string;
+    tipos_movimento: string[];
 }
 
 import React, {

@@ -1,11 +1,5 @@
 'use client'
 
-declare global {
-    interface Window {
-        _pdfMessageListener?: boolean;
-    }
-}
-
 import React, {
     useEffect,
     useMemo,
@@ -119,6 +113,38 @@ export default function Page() {
     const pdfAnexoStyle = pdfViewportAnexo
         ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.source === iframeRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPages(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewport({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
+            }
+            if (event.source === iframeAnexoRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPagesAnexo(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewportAnexo({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
 
     function changePage(newPage: number) {
         if (!iframeRef.current) return;
@@ -320,36 +346,6 @@ export default function Page() {
             const arquivoBase64 = data.arquivo;
             setRequisicaoDocumentoSelecionada(arquivoBase64);
 
-            if (!window._pdfMessageListener) {
-                window._pdfMessageListener = true;
-                window.addEventListener("message", (event) => {
-                    if (event.source === iframeRef.current?.contentWindow) {
-                        if (event.data?.totalPages) {
-                            setTotalPages(event.data.totalPages);
-                        }
-                        if (event.data?.pdfViewport) {
-                            setPdfViewport({
-                                width: event.data.pdfViewport.width,
-                                height: event.data.pdfViewport.height,
-                                scale: event.data.pdfViewport.scale
-                            });
-                        }
-                    }
-                    if (event.source === iframeAnexoRef.current?.contentWindow) {
-                        if (event.data?.totalPages) {
-                            setTotalPagesAnexo(event.data.totalPages);
-                        }
-                        if (event.data?.pdfViewport) {
-                            setPdfViewportAnexo({
-                                width: event.data.pdfViewport.width,
-                                height: event.data.pdfViewport.height,
-                                scale: event.data.pdfViewport.scale
-                            });
-                        }
-                    }
-                });
-            }
-
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
                     { pdfBase64: arquivoBase64 },
@@ -534,37 +530,6 @@ export default function Page() {
         setPreviewCoordsAnexo(null);
         setIsPreviewAnexoLocked(false);
         setPdfViewportAnexo(null);
-
-        if (!window._pdfMessageListener) {
-            window._pdfMessageListener = true;
-
-            window.addEventListener("message", (event) => {
-                if (event.source === iframeRef.current?.contentWindow) {
-                    if (event.data?.totalPages) {
-                        setTotalPages(event.data.totalPages);
-                    }
-                    if (event.data?.pdfViewport) {
-                        setPdfViewport({
-                            width: event.data.pdfViewport.width,
-                            height: event.data.pdfViewport.height,
-                            scale: event.data.pdfViewport.scale
-                        });
-                    }
-                }
-                if (event.source === iframeAnexoRef.current?.contentWindow) {
-                    if (event.data?.totalPages) {
-                        setTotalPagesAnexo(event.data.totalPages);
-                    }
-                    if (event.data?.pdfViewport) {
-                        setPdfViewportAnexo({
-                            width: event.data.pdfViewport.width,
-                            height: event.data.pdfViewport.height,
-                            scale: event.data.pdfViewport.scale
-                        });
-                    }
-                }
-            });
-        }
 
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
         setTimeout(() => {

@@ -85,6 +85,18 @@ export default function Page() {
     const [zoomAnexo, setZoomAnexo] = useState(1.5);
 
     useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.source !== iframeAnexoRef.current?.contentWindow) return;
+            if (event.data?.totalPages) {
+                setTotalPagesAnexo(event.data.totalPages);
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
+
+    useEffect(() => {
         buscaCentrosDeCusto();
         buscaUsuarios();
         buscaFornecedores();
@@ -293,16 +305,6 @@ export default function Page() {
         try {
             setAnexoSelecionado(anexo);
             const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
-
-            if (!window._pdfMessageListener) {
-                window._pdfMessageListener = true;
-
-                window.addEventListener("message", (event) => {
-                    if (event.data?.totalPages) {
-                        setTotalPagesAnexo(event.data.totalPages);
-                    }
-                });
-            }
 
             setTimeout(() => {
                 iframeAnexoRef.current?.contentWindow?.postMessage(

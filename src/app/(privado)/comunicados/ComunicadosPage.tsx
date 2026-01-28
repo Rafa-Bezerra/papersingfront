@@ -1,11 +1,5 @@
 'use client'
 
-declare global {
-    interface Window {
-        _pdfMessageListener?: boolean;
-    }
-}
-
 import React, {
     useEffect,
     useMemo,
@@ -101,6 +95,25 @@ export default function Page() {
     const [isFormComunicadoOpen, setIsFormComunicadoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateComunicadoMode, setUpdateComunicadoMode] = useState(false)
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            if (event.data?.totalPages) {
+                setTotalPages(event.data.totalPages);
+            }
+            if (event.data?.pdfViewport) {
+                setPdfViewport({
+                    width: event.data.pdfViewport.width,
+                    height: event.data.pdfViewport.height,
+                    scale: event.data.pdfViewport.scale
+                });
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
     const [deleteComunicadoId, setDeleteComunicadoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -234,24 +247,6 @@ export default function Page() {
         setIsPreviewLocked(false);
         const arquivoBase64 = requisicao.anexo;
         setRequisicaoComunicadoSelecionada(arquivoBase64);
-
-        if (!window._pdfMessageListener) {
-            window._pdfMessageListener = true;
-
-            window.addEventListener("message", (event) => {
-                if (event.source !== iframeRef.current?.contentWindow) return;
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewport({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            });
-        }
 
         setTimeout(() => {
             iframeRef.current?.contentWindow?.postMessage(

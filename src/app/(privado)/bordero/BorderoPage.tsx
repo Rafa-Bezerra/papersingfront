@@ -1,11 +1,5 @@
 'use client'
 
-declare global {
-    interface Window {
-        _pdfMessageListener?: boolean;
-    }
-}
-
 import React, {
     useEffect,
     useMemo,
@@ -79,6 +73,18 @@ export default function Page() {
     const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
     const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            if (event.data?.totalPages) {
+                setTotalPages(event.data.totalPages);
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
 
     function clearQuery() { setQuery('') }
 
@@ -304,15 +310,6 @@ export default function Page() {
             const data = await getAnexoById(item.id_movimento_ligacao);
             const arquivoBase64 = data.arquivo;
             setDocumentoItemSelecionado(arquivoBase64);
-
-            if (!window._pdfMessageListener) {
-                window._pdfMessageListener = true;
-                window.addEventListener("message", (event) => {
-                    if (event.data?.totalPages) {
-                        setTotalPages(event.data.totalPages);
-                    }
-                });
-            }
 
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
