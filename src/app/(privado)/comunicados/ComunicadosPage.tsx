@@ -89,34 +89,36 @@ export default function Page() {
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
     const [zoom, setZoom] = useState(1.5);
-    const pdfStyle = pdfViewport
-        ? { width: pdfViewport.width * zoom, height: pdfViewport.height * zoom }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
     const [isFormComunicadoOpen, setIsFormComunicadoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateComunicadoMode, setUpdateComunicadoMode] = useState(false)
+    const [deleteComunicadoId, setDeleteComunicadoId] = useState<number | null>(null);
+    const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
+    const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const carregou = useRef(false)
+    const pdfStyle = pdfViewport
+        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
-            if (event.source !== iframeRef.current?.contentWindow) return;
-            if (event.data?.totalPages) {
-                setTotalPages(event.data.totalPages);
-            }
-            if (event.data?.pdfViewport) {
-                setPdfViewport({
-                    width: event.data.pdfViewport.width,
-                    height: event.data.pdfViewport.height,
-                    scale: event.data.pdfViewport.scale
-                });
+            if (event.source === iframeRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPages(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewport({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
             }
         };
 
         window.addEventListener("message", handler);
         return () => window.removeEventListener("message", handler);
     }, []);
-    const [deleteComunicadoId, setDeleteComunicadoId] = useState<number | null>(null);
-    const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
-    const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
     const form = useForm<Comunicado>({
         defaultValues: {
@@ -151,7 +153,6 @@ export default function Page() {
         }
     }
 
-    const carregou = useRef(false)
     useEffect(() => {
         if (carregou.current) return;
         buscaUsuarios();
@@ -245,7 +246,7 @@ export default function Page() {
         setSignatureCoords(null);
         setPreviewCoords(null);
         setIsPreviewLocked(false);
-        const arquivoBase64 = requisicao.anexo;
+        const arquivoBase64 = requisicao.anexo.replace(/^data:.*;base64,/, '').trim();
         setRequisicaoComunicadoSelecionada(arquivoBase64);
 
         setTimeout(() => {
@@ -402,14 +403,14 @@ export default function Page() {
         if (!iframeRef.current) return;
         const newZoom = Math.min(5, zoom + 0.25);
         setZoom(newZoom);
-        // iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     function handleZoomOut() {
         if (!iframeRef.current) return;
         const newZoom = Math.max(0.5, zoom - 0.25);
         setZoom(newZoom);
-        // iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     async function submitAprovador(data: ComunicadoAprovacao) {

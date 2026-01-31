@@ -63,7 +63,6 @@ export default function Page() {
     const titulo = 'Documentos para Assinatura'
     const router = useRouter()
     const searchParams = useSearchParams()
-
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
@@ -76,7 +75,6 @@ export default function Page() {
     const [searched, setSearched] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
-
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -86,7 +84,6 @@ export default function Page() {
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
-
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     const [selectedAnexosResult, setSelectedAnexosResult] = useState<DocumentoAnexo[]>([])
     const [file, setFile] = useState<File | null>(null)
@@ -104,21 +101,22 @@ export default function Page() {
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const [zoom, setZoom] = useState(1.5);
     const pdfAnexoStyle = pdfViewportAnexo
-        ? { width: pdfViewportAnexo.width * zoom, height: pdfViewportAnexo.height * zoom }
+        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
-            if (event.source !== iframeRef.current?.contentWindow) return;
-            if (event.data?.totalPages) {
-                setTotalPagesAnexo(event.data.totalPages);
-            }
-            if (event.data?.pdfViewport) {
-                setPdfViewportAnexo({
-                    width: event.data.pdfViewport.width,
-                    height: event.data.pdfViewport.height,
-                    scale: event.data.pdfViewport.scale
-                });
+            if (event.source === iframeRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPagesAnexo(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewportAnexo({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
             }
         };
 

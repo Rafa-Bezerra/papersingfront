@@ -41,12 +41,12 @@ import {
 } from '@/services/borderoService';
 import { Label } from '@radix-ui/react-label';
 import { toast } from 'sonner';
+import { PdfViewport } from '@/utils/pdfCoords'
 
 export default function Page() {
     const titulo = 'Borderôs'
     const router = useRouter()
     const searchParams = useSearchParams()
-
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
@@ -73,12 +73,24 @@ export default function Page() {
     const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
     const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
+    const pdfStyle = pdfViewport
+        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
-            if (event.source !== iframeRef.current?.contentWindow) return;
-            if (event.data?.totalPages) {
-                setTotalPages(event.data.totalPages);
+            if (event.source === iframeRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPages(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewport({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
             }
         };
 
@@ -305,12 +317,14 @@ export default function Page() {
 
     async function handleDocumento(item: BorderoItem) {
         setIsLoading(true)
+        setCurrentPage(1);
+        setTotalPages(null);
+        setPdfViewport(null);
         setItemSelecionado(item)
         try {
             const data = await getAnexoById(item.id_movimento_ligacao);
-            const arquivoBase64 = data.arquivo;
+            const arquivoBase64 = data.arquivo!.replace(/^data:.*;base64,/, '').trim();
             setDocumentoItemSelecionado(arquivoBase64);
-
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
                     { pdfBase64: arquivoBase64 },
@@ -581,12 +595,7 @@ export default function Page() {
                                         ref={iframeRef}
                                         src="/pdf-viewer.html"
                                         className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
+                                        style={pdfStyle}
                                     />
                                 </>
                             ) : (

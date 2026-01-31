@@ -36,14 +36,12 @@ export default function Page() {
     const [error, setError] = useState<string | null>(null)
     const [userCodusuario, setCodusuario] = useState("");
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
-
     const [results, setResults] = useState<Rdv[]>([])
     const [selectedResult, setSelectedResult] = useState<Rdv>()
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [selectedItensResult, setSelectedItensResult] = useState<ItemRdv[]>([])
     const [isModalAprovadoresOpen, setIsModalAprovadoresOpen] = useState(false)
     const [selectedAprovadoresResult, setSelectedAprovadoresResult] = useState<AprovadoresRdv[]>([])
-
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     const [selectedAnexosResult, setSelectedAnexosResult] = useState<AnexoRdv[]>([])
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
@@ -51,7 +49,6 @@ export default function Page() {
     const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoRdv | null>(null)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
-
     const [currentPageDocumento, setCurrentPageDocumento] = useState(1);
     const [totalPagesDocumento, setTotalPagesDocumento] = useState<number | null>(null);
     const [documentoSelecionado, setDocumentoSelecionado] = useState<AnexoRdv | null>(null)
@@ -66,10 +63,10 @@ export default function Page() {
     const [zoomAnexo, setZoomAnexo] = useState(1.5)
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
     const pdfDocumentoStyle = pdfViewportDocumento
-        ? { width: pdfViewportDocumento.width * zoomDocumento, height: pdfViewportDocumento.height * zoomDocumento }
+        ? { width: `${pdfViewportDocumento.width}px`, height: `${pdfViewportDocumento.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
     const pdfAnexoStyle = pdfViewportAnexo
-        ? { width: pdfViewportAnexo.width * zoomAnexo, height: pdfViewportAnexo.height * zoomAnexo }
+        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     useEffect(() => {
@@ -103,7 +100,6 @@ export default function Page() {
         window.addEventListener("message", handler);
         return () => window.removeEventListener("message", handler);
     }, []);
-
 
     useEffect(() => {
         const storedUser = sessionStorage.getItem("userData");
