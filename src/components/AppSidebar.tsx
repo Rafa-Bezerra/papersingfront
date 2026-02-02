@@ -52,6 +52,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
   const [userCentrosCustos, setUserCentrosCustos] = useState(false)
+  const [userAdministrativo, setUserAdministrativo] = useState(false)
+  // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
   // Usa o estado externo se fornecido, senão usa o interno
   const mobileOpen = externalMobileOpen !== undefined ? externalMobileOpen : isMobileOpen
@@ -73,6 +75,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
         setUserCentrosCustos(user.ccusto);
+        setUserAdministrativo(user.administrativo);
+        // setUserSolicitante(user.solicitante);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }
@@ -206,9 +210,10 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
 
                     {section.items.map(item => {
                       if (!userAdmin) {
-                        if (item.url === "/documentos" && !userDocumentos) return null;
+                        if(!userAdministrativo) {
+                          if (item.url === "/documentos" && !userDocumentos) return null;
+                        }
                         if (item.url === "/bordero" && !userBordero) return null;
-                        // if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
                         if (item.url === "/centros-custos" && !userCentrosCustos) return null;
                         if (["/alcadas", "/usuarios", "/borderoaprovadores", "/rdvaprovadores"].includes(item.url)) return null;

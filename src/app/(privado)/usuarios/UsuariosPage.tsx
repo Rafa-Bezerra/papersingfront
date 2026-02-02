@@ -85,6 +85,8 @@ export default function PageUsuarios() {
       ccusto: false,
       externo: false,
       restrito: false,
+      administrativo: false,
+      solicitante: false,
     }
   })
 
@@ -211,6 +213,8 @@ export default function PageUsuarios() {
         ccusto: response.ccusto,
         externo: response.externo,
         restrito: response.restrito,
+        administrativo: response.administrativo,
+        solicitante: response.solicitante,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -237,6 +241,8 @@ export default function PageUsuarios() {
       rdv: false,
       ccusto: false,
       externo: false,
+      administrativo: false,
+      solicitante: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -544,6 +550,38 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Externo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="administrativo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Administrativo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="solicitante"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Solicitante</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

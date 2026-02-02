@@ -20,6 +20,34 @@ export default function HomePage() {
     pendentes: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userAdmin, setUserAdmin] = useState(false)
+  const [userDocumentos, setUserDocumentos] = useState(false)
+  const [userBordero, setUserBordero] = useState(false)
+  const [userComunicados, setUserComunicados] = useState(false)
+  const [userCentrosCustos, setUserCentrosCustos] = useState(false)
+  const [userAdministrativo, setUserAdministrativo] = useState(false)
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem("userData");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setUserName(user.nome);
+        setUserEmail(user.email);
+        setUserAdmin(user.admin);
+        setUserDocumentos(user.documentos);
+        setUserBordero(user.bordero);
+        setUserComunicados(user.comunicados);
+        setUserCentrosCustos(user.ccusto);
+        setUserAdministrativo(user.administrativo);
+        // setUserSolicitante(user.solicitante);
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     async function loadStats() {
@@ -124,7 +152,7 @@ export default function HomePage() {
       </div>
 
       {/* Cards de Acesso Rápido */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
           onClick={() => router.push('/solicitacoes')}
@@ -169,7 +197,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card 
+        {/* <Card 
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
           onClick={() => router.push('/assinatura')}
         >
@@ -189,9 +217,9 @@ export default function HomePage() {
               <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card 
+        {userAdmin && (<Card 
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
           onClick={() => router.push('/usuarios')}
         >
@@ -211,7 +239,7 @@ export default function HomePage() {
               <CheckSquare className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
             </div>
           </CardContent>
-        </Card>
+        </Card>)}
       </div>
 
       {/* Resumo de Atividades */}

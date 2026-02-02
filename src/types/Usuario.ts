@@ -17,6 +17,8 @@ export type Usuario = {
     ccusto: boolean,
     externo: boolean,
     restrito: boolean,
+    administrativo: boolean,
+    solicitante: boolean,
 }
 
 export interface LoginPayload {

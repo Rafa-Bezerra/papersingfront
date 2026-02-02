@@ -19,6 +19,8 @@ export interface LoginResponse {
   rdv: boolean;
   bordero: boolean;
   comunicados: boolean;
+  administrativo: boolean;
+  solicitante: boolean;
   ccusto: boolean;
 }
 
