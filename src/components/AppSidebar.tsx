@@ -119,11 +119,18 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'RDV': <Truck className="w-5 h-5" />,
     'Aprovação RDV': <Truck className="w-5 h-5" />,
     'Aprovadores Borderô': <Users className="w-5 h-5" />,
-    Alçadas: <Users className="w-5 h-5" />,
+    'Alçadas': <Users className="w-5 h-5" />,
     'Centros de custos': <Settings className="w-5 h-5" />,
-    Usuários: <User className="w-5 h-5" />
+    'Usuários': <User className="w-5 h-5" />,
+    Configurações: <Settings className="w-5 h-5" />,
   }
 
+  const configItems = [
+    { title: 'Alçadas', url: '/alcadas' },
+    { title: 'Usuários', url: '/usuarios' },
+    { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
+    { title: 'Centros de custos', url: '/centros-custos' },
+  ]
 
   return (
     <>
@@ -209,8 +216,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                     )}
 
                     {section.items.map(item => {
+                      if (configItems.some(c => c.url === item.url)) return null
                       if (!userAdmin) {
-                        if(!userAdministrativo) {
+                        if (!userAdministrativo) {
                           if (item.url === "/documentos" && !userDocumentos) return null;
                         }
                         if (item.url === "/bordero" && !userBordero) return null;
@@ -256,6 +264,54 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                     })}
                   </div>
                 ))}
+                {userAdmin && (
+                  <SidebarMenuItem>
+                    <details className="group">
+                      <summary
+                        className={`w-full list-none cursor-pointer transition-all duration-200 ${collapsed
+                            ? 'flex justify-center px-2 py-2.5 rounded-md'
+                            : 'flex items-center justify-between px-3 py-2'
+                          } hover:bg-primary/10`}
+                      >
+                        <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'}`}>
+                          <span className="flex-shrink-0">
+                            {iconMap['Configurações']}
+                          </span>
+
+                          {!collapsed && (
+                            <span className="text-sm font-medium text-foreground">
+                              Configurações
+                            </span>
+                          )}
+                        </div>
+
+                        {!collapsed && (
+                          <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                        )}
+                      </summary>
+
+                      {!collapsed && (
+                        <div className="mt-1 space-y-1">
+                          {configItems.map(item => (
+                            <SidebarMenuButton
+                              key={item.url}
+                              asChild
+                              isActive={path === item.url || path.startsWith(item.url + '/')}
+                              className={`ml-6 justify-start text-sm transition-colors ${path === item.url || path.startsWith(item.url + '/')
+                                  ? 'bg-slate-100 dark:bg-slate-700 font-semibold'
+                                  : 'hover:bg-primary/10'
+                                }`}
+                            >
+                              <Link href={item.url} onClick={handleMobileToggle}>
+                                {item.title}
+                              </Link>
+                            </SidebarMenuButton>
+                          ))}
+                        </div>
+                      )}
+                    </details>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroup>
 

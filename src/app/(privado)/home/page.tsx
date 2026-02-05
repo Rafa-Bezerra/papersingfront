@@ -1,48 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { FileText, CheckCircle, Clock, CheckSquare, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/DashboardCard';
-import { getDashboardStats } from '@/services/dashboardService';
+import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import './home.css';
 
 export default function HomePage() {
   const router = useRouter();
-  const [stats, setStats] = useState<{
-    documentos: number;
-    aprovados: number;
-    aprovados_hoje: number;
-    em_andamento: number;
-    concluidos: number;
-    pendentes: number;
-  } | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("");
-  const [userEmail, setUserEmail] = useState("");
   const [userAdmin, setUserAdmin] = useState(false)
-  const [userDocumentos, setUserDocumentos] = useState(false)
-  const [userBordero, setUserBordero] = useState(false)
-  const [userComunicados, setUserComunicados] = useState(false)
-  const [userCentrosCustos, setUserCentrosCustos] = useState(false)
-  const [userAdministrativo, setUserAdministrativo] = useState(false)
 
   useEffect(() => {
     const storedUser = sessionStorage.getItem("userData");
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        setUserName(user.nome);
-        setUserEmail(user.email);
         setUserAdmin(user.admin);
-        setUserDocumentos(user.documentos);
-        setUserBordero(user.bordero);
-        setUserComunicados(user.comunicados);
-        setUserCentrosCustos(user.ccusto);
-        setUserAdministrativo(user.administrativo);
-        // setUserSolicitante(user.solicitante);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }
@@ -53,6 +31,8 @@ export default function HomePage() {
     async function loadStats() {
       try {
         const data = await getDashboardStats();
+        console.log(data);
+        
         setStats(data);
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
@@ -71,7 +51,7 @@ export default function HomePage() {
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-4 w-96" />
         </header>
-        
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
@@ -99,63 +79,121 @@ export default function HomePage() {
       </header>
 
       {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         <DashboardCard
           title="Documentos"
           count={stats?.documentos || 0}
           icon={FileText}
           color="blue"
-          description="Total de documentos"
-          href="/geral?status=Todos"
-          className="w-full"
+          description="Documentos"
+          href="/geral?status=todos"
         />
-        
-        <DashboardCard
-          title="Aprovados"
-          count={stats?.aprovados || 0}
-          icon={CheckCircle}
-          color="green"
-          description="Documentos aprovados"
-          href="/geral?status=Aprovados"
-          className="w-full"
-        />
-        
+
         <DashboardCard
           title="Em Andamento"
           count={stats?.em_andamento || 0}
           icon={Clock}
           color="yellow"
-          description="Processos em análise"
-          href="/geral?status=Andamento"
-          className="w-full"
+          description="Processos em andamento"
+          href="/geral?status=em_andamento"
         />
-        
+
         <DashboardCard
-          title="Concluídos"
-          count={stats?.concluidos || 0}
-          icon={CheckSquare}
+          title="Concluído a responder"
+          count={stats?.concluido_a_responder || 0}
+          icon={FileText}
+          color="green"
+          description="Aguardando resposta"
+          href="/geral?status=concluido_a_responder"
+        />
+
+        <DashboardCard
+          title="Concluído respondido"
+          count={stats?.concluido_respondido || 0}
+          icon={CheckCircle}
           color="purple"
-          description="Processos finalizados"
-          href="/geral?status=Finalizados"
-          className="w-full"
+          description="Respondidos"
+          href="/geral?status=concluido_respondido"
         />
-        
+
         <DashboardCard
-          title="Pendentes"
-          count={stats?.pendentes || 0}
-          icon={AlertCircle}
+          title="Concluído confirmado"
+          count={stats?.concluido_confirmado || 0}
+          icon={CheckSquare}
+          color="blue"
+          description="Confirmados"
+          href="/geral?status=concluido_confirmado"
+        />
+
+        <DashboardCard
+          title="Concluído automático"
+          count={stats?.concluido_automatico || 0}
+          icon={Zap}
+          color="yellow"
+          description="Finalizado pelo sistema"
+          href="/geral?status=concluido_automatico"
+        />
+
+        <DashboardCard
+          title="Avaliado"
+          count={stats?.avaliado || 0}
+          icon={Star}
+          color="green"
+          description="Processos avaliados"
+          href="/geral?status=avaliado"
+        />
+
+        <DashboardCard
+          title="Agendado a responder"
+          count={stats?.agendado_a_responder || 0}
+          icon={CalendarClock}
+          color="purple"
+          description="Resposta agendada"
+          href="/geral?status=agendado_a_responder"
+        />
+
+        <DashboardCard
+          title="Agendado respondido"
+          count={stats?.agendado_respondido || 0}
+          icon={CalendarCheck}
+          color="blue"
+          description="Agendados respondidos"
+          href="/geral?status=agendado_respondido"
+        />
+
+        <DashboardCard
+          title="Aguardando terceiros"
+          count={stats?.aguardando_terceiros || 0}
+          icon={Users}
+          color="yellow"
+          description="Dependência externa"
+          href="/geral?status=aguardando_terceiros"
+        />
+
+        <DashboardCard
+          title="Cancelado"
+          count={stats?.cancelado || 0}
+          icon={XCircle}
           color="red"
-          description="Aguardando ação"
-          href="/geral?status=Pendentes"
-          className="w-full"
+          description="Processos cancelados"
+          href="/geral?status=cancelado"
+        />
+
+        <DashboardCard
+          title="Despertado"
+          count={stats?.despertado || 0}
+          icon={Bell}
+          color="purple"
+          description="Processos despertados"
+          href="/geral?status=despertado"
         />
       </div>
 
       {/* Cards de Acesso Rápido */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card 
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${userAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 sm:gap-6`} >
+        <Card
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
-          onClick={() => router.push('/solicitacoes')}
+          onClick={() => router.push('/carrinho')}
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -175,7 +213,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
           onClick={() => router.push('/requisicoes')}
         >
@@ -219,7 +257,7 @@ export default function HomePage() {
           </CardContent>
         </Card> */}
 
-        {userAdmin && (<Card 
+        {userAdmin && (<Card
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
           onClick={() => router.push('/usuarios')}
         >
@@ -256,7 +294,7 @@ export default function HomePage() {
               </div>
               <span className="text-sm text-muted-foreground">{stats?.aprovados_hoje || 0}</span>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
@@ -264,7 +302,7 @@ export default function HomePage() {
               </div>
               <span className="text-sm text-muted-foreground">{stats?.pendentes || 0}</span>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>

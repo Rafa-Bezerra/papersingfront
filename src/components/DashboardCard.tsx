@@ -64,44 +64,43 @@ export function DashboardCard({
 }: DashboardCardProps) {
   const router = useRouter();
   const colors = colorVariants[color];
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      handleClick();
+      router.push(href);
     }
-  };
-
-  const handleClick = () => {
-    router.push(href);
   };
 
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-md w-full dashboard-card-full",
-        "cursor-pointer transition-all duration-200 hover:shadow-md w-full dashboard-card-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "cursor-pointer w-full transition-all duration-200",
+        "hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         colors.bg,
         colors.border,
         colors.hover,
         className
       )}
-      onClick={handleClick}
+      onClick={() => router.push(href)}
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-foreground/70">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2">
+        <CardTitle className="text-xs font-medium text-foreground/70 leading-tight">
           {title}
         </CardTitle>
-        <Icon className={cn("h-4 w-4", colors.icon)} />
+        <Icon className={cn("h-3.5 w-3.5", colors.icon)} />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-foreground">{count}</div>
-        <p className="text-xs text-foreground/60 mt-1">{description}</p>
-        {/* <Badge variant="secondary" className="mt-2 text-xs">
-          Clique para ver detalhes
-        </Badge> */}
+
+      <CardContent className="px-3 pb-2 pt-0">
+        <div className="text-lg font-semibold leading-none text-foreground">
+          {count}
+        </div>
+        <p className="mt-0.5 text-[11px] leading-tight text-foreground/60">
+          {description}
+        </p>
       </CardContent>
     </Card>
   );

@@ -183,22 +183,42 @@ export default function Page() {
         const status = searchParams.get("status") ?? "";
         setFiltroDashboard(status);
         switch (status) {
-            case "Aprovados":
-                setSituacaoFiltrada("Em Andamento");
+            case "em_andamento":
+                setSituacaoFiltrada("Em Andamento")
                 break;
-            case "Pendentes":
-                setSituacaoFiltrada("Em Andamento");
+            case "concluido_a_responder":
+                setSituacaoFiltrada("Concluído a responder")
                 break;
-            case "Andamento":
-                setSituacaoFiltrada("Em Andamento");
+            case "concluido_respondido":
+                setSituacaoFiltrada("Concluído respondido")
                 break;
-            case "Finalizados":
-                setSituacaoFiltrada("Concluído confirmado");
+            case "concluido_confirmado":
+                setSituacaoFiltrada("Concluído confirmado")
+                break;
+            case "concluido_automatico":
+                setSituacaoFiltrada("Concluído automático(pelo sistema)")
+                break;
+            case "avaliado":
+                setSituacaoFiltrada("Avaliado")
+                break;
+            case "agendado_a_responder":
+                setSituacaoFiltrada("Agendado a responder")
+                break;
+            case "agendado_respondido":
+                setSituacaoFiltrada("Agendado respondido")
+                break;
+            case "aguardando_terceiros":
+                setSituacaoFiltrada("Aguardando terceiros")
+                break;
+            case "cancelado":
+                setSituacaoFiltrada("Cancelado")
+                break;
+            case "despertado":
+                setSituacaoFiltrada("Despertado")
                 break;
             default:
                 setSituacaoFiltrada("");
         }
-        console.log("setou status: " + status);
     }, []);
 
     useEffect(() => {
