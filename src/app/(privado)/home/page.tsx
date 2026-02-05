@@ -90,10 +90,10 @@ export default function HomePage() {
         />
 
         <DashboardCard
-          title="Em Andamento"
+          title="Pendentes"
           count={stats?.em_andamento || 0}
           icon={Clock}
-          color="yellow"
+          color="red"
           description="Processos em andamento"
           href="/geral?status=em_andamento"
         />
@@ -138,7 +138,7 @@ export default function HomePage() {
           title="Avaliado"
           count={stats?.avaliado || 0}
           icon={Star}
-          color="green"
+          color="yellow"
           description="Processos avaliados"
           href="/geral?status=avaliado"
         />

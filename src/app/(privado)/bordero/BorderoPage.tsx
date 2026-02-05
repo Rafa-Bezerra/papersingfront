@@ -66,11 +66,16 @@ export default function Page() {
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("AGUARDANDO APROVAÇÃO")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const loading = isPending
+    const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
+
+    
+    const [anexosResults, setAnexosResults] = useState<BorderoItem[]>([])
+    const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
+    
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState<number | null>(null);
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const [itemSelecionado, setItemSelecionado] = useState<BorderoItem | null>(null)
     const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
@@ -152,7 +157,6 @@ export default function Page() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, situacaoFiltrada, dateFrom, dateTo])
-
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -237,80 +241,6 @@ export default function Page() {
         }
     }
 
-    const colunas = useMemo<ColumnDef<Bordero>[]>(
-        () => [
-            { accessorKey: 'id_bordero', header: 'ID' },
-            { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
-            { accessorKey: 'descricao', header: 'Descrição' },
-            { accessorKey: 'cod_conta_caixa', header: 'Conta caixa' },
-            { accessorKey: 'nome_banco', header: 'Banco' },
-            { accessorKey: 'numero_banco', header: 'Número banco' },
-            { accessorKey: 'numero_agencia_banco', header: 'Agência' },
-            { accessorKey: 'numero_conta_banco', header: 'Conta' },
-            { accessorKey: 'statusaprovacaobordero', header: 'Status' },
-            { accessorKey: 'cod_convenio_banco', header: 'Convênio' },
-            {
-                id: 'actions',
-                header: 'Ações',
-                cell: ({ row }) => {
-                    const usuarioAprovador = aprovadores.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                    );
-                    console.log(usuarioAprovador)
-
-                    const status_bloqueado = ['BORDERO APROVADO', '0', 'APROVADO E REMETIDO'].includes(row.original.statusaprovacaobordero);
-
-                    const podeAprovar = usuarioAprovador && !status_bloqueado;
-                    const podeReprovar = usuarioAprovador && !status_bloqueado;
-
-                    // const podeAprovar = true;
-                    // const podeReprovar = true;
-                    return (
-                        <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
-                                Itens
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
-                                Aprovações
-                            </Button>
-
-                            {podeAprovar && (
-                                <Button
-                                    size="sm"
-                                    className="bg-green-500 hover:bg-green-600 text-white"
-                                    onClick={() => handleAprovar(row.original.id_bordero, 1)}
-                                >
-                                    Aprovar
-                                </Button>
-                            )}
-
-                            {podeReprovar && (
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleAprovar(row.original.id_bordero, 0)}
-                                >
-                                    Reprovar
-                                </Button>
-                            )}
-                        </div>
-                    );
-                }
-            }
-        ],
-        [userName]
-    )
-
-    const colunasAprovacoes = useMemo<ColumnDef<BorderoAprovacao>[]>(
-        () => [
-            { accessorKey: 'id', header: 'Id' },
-            { accessorKey: 'usuario', header: 'Usuário' },
-            { accessorKey: 'aprovacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
-        ],
-        []
-    )
-
     function sumColumn(data: BorderoItem[], key: keyof BorderoItem) {
         return data.reduce((acc, item) => acc + (Number(item[key]) || 0), 0);
     }
@@ -381,6 +311,100 @@ export default function Page() {
         iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
 
+    async function handleAnexos(requisicao: Bordero) {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllItens(requisicao.id_bordero)
+            setAnexosResults(dados)
+            setIsModalAnexosOpen(true)
+            setRequisicaoSelecionada(requisicao)
+        } catch (err) {
+            setError((err as Error).message)
+            setAnexosResults([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
+        }
+    }
+
+    const colunas = useMemo<ColumnDef<Bordero>[]>(
+        () => [
+            { accessorKey: 'id_bordero', header: 'ID' },
+            { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
+            { accessorKey: 'descricao', header: 'Descrição' },
+            { accessorKey: 'cod_conta_caixa', header: 'Conta caixa' },
+            { accessorKey: 'nome_banco', header: 'Banco' },
+            { accessorKey: 'numero_banco', header: 'Número banco' },
+            { accessorKey: 'numero_agencia_banco', header: 'Agência' },
+            { accessorKey: 'numero_conta_banco', header: 'Conta' },
+            { accessorKey: 'statusaprovacaobordero', header: 'Status' },
+            { accessorKey: 'cod_convenio_banco', header: 'Convênio' },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    const usuarioAprovador = aprovadores.some(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    );
+                    console.log(usuarioAprovador)
+
+                    const status_bloqueado = ['BORDERO APROVADO', '0', 'APROVADO E REMETIDO'].includes(row.original.statusaprovacaobordero);
+
+                    const podeAprovar = usuarioAprovador && !status_bloqueado;
+                    const podeReprovar = usuarioAprovador && !status_bloqueado;
+
+                    // const podeAprovar = true;
+                    // const podeReprovar = true;
+                    return (
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
+                                Anexos
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
+                                Itens
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
+                                Aprovações
+                            </Button>
+
+                            {podeAprovar && (
+                                <Button
+                                    size="sm"
+                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                    onClick={() => handleAprovar(row.original.id_bordero, 1)}
+                                >
+                                    Aprovar
+                                </Button>
+                            )}
+
+                            {podeReprovar && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleAprovar(row.original.id_bordero, 0)}
+                                >
+                                    Reprovar
+                                </Button>
+                            )}
+                        </div>
+                    );
+                }
+            }
+        ],
+        [userName]
+    )
+
+    const colunasAprovacoes = useMemo<ColumnDef<BorderoAprovacao>[]>(
+        () => [
+            { accessorKey: 'id', header: 'Id' },
+            { accessorKey: 'usuario', header: 'Usuário' },
+            { accessorKey: 'aprovacao', header: 'Situação' },
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+        ],
+        []
+    )
+
     const colunasItens = useMemo<ColumnDef<BorderoItem>[]>(
         () => [
             // { accessorKey: 'id_bordero', header: 'Id' },
@@ -438,6 +462,30 @@ export default function Page() {
             { accessorKey: 'validade_bordero', header: 'Validade', accessorFn: (row) => safeDateLabel(row.validade_bordero) },
             { accessorKey: 'data_criacao_lan', header: 'Data criação lanc.', accessorFn: (row) => safeDateLabel(row.data_criacao_lan) },
             { accessorKey: 'data_vencimento_lan', header: 'Data venc. lanc.', accessorFn: (row) => safeDateLabel(row.data_vencimento_lan) },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    return (
+                        <div className="flex gap-2">
+                            {row.original.possui_anexo ? (
+                                <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                    Documento
+                                </Button>
+                            ) : (
+                                <span>Nenhum anexo</span>
+                            )}
+                        </div>
+                    );
+                }
+            }
+        ],
+        []
+    )
+
+    const colunasAnexos = useMemo<ColumnDef<BorderoItem>[]>(
+        () => [
+            { accessorKey: 'id_lancamento_fin', header: 'Lanc. Fin.' },
             {
                 id: 'actions',
                 header: 'Ações',
@@ -571,6 +619,20 @@ export default function Page() {
                         )}
                         <div className="w-full">
                             <DataTable columns={colunasItens} data={itensResults} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Anexos */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id_bordero}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAnexos} data={anexosResults} loading={loading} />
                         </div>
                     </DialogContent>
                 </Dialog>

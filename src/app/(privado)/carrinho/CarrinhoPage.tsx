@@ -37,7 +37,7 @@ import {
     CommandItem,
 } from "@/components/ui/command"
 import { Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
-import { safeDateLabel, toBase64 } from '@/utils/functions';
+import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 
@@ -67,6 +67,7 @@ export default function Page() {
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
     const [zoomAnexo, setZoomAnexo] = useState(1.5);
+    const [bloqueado, setBloqueado] = useState(true)
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -79,6 +80,11 @@ export default function Page() {
         window.addEventListener("message", handler);
         return () => window.removeEventListener("message", handler);
     }, []);
+
+    useEffect(() => {
+        setBloqueado(true);
+        if (produtos.length > 0) setBloqueado(false);
+    }, [produtos])
 
     const form = useForm<Carrinho>({
         defaultValues: {
@@ -695,13 +701,13 @@ export default function Page() {
                 <CardContent className="space-y-3">
                     {produtosSubmit.map((item, i) => (
                         <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
-                            <span>{item.quantidade}x - {item.produto} - {item.descricao}</span>
+                            <span>{item.quantidade}x - {item.produto} - {item.descricao}{item.valor ? " - "+ toMoney(item.valor ?? 0) : ""}</span>
                             <Button variant="destructive" size="icon" onClick={() => removerItem(i)}>
                                 <Trash2 className="w-4 h-4" />
                             </Button>
                         </div>
                     ))}
-                    <Button onClick={onSubmit} disabled={isLoading}>
+                    <Button onClick={onSubmit} disabled={isLoading || bloqueado}>
                         {isLoading ? 'Enviando…' : 'Enviar carrinho'}
                     </Button>
                 </CardContent>

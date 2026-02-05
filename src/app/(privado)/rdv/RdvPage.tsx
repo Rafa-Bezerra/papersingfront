@@ -14,7 +14,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, Search } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, Search, Check } from "lucide-react";
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
@@ -38,12 +38,14 @@ import {
     CommandGroup,
     CommandItem,
 } from "@/components/ui/command"
-import { safeDateLabel, toBase64 } from '@/utils/functions';
+import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Usuario } from '@/types/Usuario';
 import { getAll } from '@/services/usuariosService';
 import { PopoverPortal } from '@radix-ui/react-popover';
+import { getAnexoByIdmov } from '@/services/requisicoesService';
+import { PdfViewport } from '@/utils/pdfCoords';
 
 export default function Page() {
     const titulo = 'Lançamento de RDV';
@@ -83,6 +85,18 @@ export default function Page() {
     const [aprovadoresSubmit, setAprovadoresSubmit] = useState<AprovadoresRdv[]>([])
     const [openUsuarioSearch, setOpenUsuarioSearch] = useState(false)
     const [zoomAnexo, setZoomAnexo] = useState(1.5);
+    const [bloqueado, setBloqueado] = useState(true)
+
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
+    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
+    const [rdvDocumentoSelecionada, setRdvDocumentoSelecionada] = useState<string>("")
+    const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const pdfStyle = pdfViewport
+        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -102,6 +116,11 @@ export default function Page() {
         buscaFornecedores();
         buscaUltimosRdvs();
     }, [])
+
+    useEffect(() => {
+        setBloqueado(true);
+        if (produtos.length > 0 && aprovadoresSubmit.length > 0) setBloqueado(false);
+    }, [produtos, aprovadoresSubmit])
 
     const form = useForm<Rdv>({
         defaultValues: {
@@ -341,6 +360,66 @@ export default function Page() {
         iframeAnexoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
 
+    async function handleDocumento(rdv: Rdv) {
+        setIsLoading(true)
+        setCurrentPage(1);
+        setTotalPages(null);
+        setPdfViewport(null);
+        setSelectedResult(rdv);
+        try {
+            const data = await getAnexoByIdmov(rdv.idmov!, rdv.codigo_atendimento!);
+            const arquivoBase64 = data.arquivo;
+            setRdvDocumentoSelecionada(arquivoBase64);
+
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: arquivoBase64 },
+                    '*'
+                );
+            }, 500);
+
+            setZoomDocumento(1.5);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalDocumentosOpen(true)
+        }
+    }
+
+    function handleZoomInDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.min(5, zoomDocumento + 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function changePage(newPage: number) {
+        if (!iframeRef.current) return;
+        setCurrentPage(newPage);
+        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
+    function handleImprimir() {
+        if (!iframeRef.current) return;
+
+        const iframe = iframeRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
+    }
 
     function handleImprimirAnexo() {
         if (!iframeAnexoRef.current) return;
@@ -370,6 +449,11 @@ export default function Page() {
                 cell: ({ row }) => {
                     return (
                         <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                Documento {row.original.arquivo_assinado == true && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
                                 Itens
                             </Button>
@@ -630,6 +714,7 @@ export default function Page() {
                     <div className="flex flex-col">
                         <Form {...formItem}>
                             <form onSubmit={formItem.handleSubmit(adicionarItem)} className="grid gap-4">
+                                {/** ccusto */}
                                 <FormField
                                     control={formItem.control}
                                     name="ccusto"
@@ -685,6 +770,7 @@ export default function Page() {
                                     )}
                                 />
 
+                                {/** conta */}
                                 <FormField
                                     control={formItem.control}
                                     name="codconta"
@@ -741,6 +827,7 @@ export default function Page() {
                                     )}
                                 />
 
+                                {/** produto */}
                                 <FormField
                                     control={formItem.control}
                                     name="idprd"
@@ -786,6 +873,7 @@ export default function Page() {
                                     )}
                                 />
 
+                                {/** descricao */}
                                 <FormField
                                     control={formItem.control}
                                     name="descricao"
@@ -849,7 +937,7 @@ export default function Page() {
                     </div>
                     {produtosSubmit.map((item, i) => (
                         <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
-                            <span>{item.quantidade}x - {item.produto} - {item.descricao}</span>
+                            <span>{item.quantidade}x - {item.produto} - {item.descricao} - {toMoney(item.valor ?? 0)}</span>
                             <Button variant="destructive" size="icon" onClick={() => removerItem(i)}>
                                 <Trash2 className="w-4 h-4" />
                             </Button>
@@ -943,7 +1031,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
-            <Button onClick={onSubmit}>Enviar carrinho</Button>
+            <Button onClick={onSubmit} disabled={bloqueado}>Enviar carrinho</Button>
 
             {/* Loading */}
             <Dialog open={isLoading} onOpenChange={setIsLoading}>
@@ -1087,6 +1175,95 @@ export default function Page() {
                             <Button
                                 variant="outline"
                                 onClick={() => handleImprimirAnexo()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Documento */}
+            {rdvDocumentoSelecionada && selectedResult && (
+                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Documento movimentação n° ${selectedResult.idmov}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
+                            {rdvDocumentoSelecionada ? (
+                                <>
+                                    <div className="relative" style={pdfStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-default pointer-events-none"
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
+                            <Button
+                                disabled={currentPage <= 1}
+                                onClick={() => changePage(currentPage - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPage}
+                                {totalPages ? ` / ${totalPages}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
+                                onClick={() => changePage(currentPage + 1)}
+                            >
+                                Próxima
+                            </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutDocumento}
+                                    disabled={zoomDocumento <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomDocumento * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInDocumento}
+                                    disabled={zoomDocumento >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimir()}
                                 className="flex items-center"
                             >
                                 Imprimir

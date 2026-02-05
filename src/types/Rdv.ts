@@ -19,6 +19,8 @@ export type Rdv = {
     codcfo?: string;
     situacao: string;
     arquivo?: string;
+    idmov?: number;
+    codigo_atendimento?: number;
     arquivo_assinado?: boolean;
     itens: ItemRdv[];
     anexos: AnexoRdv[];
