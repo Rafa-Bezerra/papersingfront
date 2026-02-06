@@ -86,4 +86,15 @@ export async function assinar(data: DocumentoAnexoAssinar): Promise<void> {
     }
 }
 
+export async function getAnexo(caminho_anexo: string): Promise<string> {
+    const body = { caminho_anexo };
+    const res = await fetch(`${API_BASE}/api/${caminho}/anexo`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+    }
+    const data = await res.json();
+    return data;
+}
+
 export type { Documento, DocumentoAssinar, DocumentoAprovacao, DocumentoAnexoAssinar }

@@ -21,6 +21,7 @@ export type DocumentoAnexo = {
     id?: number,
     anexo: string,
     nome: string,
+    usuario_criacao?: string,
     documento_assinado?: number,
 }
 

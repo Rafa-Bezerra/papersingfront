@@ -728,7 +728,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
                         </Button>)}
-                        {row.original.anexo && (<Button
+                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
                             size="sm"
                             variant="destructive"
                             onClick={() => setDeleteAnexoId(row.original.id)}

@@ -30,6 +30,7 @@ export type AnexoRdv = {
     id?: number;
     anexo: string;
     nome: string;
+    usuario_criacao?: string;
 };
 export type AprovadoresRdv = {
     usuario: string;

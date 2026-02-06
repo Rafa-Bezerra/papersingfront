@@ -31,7 +31,7 @@ import {
 import { safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
-import { adicionarAprovador, aprovar, assinar, createElement, deleteElement, Documento, DocumentoAprovacao, getAll } from '@/services/documentoService';
+import { adicionarAprovador, aprovar, assinar, createElement, deleteElement, Documento, DocumentoAprovacao, getAll, getAnexo } from '@/services/documentoService';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
@@ -360,25 +360,31 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
-        setIsModalVisualizarAnexoOpen(true)
-        setAnexoSelecionado(anexo);
-        setCurrentPageAnexo(1);
-        setTotalPagesAnexo(null);
-        setCoordsAnexo(null);
-        setSignatureCoordsAnexo(null);
-        setPreviewCoordsAnexo(null);
-        setIsPreviewAnexoLocked(false);
-        setPdfViewportAnexo(null);
-        const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+        try {
+            const arquivo = await getAnexo(anexo.anexo);
+            setIsModalVisualizarAnexoOpen(true)
+            setAnexoSelecionado(anexo);
+            setCurrentPageAnexo(1);
+            setTotalPagesAnexo(null);
+            setCoordsAnexo(null);
+            setSignatureCoordsAnexo(null);
+            setPreviewCoordsAnexo(null);
+            setIsPreviewAnexoLocked(false);
+            setPdfViewportAnexo(null);
+            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
 
-        setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-                { pdfBase64: pdfClean },
-                '*'
-            );
-        }, 500);
-        setIsLoading(false)
-        setZoom(1.5);
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: pdfClean },
+                    '*'
+                );
+            }, 500);
+            setZoom(1.5);
+        } catch (err) {
+            console.log(err);            
+        } finally {            
+            setIsLoading(false)
+        }
     }
 
     function changePageAnexo(newPage: number) {

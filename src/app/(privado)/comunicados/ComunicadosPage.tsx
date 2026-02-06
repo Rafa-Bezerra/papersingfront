@@ -32,7 +32,7 @@ import { htmlToPdfBase64, safeDateLabel, stripDiacritics } from '@/utils/functio
 import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
-import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement } from '@/services/comunicadoService';
+import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo } from '@/services/comunicadoService';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
@@ -238,25 +238,32 @@ export default function Page() {
 
     async function handleComunicado(requisicao: Comunicado) {
         setIsLoading(true)
-        setIsModalComunicadosOpen(true)
-        setRequisicaoSelecionada(requisicao)
-        setCurrentPage(1);
-        setTotalPages(null);
-        setCoords(null);
-        setSignatureCoords(null);
-        setPreviewCoords(null);
-        setIsPreviewLocked(false);
-        const arquivoBase64 = requisicao.anexo.replace(/^data:.*;base64,/, '').trim();
-        setRequisicaoComunicadoSelecionada(arquivoBase64);
+        try {
+            const arquivo = await getAnexo(requisicao.id);
+            setIsLoading(true)
+            setIsModalComunicadosOpen(true)
+            setRequisicaoSelecionada(requisicao)
+            setCurrentPage(1);
+            setTotalPages(null);
+            setCoords(null);
+            setSignatureCoords(null);
+            setPreviewCoords(null);
+            setIsPreviewLocked(false);
+            const arquivoBase64 = arquivo.replace(/^data:.*;base64,/, '').trim();
+            setRequisicaoComunicadoSelecionada(arquivoBase64);
 
-        setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-                { pdfBase64: arquivoBase64 },
-                '*'
-            );
-        }, 500);
-        setIsLoading(false)
-        setZoom(1.5);
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: arquivoBase64 },
+                    '*'
+                );
+            }, 500);
+            setZoom(1.5);
+        } catch (err) {
+            console.log(err);
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
@@ -397,7 +404,7 @@ export default function Page() {
             setDeleteAprovadorId(null)
             await handleSearchClick()
         }
-    }    
+    }
 
     function handleZoomIn() {
         if (!iframeRef.current) return;
@@ -441,7 +448,7 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
-                    
+
                     const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
@@ -1040,7 +1047,7 @@ export function gerarTemplateHTML(data: Comunicado): string {
 
     <!-- De acordo alinhado à direita, linha apenas sob o nome -->
     ${primeiroAprovador
-        ? `
+            ? `
         <table style="width: 100%; margin-bottom: 60px;">
             <tr>
                 <td style="text-align: right; padding-right: 20px;">
@@ -1051,8 +1058,8 @@ export function gerarTemplateHTML(data: Comunicado): string {
             </tr>
         </table>
         `
-        : ""
-    }
+            : ""
+        }
 </div>
 `;
 }

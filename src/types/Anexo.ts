@@ -3,7 +3,8 @@ export type Anexo = {
     idmov: number,
     documento_assinado: number,
     anexo: string,
-    nome: string
+    nome: string,
+    usuario_criacao?: string,
 }
 
 export type AnexoUpload = {
