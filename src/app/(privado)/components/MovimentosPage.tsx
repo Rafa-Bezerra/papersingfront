@@ -42,7 +42,9 @@ import {
     aprovar,
     getAll as getAllRequisicoes,
     getAnexoByIdmov,
-    reprovar
+    Requisicao_avaliacoes,
+    getAllAvaliacoes,
+    createAvaliacao
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
@@ -59,6 +61,15 @@ import {
 } from '@/services/anexoService';
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { useForm } from 'react-hook-form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form'
 
 export default function Page({ titulo, tipos_movimento }: Props) {
     const router = useRouter()
@@ -116,6 +127,10 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const pdfAnexoStyle = pdfViewportAnexo
         ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
+        
+    const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
+    const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)    
+    const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -387,16 +402,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         }
     }
 
-    async function handleReprovar(id: number, atendimento: number) {
-        setIsLoading(true)
-        try {
-            await reprovar(id, atendimento)
-            handleSearchClick()
-        } catch (err) {
-            setError((err as Error).message)
-        } finally {
-            setIsLoading(false)
-        }
+    async function handleReprovar(requisicao: RequisicaoDto) {
+        form.reset({
+            avaliacao: '',
+            idmov: requisicao.requisicao.idmov,
+            codigo_atendimento: requisicao.requisicao.codigo_atendimento
+        })
+        setAvaliarRequisicao(requisicao)
     }
 
     async function handleAnexos(requisicao: RequisicaoDto) {
@@ -653,9 +665,19 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleReprovar(requisicao.idmov, requisicao.codigo_atendimento)}
+                                    onClick={() => handleReprovar(row.original)}
                                 >
                                     Reprovar
+                                </Button>
+                            )}
+
+                            {requisicao.possui_avaliacoes == 1 && (
+                                <Button
+                                    size="sm"
+                                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                                    onClick={() => handleAvaliacoes(row.original)}
+                                >
+                                    Avaliações
                                 </Button>
                             )}
                         </div>
@@ -719,6 +741,53 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         ],
         []
     )
+
+    async function handleAvaliacoes(requisicao: RequisicaoDto) {
+        setRequisicaoSelecionada(requisicao)
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllAvaliacoes(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento)
+            setAvaliacoes(dados)
+        } catch (err) {
+            setError((err as Error).message)
+            setAvaliacoes([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
+            setIsModalAvaliacoesOpen(true)
+        }
+    }
+
+    const colunasAvaliacoes = useMemo<ColumnDef<Requisicao_avaliacoes>[]>(
+        () => [
+            { accessorKey: 'data_avaliacao', header: 'Data' },
+            { accessorKey: 'nome', header: 'Usuário' },
+            { accessorKey: 'avaliacao', header: 'Avaliação' },
+        ],
+        []
+    )
+
+    const form = useForm<Requisicao_avaliacoes>({
+        defaultValues: {
+            avaliacao: '',
+            idmov: requisicaoSelecionada?.requisicao.idmov,
+            codigo_atendimento: requisicaoSelecionada?.requisicao.codigo_atendimento
+        }
+    })
+
+    async function handleAvaliar(data: Requisicao_avaliacoes) {
+        try {
+            await createAvaliacao(data)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            toast.success(`Avaliação enviada`)
+            form.reset()
+            await handleAvaliacoes(requisicaoSelecionada!)
+            setAvaliarRequisicao(null)
+        }
+    }
 
     return (
         <div className="p-6">
@@ -1195,6 +1264,57 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 </DialogContent>
             </Dialog>
 
+            {/* Avaliações */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalAvaliacoesOpen} onOpenChange={setIsModalAvaliacoesOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAvaliacoes} data={avaliacoes} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Confirmação de exclusão usando Dialog */}
+            {avaliarRequisicao && (<Dialog open={avaliarRequisicao !== null} onOpenChange={() => setAvaliarRequisicao(null)}>
+                <DialogHeader>
+                    <DialogTitle>Avaliar requisição #{avaliarRequisicao.requisicao.idmov}</DialogTitle>
+                </DialogHeader>
+                <DialogContent
+                    className="max-w-sm rounded-xl bg-background p-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()} // evita propagação
+                >
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleAvaliar)} className="grid gap-4">
+                            <FormField
+                                control={form.control}
+                                name="avaliacao"
+                                rules={{ required: 'Centro de custo é obrigatório' }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Avaliação</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setAvaliarRequisicao(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={loading}>
+                                    {loading ? 'Salvando…' : 'Avaliar'}
+                                </Button>
+                            </div>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>)}
 
             {error && (
                 <p className="mb-4 text-center text-sm text-destructive">

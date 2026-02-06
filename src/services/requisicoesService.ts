@@ -1,4 +1,4 @@
-import { AnexoMovimento, RequisicaoDto, Requisicao_aprovacao, Requisicao_item } from "@/types/Requisicao";
+import { AnexoMovimento, RequisicaoDto, Requisicao_aprovacao, Requisicao_avaliacoes, Requisicao_item } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Requisicoes";
 const elemento_singular = "requisição";
@@ -50,4 +50,34 @@ export async function getAnexoByIdmov(id: number, atendimento: number): Promise<
     return apiData;
 }
 
-export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao, AnexoMovimento }
+export async function getAllAvaliacoes(idmov: number, codigo_atendimento: number): Promise<Requisicao_avaliacoes[]> {
+    const url = new URL(`${API_BASE}/api/${caminho}/avaliacoes`);
+    
+    const body = { idmov, codigo_atendimento };
+
+    const res = await fetch(url.toString(), {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
+    }
+    
+    const list: Requisicao_avaliacoes[] = await res.json();
+    return list;
+}
+
+export async function createAvaliacao(data: Requisicao_avaliacoes): Promise<void> {
+    const url = new URL(`${API_BASE}/api/${caminho}/avaliacoes/create`);
+    const res = await fetch(url.toString(), { method: 'POST', headers: headers(), body: JSON.stringify(data), });
+
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
+    }
+}
+
+export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao, AnexoMovimento, Requisicao_avaliacoes }

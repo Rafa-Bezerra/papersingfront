@@ -20,6 +20,7 @@ export type Requisicao = {
     historico_movimento: string,
     nome_etapa: string,
     arquivo: string,
+    possui_avaliacoes: number,
     quantidade_anexos: number,
     requisicao_itens: Requisicao_item[],
     requisicao_aprovacoes?: Requisicao_aprovacao[]
@@ -48,4 +49,13 @@ export type Requisicao_aprovacao = {
 
 export type AnexoMovimento = {
     arquivo: string,
+}
+
+export type Requisicao_avaliacoes = {
+    idmov: number,
+    codigo_atendimento: number,
+    avaliacao?: string,
+    data_avaliacao?: string,
+    usuario_criacao?: string,
+    nome?: string,
 }
