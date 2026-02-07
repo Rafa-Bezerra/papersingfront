@@ -196,43 +196,59 @@ export default function Page() {
 
 
         const status = searchParams.get("status") ?? "";
-        setFiltroDashboard(status);
         switch (status) {
             case "em_andamento":
                 setSituacaoFiltrada("Em Andamento")
+                setFiltroDashboard(status);
                 break;
             case "concluido_a_responder":
                 setSituacaoFiltrada("Concluído a responder")
+                setFiltroDashboard(status);
                 break;
             case "concluido_respondido":
                 setSituacaoFiltrada("Concluído respondido")
+                setFiltroDashboard(status);
                 break;
             case "concluido_confirmado":
                 setSituacaoFiltrada("Concluído confirmado")
+                setFiltroDashboard(status);
                 break;
             case "concluido_automatico":
                 setSituacaoFiltrada("Concluído automático(pelo sistema)")
+                setFiltroDashboard(status);
                 break;
             case "avaliado":
                 setSituacaoFiltrada("Avaliado")
+                setFiltroDashboard(status);
                 break;
             case "agendado_a_responder":
                 setSituacaoFiltrada("Agendado a responder")
+                setFiltroDashboard(status);
                 break;
             case "agendado_respondido":
                 setSituacaoFiltrada("Agendado respondido")
+                setFiltroDashboard(status);
                 break;
             case "aguardando_terceiros":
                 setSituacaoFiltrada("Aguardando terceiros")
+                setFiltroDashboard(status);
                 break;
             case "cancelado":
                 setSituacaoFiltrada("Cancelado")
+                setFiltroDashboard(status);
                 break;
             case "despertado":
                 setSituacaoFiltrada("Despertado")
+                setFiltroDashboard(status);
+                break;
+            case "pendentes":
+                setSituacaoFiltrada("Em Andamento");
+                setFiltroDashboard("Pendentes");                
                 break;
             default:
                 setSituacaoFiltrada("");
+                setFiltroDashboard(status);
+                break;
         }
     }, []);
 
@@ -267,54 +283,33 @@ export default function Page() {
         setError(null);
 
         try {
-            console.log("buscou status: " + situacaoFiltrada);
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
-
-            const from = dateFrom && dateFrom !== ""
-                ? dateFrom
-                : fiveDaysAgo.toISOString().substring(0, 10);
-
-            const to = dateTo && dateTo !== ""
-                ? dateTo
-                : today.toISOString().substring(0, 10);
-
-            const dados = await getAllRequisicoes(
-                from,
-                to,
-                [],
-                situacaoFiltrada
-            );
-
+            const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10);
+            const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10);
+            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada);
             const qNorm = stripDiacritics(q.toLowerCase().trim());
-            const usuarioLogado = stripDiacritics(
-                (userCodusuario ?? "").toLowerCase().trim()
-            );
-
+            const usuarioLogado = stripDiacritics((userCodusuario ?? "").toLowerCase().trim());
+            
             const filtrados = dados.filter(d => {
-                const movimento = stripDiacritics(
-                    (d.requisicao.movimento ?? "").toLowerCase()
-                );
-
-                const matchQuery =
-                    qNorm === "" ||
-                    movimento.includes(qNorm) ||
-                    String(d.requisicao.idmov ?? "").includes(qNorm);
-
-                const matchSituacao =
-                    !situacaoFiltrada ||
-                    d.requisicao.status_movimento === situacaoFiltrada;
-
-                const usuarioAprovador =
-                    userAdmin ||
-                    d.requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado
-                    );
+                const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
+                const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? "").includes(qNorm);
+                const matchSituacao = !situacaoFiltrada || d.requisicao.status_movimento === situacaoFiltrada;
+                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
 
                 return matchQuery && matchSituacao && usuarioAprovador;
             });
+
             const fitradosStatus = filtrados.filter(d => {
+                const nivelUsuario = d.requisicao_aprovacoes.find(
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                )?.nivel ?? 1;    
+                const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+                const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
+                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+
                 switch (filtroDashboard) {
                     case "Aprovados":
                         return d.requisicao_aprovacoes.some(a =>
@@ -323,14 +318,12 @@ export default function Page() {
                         );
 
                     case "Pendentes":
-                        return d.requisicao_aprovacoes.some(a =>
-                            stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
-                            a.situacao === "P"
-                        );
+                        return d.requisicao_aprovacoes.some(a => stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado && a.situacao === "P" && podeAprovar);
                     default:
                         return true;
                 };
             });
+
             setResults(fitradosStatus);
         } catch (err) {
             setError((err as Error).message);

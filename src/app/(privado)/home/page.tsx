@@ -91,11 +91,11 @@ export default function HomePage() {
 
         <DashboardCard
           title="Pendentes"
-          count={stats?.em_andamento || 0}
+          count={stats?.pendentes || 0}
           icon={Clock}
           color="red"
           description="Processos em andamento"
-          href="/geral?status=em_andamento"
+          href="/geral?status=pendentes"
         />
 
         <DashboardCard
@@ -180,13 +180,22 @@ export default function HomePage() {
         />
 
         <DashboardCard
+          title="Em andamento"
+          count={stats?.em_andamento || 0}
+          icon={Bell}
+          color="purple"
+          description="Em andamento"
+          href="/geral?status=em_andamento"
+        />
+
+        {/* <DashboardCard
           title="Despertado"
           count={stats?.despertado || 0}
           icon={Bell}
           color="purple"
           description="Processos despertados"
           href="/geral?status=despertado"
-        />
+        /> */}
       </div>
 
       {/* Cards de Acesso Rápido */}
