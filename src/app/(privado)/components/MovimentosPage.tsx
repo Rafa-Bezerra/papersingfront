@@ -63,12 +63,12 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useForm } from 'react-hook-form';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage
 } from '@/components/ui/form'
 
 export default function Page({ titulo, tipos_movimento }: Props) {
@@ -127,10 +127,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const pdfAnexoStyle = pdfViewportAnexo
         ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
-        
+
     const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
-    const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)    
+    const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
     const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
+    const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
+    const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
+    const [solicitantes, setSolicitantes] = useState<string[]>([])
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -207,7 +210,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -219,19 +222,32 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
             const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada)
+
+            const solicitantesUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.nome_solicitante)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+
+            setSolicitantes(solicitantesUnicos)
+
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
                 const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
+                const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
+                const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 
                 let usuarioAprovador = d.requisicao_aprovacoes.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
 
                 if (userAdmin) { usuarioAprovador = true; }
-                return matchQuery && matchTipos && matchSituacao && usuarioAprovador
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento
             })
             setResults(filtrados)
         } catch (err) {
@@ -793,9 +809,11 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         <div className="p-6">
             {/* Cabeçalho */}
             <Card className="mb-6">
+                {/* Filtros */}
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex justify-end items-end gap-4">
+                        {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="dateFrom">Data de</Label>
                             <Input
@@ -807,6 +825,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                             />
                         </div>
 
+                        {/* Data até */}
                         <div className="flex flex-col">
                             <Label htmlFor="dateTo">Data até</Label>
                             <Input
@@ -817,7 +836,54 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 className="w-40"
                             />
                         </div>
-                        {/* Botão de Filtros - Dropdown com checkboxes */}
+
+                        {/* Tipo de movimento */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Tipo de movimento</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Tipo de movimento</DropdownMenuLabel>
+                                {tipos_movimento.map((tipo_movimento) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={tipo_movimento}
+                                        checked={tipoMovimentoFiltrado === tipo_movimento}
+                                        onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado(tipo_movimento) }}
+                                    >
+                                        {tipo_movimento}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={tipoMovimentoFiltrado == ""} onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Solicitantes */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Solicitantes</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Solicitantes</DropdownMenuLabel>
+                                {solicitantes.map((solicitante) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={solicitante}
+                                        checked={solicitanteFiltrado === solicitante}
+                                        onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado(solicitante) }}
+                                    >
+                                        {solicitante}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={solicitanteFiltrado == ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Situação */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" aria-label="Abrir filtros">

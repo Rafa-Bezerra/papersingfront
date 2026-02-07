@@ -128,6 +128,10 @@ export default function Page() {
     const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
     const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
     const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
+    const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
+    const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
+    const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -243,7 +247,7 @@ export default function Page() {
                 break;
             case "pendentes":
                 setSituacaoFiltrada("Em Andamento");
-                setFiltroDashboard("Pendentes");                
+                setFiltroDashboard("Pendentes");
                 break;
             default:
                 setSituacaoFiltrada("");
@@ -274,9 +278,10 @@ export default function Page() {
         situacaoFiltrada,
         filtroDashboard,
         userAdmin,
-        userCodusuario
+        userCodusuario,
+        solicitanteFiltrado,
+        tipoMovimentoFiltrado
     ]);
-
 
     async function handleSearch(q: string) {
         setIsLoading(true);
@@ -289,22 +294,43 @@ export default function Page() {
             const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10);
             const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10);
             const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada);
+
+            const solicitantesUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.nome_solicitante)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+            setSolicitantes(solicitantesUnicos)
+
+            const tiposDeMovimentoUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.tipo_movimento)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+            setTiposDeMovimento(tiposDeMovimentoUnicos)
+
             const qNorm = stripDiacritics(q.toLowerCase().trim());
             const usuarioLogado = stripDiacritics((userCodusuario ?? "").toLowerCase().trim());
-            
+
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? "").includes(qNorm);
                 const matchSituacao = !situacaoFiltrada || d.requisicao.status_movimento === situacaoFiltrada;
                 const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
+                const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 
-                return matchQuery && matchSituacao && usuarioAprovador;
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento;
             });
 
             const fitradosStatus = filtrados.filter(d => {
                 const nivelUsuario = d.requisicao_aprovacoes.find(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                )?.nivel ?? 1;    
+                )?.nivel ?? 1;
                 const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                 const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
                 const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
@@ -333,7 +359,6 @@ export default function Page() {
             setIsLoading(false);
         }
     }
-
 
     async function handleSearchClick() {
         setIsLoading(true)
@@ -881,9 +906,11 @@ export default function Page() {
     return (
         <div className="p-6">
             <Card className="mb-6">
+                {/* Filtros */}
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex justify-end items-end gap-4">
+                        {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="dateFrom">Data de</Label>
                             <Input
@@ -895,6 +922,7 @@ export default function Page() {
                             />
                         </div>
 
+                        {/* Data até */}
                         <div className="flex flex-col">
                             <Label htmlFor="dateTo">Data até</Label>
                             <Input
@@ -905,7 +933,54 @@ export default function Page() {
                                 className="w-40"
                             />
                         </div>
-                        {/* Botão de Filtros - Dropdown com checkboxes */}
+
+                        {/* Tipo de movimento */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Tipo de movimento</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Tipo de movimento</DropdownMenuLabel>
+                                {tiposDeMovimento.map((tipo_movimento) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={tipo_movimento}
+                                        checked={tipoMovimentoFiltrado === tipo_movimento}
+                                        onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado(tipo_movimento) }}
+                                    >
+                                        {tipo_movimento}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={tipoMovimentoFiltrado == ""} onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Solicitantes */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Solicitantes</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Solicitantes</DropdownMenuLabel>
+                                {solicitantes.map((solicitante) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={solicitante}
+                                        checked={solicitanteFiltrado === solicitante}
+                                        onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado(solicitante) }}
+                                    >
+                                        {solicitante}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={solicitanteFiltrado == ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Situação */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" aria-label="Abrir filtros">
