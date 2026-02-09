@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>PDF Viewer</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        #pdfContainer,
+        #viewerContainer,
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="pdfContainer"></div>
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        let currentPdf = null;
+        let currentPage = 1;
+        let currentScale = 1.5;
+
+        function base64ToUint8Array(base64) {
+            const raw = atob(base64);
+            const uint8Array = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) {
+                uint8Array[i] = raw.charCodeAt(i);
+            }
+            return uint8Array;
+        }
+
+        function postViewportInfo(viewport) {
+            if (!viewport) return;
+            window.parent.postMessage({
+                pdfViewport: {
+                    width: Math.floor(viewport.width),
+                    height: Math.floor(viewport.height),
+                    scale: currentScale,
+                    page: currentPage
+                }
+            }, "*");
+        }
+
+        function renderPage(pageNum, scale = currentScale) {
+            if (!currentPdf) return;
+
+            currentPdf.getPage(pageNum).then(page => {
+                const container = document.getElementById('pdfContainer');
+                container.innerHTML = '';
+
+                const devicePixelRatio = window.devicePixelRatio || 1;
+                const outputScale = devicePixelRatio;
+
+                const viewport = page.getViewport({ scale: 1 });
+
+                const scaledViewport = page.getViewport({ scale });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+
+                canvas.width = Math.floor(scaledViewport.width * outputScale);
+                canvas.height = Math.floor(scaledViewport.height * outputScale);
+
+                // Ajustar CSS para manter tamanho visual correto
+                canvas.style.width = Math.floor(scaledViewport.width) + 'px';
+                canvas.style.height = Math.floor(scaledViewport.height) + 'px';
+                container.appendChild(canvas);
+
+                context.scale(outputScale, outputScale);
+
+                postViewportInfo(scaledViewport);
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: scaledViewport
+                };
+
+                page.render(renderContext).promise.then(() => {
+                }).catch(err => {
+                    console.error('Erro ao renderizar página:', err);
+                });
+            });
+        }
+
+        // Ouve mensagens do parent (PDF + navegação)
+        window.addEventListener('message', (event) => {
+            const { pdfBase64, page, zoom, zoomIn, zoomOut, zoomReset } = event.data;
+
+            if (pdfBase64) {
+                const pdfData = base64ToUint8Array(pdfBase64);
+                pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
+                    currentPdf = pdf;
+                    currentPage = 1;
+                    currentScale = 1.5;
+                    window.parent.postMessage({ totalPages: pdf.numPages }, "*");
+                    renderPage(currentPage, currentScale);
+                }).catch(err => console.error('Erro ao carregar PDF:', err));
+            }
+
+            if (page && currentPdf) {
+                currentPage = Math.min(Math.max(page, 1), currentPdf.numPages);
+                renderPage(currentPage, currentScale);
+            }
+
+            // Controles de zoom
+            if (zoom !== undefined && currentPdf) {
+                currentScale = Math.max(0.5, Math.min(5, zoom)); // Limite entre 0.5x e 5x
+                renderPage(currentPage, currentScale);
+            }
+
+            if (zoomIn && currentPdf) {
+                currentScale = Math.min(5, currentScale + 0.25); // Incrementa 0.25x
+                renderPage(currentPage, currentScale);
+            }
+
+            if (zoomOut && currentPdf) {
+                currentScale = Math.max(0.5, currentScale - 0.25); // Decrementa 0.25x
+                renderPage(currentPage, currentScale);
+            }
+
+            if (zoomReset && currentPdf) {
+                currentScale = 1.5; // Reset para zoom padrão
+                renderPage(currentPage, currentScale);
+            }
+        });
+    </script>
+</body>
+
+</html>
