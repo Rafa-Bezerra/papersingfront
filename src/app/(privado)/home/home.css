@@ -1,0 +1,24 @@
+/* Estilos específicos para a página home */
+.home-page .dashboard-container {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.home-page .dashboard-grid {
+  width: 100% !important;
+  display: grid !important;
+  gap: 1.5rem !important;
+}
+
+.home-page .dashboard-grid-stats {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+}
+
+.home-page .dashboard-grid-actions {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+}
+
+.home-page .dashboard-card {
+  width: 100% !important;
+  min-width: 0 !important;
+}

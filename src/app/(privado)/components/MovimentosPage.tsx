@@ -1,0 +1,1406 @@
+'use client'
+
+interface Props {
+    titulo: string;
+    tipos_movimento: string[];
+}
+
+import React, {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition
+} from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ColumnDef } from '@tanstack/react-table'
+import { Check, Filter, SearchIcon, X, ZoomIn, ZoomOut, Search } from 'lucide-react'
+
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DataTable } from '@/components/ui/data-table'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from '@/components/ui/dialog'
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
+import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
+import {
+    RequisicaoDto,
+    Requisicao_aprovacao,
+    Requisicao_item,
+    aprovar,
+    getAll as getAllRequisicoes,
+    getAnexoByIdmov,
+    Requisicao_avaliacoes,
+    getAllAvaliacoes,
+    createAvaliacao
+} from '@/services/requisicoesService'
+import { Assinar, assinar } from '@/services/assinaturaService'
+import { toast } from 'sonner'
+import { Loader2 } from "lucide-react";
+import { Label } from '@radix-ui/react-label';
+import {
+    Anexo,
+    AnexoAssinar,
+    AnexoUpload,
+    getAll as getAllAnexos,
+    createElement as createAnexo,
+    updateElement as updateAnexo,
+    deleteElement as deleteAnexo
+} from '@/services/anexoService';
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { useForm } from 'react-hook-form';
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage
+} from '@/components/ui/form'
+
+export default function Page({ titulo, tipos_movimento }: Props) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const [isLoading, setIsLoading] = useState(false)
+    const [userName, setUserName] = useState("");
+    const [userAdmin, setUserAdmin] = useState(false);
+    const [userCodusuario, setCodusuario] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
+    const [results, setResults] = useState<RequisicaoDto[]>([])
+    const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
+    const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
+    const [requisicaoAprovacoesSelecionada, setRequisicaoAprovacoesSelecionada] = useState<Requisicao_aprovacao[]>([])
+    const [requisicaoDocumentoSelecionada, setRequisicaoDocumentoSelecionada] = useState<string>("")
+    const [searched, setSearched] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
+    const [isModalItensOpen, setIsModalItensOpen] = useState(false)
+    const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
+    const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    const loading = isPending
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
+    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
+    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
+    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
+    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
+    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
+    const [anexos, setAnexos] = useState<Anexo[]>([])
+    const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
+    const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
+    const [file, setFile] = useState<File | null>(null)
+    const [fileName, setFileName] = useState<string>("")
+    const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
+    const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
+    const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
+    const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
+    const [coordsAnexo, setCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [signatureCoordsAnexo, setSignatureCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [previewCoordsAnexo, setPreviewCoordsAnexo] = useState<PdfClickCoords | null>(null);
+    const [isPreviewAnexoLocked, setIsPreviewAnexoLocked] = useState(false);
+    const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
+    const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
+    const [podeAssinar, setPodeAssinar] = useState(false)
+    const [zoomAnexo, setZoomAnexo] = useState(1.5)
+    const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const pdfStyle = pdfViewport
+        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
+    const pdfAnexoStyle = pdfViewportAnexo
+        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
+        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
+
+    const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
+    const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
+    const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
+    const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
+    const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
+    const [solicitantes, setSolicitantes] = useState<string[]>([])
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.source === iframeRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPages(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewport({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
+            }
+            if (event.source === iframeAnexoRef.current?.contentWindow) {
+                if (event.data?.totalPages) {
+                    setTotalPagesAnexo(event.data.totalPages);
+                }
+                if (event.data?.pdfViewport) {
+                    setPdfViewportAnexo({
+                        width: event.data.pdfViewport.width,
+                        height: event.data.pdfViewport.height,
+                        scale: event.data.pdfViewport.scale
+                    });
+                }
+            }
+        };
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
+
+    function changePage(newPage: number) {
+        if (!iframeRef.current) return;
+        setCurrentPage(newPage);
+        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
+    function clearQuery() {
+        setQuery('')
+    }
+
+    function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            handleSearchClick()
+        }
+    }
+
+    useEffect(() => {
+        if (dateFrom === "" && dateTo === "") {
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+
+            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
+            setDateTo(today.toISOString().substring(0, 10));
+        }
+
+        const storedUser = sessionStorage.getItem("userData");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            setUserAdmin(user.admin);
+            setUserName(user.nome.toUpperCase());
+            setCodusuario(user.codusuario.toUpperCase());
+        }
+
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => {
+            handleSearch("")
+        }, 300)
+
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+        }
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+
+    async function handleSearch(q: string) {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const today = new Date();
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+            const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
+            const to = dateTo ? dateTo : dateToIso(today)
+            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada)
+
+            const solicitantesUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.nome_solicitante)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+
+            setSolicitantes(solicitantesUnicos)
+
+            const qNorm = stripDiacritics(q.toLowerCase().trim())
+            const filtrados = dados.filter(d => {
+                const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
+                const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
+                const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
+                const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
+                const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
+                const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
+
+                let usuarioAprovador = d.requisicao_aprovacoes.some(
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                );
+
+                if (userAdmin) { usuarioAprovador = true; }
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento
+            })
+            setResults(filtrados)
+        } catch (err) {
+            setError((err as Error).message)
+            setResults([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
+        }
+    }
+
+    async function handleSearchClick() {
+        setIsLoading(true)
+        startTransition(() => {
+            const sp = new URLSearchParams(Array.from(searchParams.entries()))
+            if (query) sp.set('q', query)
+            else sp.delete('q')
+            router.replace(`?${sp.toString()}`)
+        })
+        await handleSearch(query)
+        setIsLoading(false)
+    }
+
+    async function handleDocumento(requisicao: RequisicaoDto) {
+        setIsLoading(true)
+        setCurrentPage(1);
+        setTotalPages(null);
+        setCoords(null);
+        setSignatureCoords(null);
+        setPreviewCoords(null);
+        setIsPreviewLocked(false);
+        setPdfViewport(null);
+        setPodeAssinar(false);
+        const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        );
+        const nivelUsuario = requisicao.requisicao_aprovacoes.find(
+            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+        )?.nivel ?? 1;
+
+        const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+        const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
+        const podeAssinar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+        setPodeAssinar(podeAssinar);
+        setRequisicaoSelecionada(requisicao)
+        try {
+            const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
+            const arquivoBase64 = data.arquivo;
+            setRequisicaoDocumentoSelecionada(arquivoBase64);
+
+            setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: arquivoBase64 },
+                    '*'
+                );
+            }, 500);
+
+            setZoomDocumento(1.5);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalDocumentosOpen(true)
+        }
+    }
+
+    function handleZoomInDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.min(5, zoomDocumento + 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutDocumento() {
+        if (!iframeRef.current) return;
+        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
+        setZoomDocumento(newZoom);
+        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    async function handleAssinar(data: Assinar) {
+        setIsLoading(true)
+        setSearched(false)
+        try {
+            data.arquivo = requisicaoDocumentoSelecionada;
+            await assinar(data)
+            handleSearchClick()
+            toast.success("Assinatura enviada com sucesso!");
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsModalDocumentosOpen(false)
+            setSearched(true)
+            setIsLoading(false)
+        }
+    }
+
+    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
+        const nextCoords = getPdfClickCoords(e, pdfViewport);
+        setCoords(nextCoords);
+        setSignatureCoords(nextCoords);
+        setPreviewCoords(null);
+        setIsPreviewLocked(true);
+    }
+
+    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
+        if (isPreviewLocked) return;
+        setPreviewCoords(getPdfClickCoords(e, pdfViewport));
+    }
+
+    async function confirmarAssinatura() {
+        if (!coords) {
+            toast.error("Clique no local onde deseja assinar o documento.");
+            return;
+        }
+        const dadosAssinatura: Assinar = {
+            idmov: requisicaoSelecionada!.requisicao.idmov,
+            atendimento: requisicaoSelecionada!.requisicao.codigo_atendimento,
+            arquivo: requisicaoSelecionada!.requisicao.arquivo,
+            pagina: currentPage,
+            posX: coords.x,
+            posY: coords.yI,
+            largura: 90,
+            altura: 30,
+        };
+        await handleAssinar(dadosAssinatura);
+    }
+
+    function handleImprimir() {
+        if (!iframeRef.current) return;
+
+        const iframe = iframeRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
+    }
+
+    async function handleItens(requisicao: RequisicaoDto) {
+        setIsLoading(true)
+        setIsModalItensOpen(true)
+        setRequisicaoSelecionada(requisicao)
+        setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+        setIsLoading(false)
+    }
+
+    async function handleAprovacoes(requisicao: RequisicaoDto) {
+        setIsLoading(true)
+        setIsModalAprovacoesOpen(true)
+        setRequisicaoSelecionada(requisicao)
+        setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
+        setIsLoading(false)
+    }
+
+    async function handleAprovar(id: number, atendimento: number) {
+        setIsLoading(true)
+        try {
+            await aprovar(id, atendimento)
+            handleSearchClick()
+        } catch (err) {
+            setError((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleReprovar(requisicao: RequisicaoDto) {
+        form.reset({
+            avaliacao: '',
+            idmov: requisicao.requisicao.idmov,
+            codigo_atendimento: requisicao.requisicao.codigo_atendimento
+        })
+        setAvaliarRequisicao(requisicao)
+    }
+
+    async function handleAnexos(requisicao: RequisicaoDto) {
+        setRequisicaoSelecionada(requisicao)
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllAnexos(requisicao.requisicao.idmov)
+            setAnexos(dados)
+        } catch (err) {
+            setError((err as Error).message)
+            setResults([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
+            setIsModalAnexosOpen(true)
+        }
+    }
+
+    async function handleAnexarDocumento() {
+        setIsLoading(true)
+        if (!requisicaoSelecionada) return toast.error("Selecione um arquivo primeiro!")
+        if (!file) return toast.error("Selecione um arquivo primeiro!")
+        const base64 = await toBase64(file)
+        const anexo: AnexoUpload = {
+            anexo: base64,
+            nome: fileName,
+            idmov: requisicaoSelecionada.requisicao.idmov
+        }
+
+        try {
+            await createAnexo(anexo)
+            toast.success("Arquivo enviado com sucesso!")
+            setFile(null)
+            setFileName("")
+            const dados = await getAllAnexos(requisicaoSelecionada.requisicao.idmov)
+            setAnexos(dados)
+        } catch (err) {
+            setError((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleVisualizarAnexo(anexo: Anexo) {
+        setIsLoading(true)
+        try {
+            setAnexoSelecionado(anexo);
+            setCurrentPageAnexo(1);
+            setTotalPagesAnexo(null);
+            setCoordsAnexo(null);
+            setSignatureCoordsAnexo(null);
+            setPreviewCoordsAnexo(null);
+            setIsPreviewAnexoLocked(false);
+            setPdfViewportAnexo(null);
+            const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+
+            setTimeout(() => {
+                iframeAnexoRef.current?.contentWindow?.postMessage(
+                    { pdfBase64: pdfClean },
+                    '*'
+                );
+            }, 500);
+
+            setZoomAnexo(1.5);
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsModalVisualizarAnexoOpen(true)
+            setIsLoading(false)
+        }
+    }
+
+    function handleZoomInAnexo() {
+        if (!iframeAnexoRef.current) return;
+        const newZoom = Math.min(5, zoomAnexo + 0.25);
+        setZoomAnexo(newZoom);
+        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    function handleZoomOutAnexo() {
+        if (!iframeAnexoRef.current) return;
+        const newZoom = Math.max(0.5, zoomAnexo - 0.25);
+        setZoomAnexo(newZoom);
+        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
+    }
+
+    async function handleExcluirAnexo() {
+        setIsLoading(true)
+        if (!deleteAnexoId) return
+        try {
+            await deleteAnexo(deleteAnexoId)
+            handleAnexos(requisicaoSelecionada!)
+            setDeleteAnexoId(null)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            toast.success(`Anexo excluído`)
+        }
+    }
+
+    async function handleAssinarAnexo(data: AnexoAssinar) {
+        setIsLoading(true)
+        setSearched(false)
+        try {
+            await updateAnexo(data)
+            toast.success("Assinatura enviada com sucesso!");
+            handleAnexos(requisicaoSelecionada!)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsModalVisualizarAnexoOpen(false)
+            setSearched(true)
+            setIsLoading(false)
+        }
+    }
+
+    function handleClickPdfAnexo(e: React.MouseEvent<HTMLDivElement>) {
+        const nextCoords = getPdfClickCoords(e, pdfViewportAnexo);
+        setCoordsAnexo(nextCoords);
+        setSignatureCoordsAnexo(nextCoords);
+        setPreviewCoordsAnexo(null);
+        setIsPreviewAnexoLocked(true);
+    }
+
+    function handleHoverPdfAnexo(e: React.MouseEvent<HTMLDivElement>) {
+        if (isPreviewAnexoLocked) return;
+        setPreviewCoordsAnexo(getPdfClickCoords(e, pdfViewportAnexo));
+    }
+
+    async function confirmarAssinaturaAnexo() {
+        if (!coordsAnexo) {
+            toast.error("Clique no local onde deseja assinar o documento.");
+            return;
+        }
+        const dadosAssinatura: AnexoAssinar = {
+            id: anexoSelecionado!.id,
+            anexo: anexoSelecionado!.anexo,
+            pagina: currentPageAnexo,
+            posX: coordsAnexo.x,
+            posY: coordsAnexo.yI,
+            largura: 90,
+            altura: 30,
+        };
+        await handleAssinarAnexo(dadosAssinatura);
+    }
+
+    function changePageAnexo(newPage: number) {
+        if (!iframeAnexoRef.current) return;
+        setCurrentPageAnexo(newPage);
+        iframeAnexoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+    }
+
+    function handleImprimirAnexo() {
+        if (!iframeAnexoRef.current) return;
+
+        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
+        const iframeWindow = iframe.contentWindow;
+
+        if (iframeWindow) {
+            iframeWindow.focus();
+            iframeWindow.print();
+        } else {
+            toast.error("Não foi possível acessar o documento para impressão.");
+        }
+    }
+
+    const handleDownloadAll = async () => {
+        if (!anexos?.length) return;
+        const zip = new JSZip();
+        const folder = zip.folder("anexos");
+        for (const anexo of anexos) {
+            try {
+                const byteCharacters = atob(anexo.anexo);
+                const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: "application/pdf" });
+                const nomeArquivo = `${anexo.nome}.pdf`;
+                folder!.file(nomeArquivo, blob);
+            } catch (err) {
+                console.error("Erro ao baixar anexo:", anexo, err);
+            }
+        }
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, `anexos_mov_${requisicaoSelecionada!.requisicao.idmov}.zip`);
+    };
+
+    const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
+        () => [
+            { accessorKey: 'requisicao.idmov', header: 'ID' },
+            { accessorKey: 'requisicao.data_emissao', header: 'Emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
+            { accessorKey: 'requisicao.movimento', header: 'Movimento' },
+            { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    const { requisicao, requisicao_aprovacoes } = row.original;
+                    const usuarioAprovador = requisicao_aprovacoes.some(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    );
+
+                    const nivelUsuario = row.original.requisicao_aprovacoes.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    )?.nivel ?? 1;
+
+                    const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+
+                    // const usuarioAprovou = requisicao_aprovacoes.some(ap =>
+                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
+                    // );
+
+                    // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
+                    const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
+
+                    // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
+                    // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+
+                    return (
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                Documento {requisicao.documento_assinado == 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>
+                            {requisicao && (
+                                <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
+                                    Anexos {row.original.requisicao.quantidade_anexos > 0 ? `(${row.original.requisicao.quantidade_anexos})` : ''}
+                                </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
+                                Itens
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
+                                Aprovações
+                            </Button>
+
+                            {podeAprovar && requisicao.documento_assinado == 1 && (
+                                <Button
+                                    size="sm"
+                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                    onClick={() => handleAprovar(requisicao.idmov, requisicao.codigo_atendimento)}
+                                >
+                                    Aprovar
+                                </Button>
+                            )}
+
+                            {podeReprovar && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleReprovar(row.original)}
+                                >
+                                    Reprovar
+                                </Button>
+                            )}
+
+                            {requisicao.possui_avaliacoes == 1 && (
+                                <Button
+                                    size="sm"
+                                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                                    onClick={() => handleAvaliacoes(row.original)}
+                                >
+                                    Avaliações
+                                </Button>
+                            )}
+                        </div>
+                    );
+                }
+            }
+        ],
+        [userName]
+    )
+
+    const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
+        () => [
+            { accessorKey: 'centro_custo', header: 'Centro de custo', accessorFn: (row) => row.centro_custo + ' - ' + (row.nome_centro_custo ?? '-') },
+            { accessorKey: 'codigo_item_movimento', header: 'Cod. Item' },
+            { accessorKey: 'item_preco_unitario', header: 'Preço unitário', accessorFn: (row) => toMoney(row.item_preco_unitario) },
+            { accessorKey: 'item_quantidade', header: 'Quantidade' },
+            { accessorKey: 'item_total', header: 'Total' },
+            // { accessorKey: 'historico_item', header: 'Histórico' }
+        ],
+        []
+    )
+
+    const colunasAprovacoes = useMemo<ColumnDef<Requisicao_aprovacao>[]>(
+        () => [
+            { accessorKey: 'id', header: 'Id' },
+            { accessorKey: 'nome', header: 'Usuário' },
+            { accessorKey: 'situacao', header: 'Situação' },
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+        ],
+        []
+    )
+
+    const colunasAnexos = useMemo<ColumnDef<Anexo>[]>(
+        () => [
+            { accessorKey: 'id', header: 'ID' },
+            { accessorKey: 'nome', header: 'Anexo' },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => (
+                    <div className="flex gap-2">
+                        {row.original.anexo && (<Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleVisualizarAnexo(row.original)}
+                        >
+                            Visualizar {row.original.documento_assinado == 1 && (
+                                <Check className="w-4 h-4 text-green-500" />
+                            )}
+                        </Button>)}
+                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setDeleteAnexoId(row.original.id)}
+                        >
+                            Excluir
+                        </Button>)}
+                    </div>
+                )
+            }
+        ],
+        []
+    )
+
+    async function handleAvaliacoes(requisicao: RequisicaoDto) {
+        setRequisicaoSelecionada(requisicao)
+        setIsLoading(true)
+        setError(null)
+        try {
+            const dados = await getAllAvaliacoes(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento)
+            setAvaliacoes(dados)
+        } catch (err) {
+            setError((err as Error).message)
+            setAvaliacoes([])
+        } finally {
+            setSearched(true)
+            setIsLoading(false)
+            setIsModalAvaliacoesOpen(true)
+        }
+    }
+
+    const colunasAvaliacoes = useMemo<ColumnDef<Requisicao_avaliacoes>[]>(
+        () => [
+            { accessorKey: 'data_avaliacao', header: 'Data' },
+            { accessorKey: 'nome', header: 'Usuário' },
+            { accessorKey: 'avaliacao', header: 'Avaliação' },
+        ],
+        []
+    )
+
+    const form = useForm<Requisicao_avaliacoes>({
+        defaultValues: {
+            avaliacao: '',
+            idmov: requisicaoSelecionada?.requisicao.idmov,
+            codigo_atendimento: requisicaoSelecionada?.requisicao.codigo_atendimento
+        }
+    })
+
+    async function handleAvaliar(data: Requisicao_avaliacoes) {
+        try {
+            await createAvaliacao(data)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            toast.success(`Avaliação enviada`)
+            form.reset()
+            await handleAvaliacoes(requisicaoSelecionada!)
+            setAvaliarRequisicao(null)
+        }
+    }
+
+    return (
+        <div className="p-6">
+            {/* Cabeçalho */}
+            <Card className="mb-6">
+                {/* Filtros */}
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <div className="flex justify-end items-end gap-4">
+                        {/* Data de */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateFrom">Data de</Label>
+                            <Input
+                                id="dateFrom"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+
+                        {/* Data até */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateTo">Data até</Label>
+                            <Input
+                                id="dateTo"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+
+                        {/* Tipo de movimento */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Tipo de movimento</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Tipo de movimento</DropdownMenuLabel>
+                                {tipos_movimento.map((tipo_movimento) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={tipo_movimento}
+                                        checked={tipoMovimentoFiltrado === tipo_movimento}
+                                        onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado(tipo_movimento) }}
+                                    >
+                                        {tipo_movimento}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={tipoMovimentoFiltrado == ""} onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Solicitantes */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Solicitantes</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Solicitantes</DropdownMenuLabel>
+                                {solicitantes.map((solicitante) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={solicitante}
+                                        checked={solicitanteFiltrado === solicitante}
+                                        onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado(solicitante) }}
+                                    >
+                                        {solicitante}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={solicitanteFiltrado == ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Situação */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Filtros</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Em Andamento") }}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído a responder") }}>Concluído a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído respondido") }}>Concluído respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído confirmado") }}>Concluído confirmado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído automático(pelo sistema)") }}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Avaliado") }}>Avaliado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado a responder") }}>Agendado a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado respondido") }}>Agendado respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Aguardando terceiros") }}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Cancelado") }}>Cancelado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Despertado") }}>Despertado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 md:flex-row">
+                    <div className="relative flex-1">
+                        <Input
+                            placeholder="Pesquise por nome ou ID"
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="pr-10"
+                            aria-label="Campo de busca"
+                        />
+                        {query && (
+                            <button
+                                aria-label="Limpar busca"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
+                                onClick={clearQuery}
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    <Button onClick={handleSearchClick} className="flex items-center">
+                        <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* Main */}
+            <Card className="mb-6">
+                <CardContent className="flex flex-col">
+                    <DataTable columns={colunas} data={results} loading={loading} />
+                </CardContent>
+            </Card>
+
+            {/* Itens */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+
+                        {requisicaoItensSelecionada?.length > 0 && (
+                            <Card className="p-4 my-4">
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Coligada:</span>
+                                    <span>{requisicaoSelecionada.requisicao.codcoligada}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Natureza Orçamentária:</span>
+                                    <span>{requisicaoItensSelecionada[0]?.codigo_natureza_orcamentaria} - {requisicaoItensSelecionada[0]?.nome_natureza_orcamentaria ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-muted-foreground">Etapa:</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_etapa ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Fornecedor:</span>
+                                    <span>{requisicaoSelecionada.requisicao.nome_fornecedor ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Data emissão:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.data_emissao) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Valor bruto:</span>
+                                    <span>{toMoney(requisicaoSelecionada.requisicao.valor_total.toFixed(2)) ?? "-"}</span>
+                                </div>
+
+                                <div className="flex justify-between border-b border-muted pb-1">
+                                    <span className="font-semibold text-muted-foreground">Histórico:</span>
+                                    <span>{safeDateLabel(requisicaoSelecionada.requisicao.historico_movimento) ?? "-"}</span>
+                                </div>
+                            </Card>
+                        )}
+                        <div className="w-full">
+                            <DataTable columns={colunasItens} data={requisicaoItensSelecionada} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Aprovações */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Documento */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
+                            {requisicaoDocumentoSelecionada ? (
+                                <>
+                                    <div className="relative" style={pdfStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-default pointer-events-none"
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+
+                                        {/* Overlay */}
+                                        <div
+                                            id="assinatura-overlay"
+                                            className="absolute inset-0 cursor-default pointer-events-auto z-10"
+                                            onClick={handleClickPdf}
+                                            onMouseMove={handleHoverPdf}
+                                            onMouseLeave={() => {
+                                                if (!isPreviewLocked) setPreviewCoords(null);
+                                            }}
+                                            onWheel={handlePdfOverlayWheel}
+                                        />
+
+                                        {/* Pré-visualização da assinatura */}
+                                        {!isPreviewLocked && previewCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
+                                            />
+                                        )}
+                                        {signatureCoords && (
+                                            <div
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
+                                            />
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
+                            <Button
+                                disabled={currentPage <= 1}
+                                onClick={() => changePage(currentPage - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPage}
+                                {totalPages ? ` / ${totalPages}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
+                                onClick={() => changePage(currentPage + 1)}
+                            >
+                                Próxima
+                            </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutDocumento}
+                                    disabled={zoomDocumento <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomDocumento * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInDocumento}
+                                    disabled={zoomDocumento >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            {(requisicaoSelecionada.requisicao.documento_assinado == 0 && podeAssinar && <Button onClick={confirmarAssinatura} className="flex items-center">
+                                Assinar
+                            </Button>)}
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimir()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Loading */}
+            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+                <DialogContent
+                    showCloseButton={false}
+                    className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
+                >
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col items-center justify-center rounded-2xl p-6 shadow-lg">
+                        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                        <p className="text-sm text-gray-600 mt-2">Carregando</p>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Anexos */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAnexos} data={anexos} loading={loading} />
+                        </div>
+                        {/* Ações */}
+                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
+                            <Input
+                                type="file"
+                                accept="application/pdf/*"
+                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                                className="w-40"
+                            />
+                            <Input
+                                type="text"
+                                onChange={(e) => setFileName(e.target.value)}
+                                className="w-40"
+                                aria-label='Descrição do anexo'
+                                placeholder='Descrição do anexo'
+                            />
+                            <Button
+                                onClick={handleAnexarDocumento}
+                                disabled={!file || isLoading}
+                                className="flex items-center"
+                            >
+                                {isLoading ? "Enviando..." : "Anexar documento"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleDownloadAll}
+                                disabled={!anexos?.length}
+                                className="flex items-center gap-2"
+                            >
+                                Baixar todos
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Assinatura de anexo */}
+            {anexoSelecionado && (
+                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                        <DialogHeader className="p-4 shrink-0 sticky top-0">
+                            <DialogTitle className="text-lg font-semibold text-center">
+                                {`Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}`}
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Área do PDF */}
+                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
+                            {anexoSelecionado ? (
+                                <>
+                                    <div className="relative" style={pdfAnexoStyle}>
+                                        {/* PDF */}
+                                        <iframe
+                                            ref={iframeAnexoRef}
+                                            src="/pdf-viewer.html"
+                                            className="relative border-none cursor-default pointer-events-none"
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+
+                                        {/* Overlay */}
+                                        <div
+                                            id="assinatura-overlay"
+                                            className="absolute inset-0 cursor-default pointer-events-auto z-10"
+                                            onClick={handleClickPdfAnexo}
+                                            onMouseMove={handleHoverPdfAnexo}
+                                            onMouseLeave={() => {
+                                                if (!isPreviewAnexoLocked) setPreviewCoordsAnexo(null);
+                                            }}
+                                            onWheel={handlePdfOverlayWheel}
+                                        />
+
+                                        {/* Pré-visualização da assinatura */}
+                                        {!isPreviewAnexoLocked && previewCoordsAnexo && (
+                                            <div
+                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyleFromPointer(previewCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                            />
+                                        )}
+                                        {signatureCoordsAnexo && (
+                                            <div
+                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none z-20"
+                                                style={getSignaturePreviewStyle(signatureCoordsAnexo, pdfViewportAnexo) ?? undefined}
+                                            />
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="flex items-center justify-center h-full py-10">
+                                    Nenhum documento disponível
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
+                            <Button
+                                disabled={currentPageAnexo <= 1}
+                                onClick={() => changePageAnexo(currentPageAnexo - 1)}
+                            >
+                                Anterior
+                            </Button>
+                            <span>
+                                Página {currentPageAnexo}
+                                {totalPagesAnexo ? ` / ${totalPagesAnexo}` : ""}
+                            </span>
+                            <Button
+                                disabled={currentPageAnexo >= (totalPagesAnexo == null ? 1 : totalPagesAnexo)}
+                                onClick={() => changePageAnexo(currentPageAnexo + 1)}
+                            >
+                                Próxima
+                            </Button>
+
+                            {/* Controles de Zoom */}
+                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Zoom:</span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomOutAnexo}
+                                    disabled={zoomAnexo <= 0.5}
+                                    title="Diminuir zoom"
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm min-w-[3rem] text-center font-medium">
+                                    {Math.round(zoomAnexo * 100)}%
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleZoomInAnexo}
+                                    disabled={zoomAnexo >= 5}
+                                    title="Aumentar zoom"
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            {(anexoSelecionado.documento_assinado == 0 && <Button onClick={confirmarAssinaturaAnexo} className="flex items-center">
+                                Assinar
+                            </Button>)}
+                            <Button
+                                variant="outline"
+                                onClick={() => handleImprimirAnexo()}
+                                className="flex items-center"
+                            >
+                                Imprimir
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Confirmação de exclusão usando Dialog */}
+            <Dialog open={deleteAnexoId !== null} onOpenChange={() => setDeleteAnexoId(null)}>
+                <DialogContent
+                    className="max-w-sm rounded-xl bg-background p-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()} // evita propagação
+                >
+                    <DialogHeader>
+                        <DialogTitle>Excluir anexo</DialogTitle>
+                    </DialogHeader>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                        Tem certeza que deseja excluir o anexo #{deleteAnexoId}?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setDeleteAnexoId(null)}>
+                            Cancelar
+                        </Button>
+                        <Button variant="destructive" onClick={handleExcluirAnexo}>
+                            Excluir
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Avaliações */}
+            {requisicaoSelecionada && (
+                <Dialog open={isModalAvaliacoesOpen} onOpenChange={setIsModalAvaliacoesOpen}>
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAvaliacoes} data={avaliacoes} loading={loading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Confirmação de exclusão usando Dialog */}
+            {avaliarRequisicao && (<Dialog open={avaliarRequisicao !== null} onOpenChange={() => setAvaliarRequisicao(null)}>
+                <DialogHeader>
+                    <DialogTitle>Avaliar requisição #{avaliarRequisicao.requisicao.idmov}</DialogTitle>
+                </DialogHeader>
+                <DialogContent
+                    className="max-w-sm rounded-xl bg-background p-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()} // evita propagação
+                >
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleAvaliar)} className="grid gap-4">
+                            <FormField
+                                control={form.control}
+                                name="avaliacao"
+                                rules={{ required: 'Centro de custo é obrigatório' }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Avaliação</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setAvaliarRequisicao(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={loading}>
+                                    {loading ? 'Salvando…' : 'Avaliar'}
+                                </Button>
+                            </div>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>)}
+
+            {error && (
+                <p className="mb-4 text-center text-sm text-destructive">
+                    Erro: {error}
+                </p>
+            )}
+
+            {!searched && (
+                <div className="grid gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+                    ))}
+                </div>
+            )}
+
+            {searched && results.length === 0 && !loading && !error && (
+                <p className="text-center text-sm text-muted-foreground">
+                    Nenhum registro encontrado.
+                </p>
+            )}
+        </div>
+    )
+}
