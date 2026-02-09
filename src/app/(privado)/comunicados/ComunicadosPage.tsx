@@ -240,6 +240,8 @@ export default function Page() {
         setIsLoading(true)
         try {
             const arquivo = await getAnexo(requisicao.id);
+            console.log(arquivo);
+            
             setIsLoading(true)
             setIsModalComunicadosOpen(true)
             setRequisicaoSelecionada(requisicao)
@@ -464,7 +466,7 @@ export default function Page() {
 
                     return (
                         <div className="flex gap-2">
-                            {row.original.anexo && (
+                            {row.original.anexo == "SIM" && (
                                 <Button size="sm" variant="outline" onClick={() => handleComunicado(row.original)}>
                                     Comunicado {row.original.documento_assinado == 1 && (
                                         <Check className="w-4 h-4 text-green-500" />

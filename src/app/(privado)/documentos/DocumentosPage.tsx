@@ -361,7 +361,11 @@ export default function Page() {
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
         try {
+            console.log(anexo);
             const arquivo = await getAnexo(anexo.anexo);
+            console.log(arquivo);
+            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
+            
             setIsModalVisualizarAnexoOpen(true)
             setAnexoSelecionado(anexo);
             setCurrentPageAnexo(1);
@@ -371,7 +375,6 @@ export default function Page() {
             setPreviewCoordsAnexo(null);
             setIsPreviewAnexoLocked(false);
             setPdfViewportAnexo(null);
-            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
 
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(

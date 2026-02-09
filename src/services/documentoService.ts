@@ -93,7 +93,7 @@ export async function getAnexo(caminho_anexo: string): Promise<string> {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
     }
-    const data = await res.json();
+    const data = await res.text();
     return data;
 }
 
