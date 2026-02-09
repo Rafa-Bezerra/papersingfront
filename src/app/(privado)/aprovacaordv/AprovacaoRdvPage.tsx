@@ -407,13 +407,16 @@ export default function Page() {
         [userCodusuario]
     )
 
+    // Itens RDV: Valor unit. (API), Total = qtd * valor; backend retorna I.DESCRICAO e quantidade=1
     const colunasItens = useMemo<ColumnDef<ItemRdv>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
             { accessorKey: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.ccusto + ' - ' + (row.custo ?? '-') },
             { accessorKey: 'codconta', header: 'Conta financeira', accessorFn: (row) => row.codconta + ' - ' + (row.contabil ?? '-') },
             { accessorKey: 'idprd', header: 'Produto', accessorFn: (row) => row.idprd + ' - ' + (row.produto ?? '-') },
-            { accessorKey: 'valor', header: 'Valor', accessorFn: (row) => row.valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '' },
+            { accessorKey: 'quantidade', header: 'Qtd', accessorFn: (row) => String(row.quantidade ?? 1) },
+            { accessorKey: 'valor', header: 'Valor unit.', accessorFn: (row) => (row.valor != null ? Number(row.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '') },
+            { id: 'total', header: 'Total', accessorFn: (row) => ((row.quantidade ?? 1) * (row.valor ?? 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) },
             { accessorKey: 'descricao', header: 'Descrição' },
         ],
         []
