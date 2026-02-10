@@ -52,6 +52,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
   const [userCentrosCustos, setUserCentrosCustos] = useState(false)
+  const [userRestrito, setUserRestrito] = useState(false)
   const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -72,6 +73,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserEmail(user.email);
         setUserAdmin(user.admin);
         setUserDocumentos(user.documentos);
+        setUserRestrito(user.restrito);
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
         setUserCentrosCustos(user.ccusto);
@@ -229,6 +231,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/bordero" && !userBordero) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
                         if (item.url === "/centros-custos" && !userCentrosCustos) return null;
+                        if (item.url === "/gestao-pessoas" && !userRestrito) return null;
                         if (["/alcadas", "/usuarios", "/borderoaprovadores", "/rdvaprovadores"].includes(item.url)) return null;
                       }
                       return (
