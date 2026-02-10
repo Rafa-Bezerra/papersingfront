@@ -22,6 +22,7 @@ export interface LoginResponse {
   administrativo: boolean;
   solicitante: boolean;
   ccusto: boolean;
+  restrito: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {

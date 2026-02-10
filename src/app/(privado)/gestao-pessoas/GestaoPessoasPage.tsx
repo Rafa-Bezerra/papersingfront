@@ -66,7 +66,7 @@ import {
 } from '@/components/ui/form'
 
 export default function Page() {
-    const titulo = 'Movimentações para aprovação'
+    const titulo = 'Movimentações para aprovação - Gestão de Pessoas'
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
