@@ -133,6 +133,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     { title: 'Alçadas', url: '/alcadas' },
     { title: 'Usuários', url: '/usuarios' },
     { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
+    { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
     { title: 'Centros de custos', url: '/centros-custos' },
   ]
 
