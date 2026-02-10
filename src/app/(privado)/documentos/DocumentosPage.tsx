@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, assinar, createElement, deleteElement, Documento, DocumentoAprovacao, getAll, getAnexo } from '@/services/documentoService';
@@ -562,7 +562,7 @@ export default function Page() {
             { accessorKey: 'usuario_nome', header: 'Usuário' },
             { accessorKey: 'ordem', header: 'Ordem' },
             { accessorKey: 'aprovacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) }
         ],
         []
     )
