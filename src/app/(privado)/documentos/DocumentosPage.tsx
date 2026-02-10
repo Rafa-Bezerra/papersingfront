@@ -91,6 +91,8 @@ export default function Page() {
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<DocumentoAnexo | null>(null)
+    /** Base64 do PDF do anexo (vindo de getAnexo). Enviado na assinatura; anexo.anexo é só o caminho. */
+    const [anexoPdfBase64ParaAssinatura, setAnexoPdfBase64ParaAssinatura] = useState<string | null>(null)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [anexosSubmit, setAnexosSubmit] = useState<DocumentoAnexo[]>([])
@@ -361,13 +363,13 @@ export default function Page() {
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
         try {
-            console.log(anexo);
+            // anexo.anexo é o caminho (ex: /anexos/documentos/xxx); getAnexo retorna o PDF em base64
             const arquivo = await getAnexo(anexo.anexo);
-            console.log(arquivo);
             const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
             
             setIsModalVisualizarAnexoOpen(true)
             setAnexoSelecionado(anexo);
+            setAnexoPdfBase64ParaAssinatura(arquivo); // guarda para enviar na assinatura (evita "Base64 do PDF inválido")
             setCurrentPageAnexo(1);
             setTotalPagesAnexo(null);
             setCoordsAnexo(null);
@@ -384,8 +386,9 @@ export default function Page() {
             }, 500);
             setZoom(1.5);
         } catch (err) {
-            console.log(err);            
-        } finally {            
+            console.log(err);
+            toast.error("Não foi possível carregar o anexo.");
+        } finally {
             setIsLoading(false)
         }
     }
@@ -422,6 +425,7 @@ export default function Page() {
             toast.error((err as Error).message)
         } finally {
             setIsModalVisualizarAnexoOpen(false)
+            setAnexoPdfBase64ParaAssinatura(null)
             setSearched(true)
             setIsLoading(false)
         }
@@ -445,9 +449,15 @@ export default function Page() {
             toast.error("Clique no local onde deseja assinar o documento.");
             return;
         }
+        // Backend espera base64 do PDF; anexoSelecionado.anexo é só caminho — usar base64 guardado ao abrir o anexo
+        const pdfBase64 = anexoPdfBase64ParaAssinatura ?? anexoSelecionado?.anexo;
+        if (!pdfBase64) {
+            toast.error("Documento não carregado. Feche e abra o anexo novamente antes de assinar.");
+            return;
+        }
         const dadosAssinatura: DocumentoAnexoAssinar = {
             id: anexoSelecionado!.id,
-            anexo: anexoSelecionado!.anexo,
+            anexo: pdfBase64,
             pagina: currentPageAnexo,
             posX: coordsAnexo.x,
             posY: coordsAnexo.yI,
@@ -873,7 +883,7 @@ export default function Page() {
 
             {/* Visualizar anexo */}
             {anexoSelecionado && (
-                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
+                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={(open) => { if (!open) setAnexoPdfBase64ParaAssinatura(null); setIsModalVisualizarAnexoOpen(open); }}>
                     <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
