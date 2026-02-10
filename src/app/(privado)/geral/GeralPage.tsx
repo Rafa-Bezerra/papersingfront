@@ -293,7 +293,7 @@ export default function Page() {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10);
             const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10);
-            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada);
+            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada, "");
 
             const solicitantesUnicos = Array.from(
                 new Set(

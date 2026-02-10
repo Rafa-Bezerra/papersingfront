@@ -221,7 +221,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
-            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada)
+            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada, "")
 
             const solicitantesUnicos = Array.from(
                 new Set(
