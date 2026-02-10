@@ -38,7 +38,7 @@ import {
     CommandGroup,
     CommandItem,
 } from "@/components/ui/command"
-import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
+import { safeDateLabel, safeDateLabelAprovacao, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { Usuario } from '@/types/Usuario';
@@ -491,7 +491,7 @@ export default function Page() {
             { accessorKey: 'id', header: 'ID' },
             { accessorKey: 'nome', header: 'Aprovador' },
             { accessorKey: 'aprovacao', header: 'Aprovação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => row.data_aprovacao ? safeDateLabel(row.data_aprovacao) : '' },
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) },
         ],
         []
     )

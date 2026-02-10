@@ -43,6 +43,13 @@ export function safeDateLabel(iso?: string) {
   return dt ? format(dt, 'dd/MM/yyyy', { locale: ptBR }) : '—'
 }
 
+/** Para data de aprovação: retorna '—' quando null ou data placeholder (ex: 01/01/0001). */
+export function safeDateLabelAprovacao(iso?: string | null) {
+  const dt = safeDate(iso ?? undefined)
+  if (!dt || dt.getFullYear() < 1900) return '—'
+  return format(dt, 'dd/MM/yyyy', { locale: ptBR })
+}
+
 export function safeDateTimeLabel(iso?: string) {
   const dt = safeDate(iso);
   return dt ? format(dt, "dd/MM/yyyy HH:mm", { locale: ptBR }) : "—";
