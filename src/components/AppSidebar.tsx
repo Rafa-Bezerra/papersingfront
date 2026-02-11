@@ -136,6 +136,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     { title: 'Usuários', url: '/usuarios' },
     { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
     { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
+    { title: 'Aprovadores Impostos', url: '/impostosaprovadores' },
+    { title: 'Aprovadores RH', url: '/rhaprovadores' },
     { title: 'Centros de custos', url: '/centros-custos' },
   ]
 
@@ -232,7 +234,15 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/comunicados" && !userComunicados) return null;
                         if (item.url === "/centros-custos" && !userCentrosCustos) return null;
                         if (item.url === "/gestao-pessoas" && !userRestrito) return null;
-                        if (["/alcadas", "/usuarios", "/borderoaprovadores", "/rdvaprovadores"].includes(item.url)) return null;
+                        if ([
+                            "/alcadas", 
+                            "/usuarios", 
+                            "/borderoaprovadores", 
+                            "/rdvaprovadores",
+                            '/restritoaprovadores',
+                            '/impostosaprovadores',
+                            '/rhaprovadores'
+                          ].includes(item.url)) return null;
                       }
                       return (
                         <SidebarMenuItem key={item.title}>
