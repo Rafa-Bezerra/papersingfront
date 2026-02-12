@@ -241,6 +241,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                             "/rdvaprovadores",
                             '/restritoaprovadores',
                             '/impostosaprovadores',
+                            '/pagamentos-impostos',
+                            '/pagamentos-rh',
                             '/rhaprovadores'
                           ].includes(item.url)) return null;
                       }

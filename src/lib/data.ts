@@ -29,8 +29,8 @@ export const data = {
         { title: "Aprovação RDV", url: "/aprovacaordv" },
         // === MÓDULOS GESTÃO DE PESSOAS (3 novos - ver comentários nos services e páginas) ===
         { title: "Gestão de Pessoas", url: "/gestao-pessoas" },
-        // { title: "Pagamentos G. Pessoas", url: "/pagamentos-gestao-pessoas" }, // Pagamentos folha (PAGAMENTO_RH, em aberto)
-        // { title: "Pagamentos Impostos", url: "/pagamentos-impostos" },    // Pagamentos impostos (IRF, ISS, PIS, COFINS, em aberto)
+        { title: "Pagamentos G. Pessoas", url: "/pagamentos-rh" },
+        { title: "Pagamentos Impostos", url: "/pagamentos-impostos" },
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Aprovadores Restritos", url: "/restritoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
