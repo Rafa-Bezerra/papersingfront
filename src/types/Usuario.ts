@@ -19,6 +19,9 @@ export type Usuario = {
     restrito: boolean,
     administrativo: boolean,
     solicitante: boolean,
+    pagamento_impostos: boolean,
+    pagamento_rh: boolean,
+    gestao_pessoas: boolean,
 }
 
 export interface LoginPayload {

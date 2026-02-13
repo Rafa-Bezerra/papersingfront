@@ -51,9 +51,11 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
-  const [userCentrosCustos, setUserCentrosCustos] = useState(false)
+  const [userPagamentoRh, setPagamentoRh] = useState(false)
+  const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
   const [userRestrito, setUserRestrito] = useState(false)
-  const [userAdministrativo, setUserAdministrativo] = useState(false)
+  const [userRdv, setUserRdv] = useState(false)
+  // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
   // Usa o estado externo se fornecido, senão usa o interno
@@ -76,8 +78,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserRestrito(user.restrito);
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
-        setUserCentrosCustos(user.ccusto);
-        setUserAdministrativo(user.administrativo);
+        setPagamentoRh(user.pagamento_rh);
+        setPagamentoImpostos(user.pagamento_impostos);
+        setUserRdv(user.rdv);
         // setUserSolicitante(user.solicitante);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -227,23 +230,21 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
                       if (!userAdmin) {
-                        if (!userAdministrativo) {
-                          if (item.url === "/documentos" && !userDocumentos) return null;
-                        }
-                        if (item.url === "/bordero" && !userBordero) return null;
+                        if (item.url === "/documentos" && !userDocumentos) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
-                        if (item.url === "/centros-custos" && !userCentrosCustos) return null;
+                        if (item.url === "/bordero" && !userBordero) return null;
+                        if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/gestao-pessoas" && !userRestrito) return null;
+                        if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
+                        if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
                         if ([
                             "/alcadas", 
                             "/usuarios", 
                             "/borderoaprovadores", 
-                            "/rdvaprovadores",
                             '/restritoaprovadores',
                             '/impostosaprovadores',
-                            '/pagamentos-impostos',
-                            '/pagamentos-rh',
-                            '/rhaprovadores'
+                            '/rhaprovadores',
+                            '/centros-custos'
                           ].includes(item.url)) return null;
                       }
                       return (

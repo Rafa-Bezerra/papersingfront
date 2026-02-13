@@ -148,7 +148,9 @@ export default function Page({ titulo, grupo }: Props) {
         try {
             const dataAprovadores: PagamentoAprovar = {
                 id: data.idlan,
-                aprovacao: 'A'
+                aprovacao: 'A',
+                aprovar: true,
+                grupo: grupo
             };
             await aprovarPagamento(dataAprovadores);
         } catch (err) {
@@ -164,7 +166,9 @@ export default function Page({ titulo, grupo }: Props) {
         try {
             const dataAprovadores: PagamentoAprovar = {
                 id: data.idlan,
-                aprovacao: 'R'
+                aprovacao: 'R',
+                aprovar: false,
+                grupo: grupo
             };
             await aprovarPagamento(dataAprovadores);            
         } catch (err) {
@@ -181,7 +185,7 @@ export default function Page({ titulo, grupo }: Props) {
             { accessorKey: 'nome_fantasia', header: 'Fantasia' },
             { accessorKey: 'numero_documento', header: 'N° Documento' },
             { accessorKey: 'tipo_documento', header: 'Tipo Documento' },
-            { accessorKey: 'historico', header: 'Histórico' },
+            { accessorKey: 'historico', header: 'Histórico', accessorFn: (row) => row.historico.length > 50 ? row.historico.slice(0, 50) + '...' : row.historico },
             { accessorKey: 'usuario_criacao', header: 'Usuário Criação' },
             { accessorKey: 'status_lancamento', header: 'Status' },
             { accessorKey: 'data_criacao', header: 'Data Criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
