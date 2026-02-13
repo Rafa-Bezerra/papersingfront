@@ -38,6 +38,7 @@ export default function Page({ titulo, grupo }: Props) {
     const [dateTo, setDateTo] = useState("");
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("EM ABERTO")
+    const [statusFiltrado, setStatusFiltrado] = useState<string>("")
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Pagamento[]>([])
     const [selectedResult, setSelectedResult] = useState<Pagamento | null>(null)
@@ -69,7 +70,7 @@ export default function Page({ titulo, grupo }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada])
+    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado])
 
     function clearQuery() {
         setQuery('')
@@ -100,7 +101,8 @@ export default function Page({ titulo, grupo }: Props) {
                 dateFrom: from,
                 dateTo: to,
                 grupo: grupo,
-                status: situacaoFiltrada
+                status: situacaoFiltrada,
+                situacao: statusFiltrado,
             };
             const dados = await getAll(data)
 
@@ -110,7 +112,8 @@ export default function Page({ titulo, grupo }: Props) {
                 const movimento = stripDiacritics((d.tipo_documento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.idlan ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.status_lancamento == situacaoFiltrada
-                return matchQuery && matchSituacao
+                const matchStatus = statusFiltrado === "" || d.status_aprovacao == statusFiltrado
+                return matchQuery && matchSituacao && matchStatus
             })
             setResults(filtrados)
         } catch (err) {
@@ -153,6 +156,7 @@ export default function Page({ titulo, grupo }: Props) {
                 grupo: grupo
             };
             await aprovarPagamento(dataAprovadores);
+            await handleSearchClick();
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -170,7 +174,8 @@ export default function Page({ titulo, grupo }: Props) {
                 aprovar: false,
                 grupo: grupo
             };
-            await aprovarPagamento(dataAprovadores);            
+            await aprovarPagamento(dataAprovadores);   
+            await handleSearchClick();         
         } catch (err) {
             setError((err as Error).message)
             setResults([])
@@ -188,6 +193,7 @@ export default function Page({ titulo, grupo }: Props) {
             { accessorKey: 'historico', header: 'Histórico', accessorFn: (row) => row.historico.length > 50 ? row.historico.slice(0, 50) + '...' : row.historico },
             { accessorKey: 'usuario_criacao', header: 'Usuário Criação' },
             { accessorKey: 'status_lancamento', header: 'Status' },
+            { accessorKey: 'status_aprovacao', header: 'Situação' },
             { accessorKey: 'data_criacao', header: 'Data Criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
             { accessorKey: 'data_vencimento', header: 'Data Vencimento', accessorFn: (row) => safeDateLabel(row.data_vencimento) },
             { accessorKey: 'data_prev_baixa', header: 'Data Prev Baixa', accessorFn: (row) => safeDateLabel(row.data_prev_baixa) },
@@ -278,12 +284,12 @@ export default function Page({ titulo, grupo }: Props) {
                             />
                         </div>
 
-                        {/* Situação */}
+                        {/* Status */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" aria-label="Abrir filtros">
                                     <Filter className="h-4 w-4 mr-2" />
-                                    <span className="hidden sm:inline">Filtros</span>
+                                    <span className="hidden sm:inline">Status</span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
@@ -293,6 +299,23 @@ export default function Page({ titulo, grupo }: Props) {
                                 <DropdownMenuCheckboxItem key={"BAIXADO PARCIALMENTE"} checked={situacaoFiltrada == "BAIXADO PARCIALMENTE"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("BAIXADO PARCIALMENTE") }}>BAIXADO PARCIALMENTE</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"CANCELADO"} checked={situacaoFiltrada == "CANCELADO"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("CANCELADO") }}>CANCELADO</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Situação */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Situação</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Situação</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem key={"PENDENTE"} checked={statusFiltrado == "PENDENTE"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("PENDENTE") }}>PENDENTE</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"APROVADA"} checked={statusFiltrado == "APROVADA"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("APROVADA") }}>APROVADA</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"RECUSADA"} checked={statusFiltrado == "RECUSADA"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("RECUSADA") }}>RECUSADA</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={statusFiltrado == ""} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>

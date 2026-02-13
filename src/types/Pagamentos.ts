@@ -16,7 +16,8 @@ export type Pagamento = {
     valor_liquido: number,
     valor_original: number,
     pode_aprovar: boolean,
-    pode_reprovar: boolean
+    pode_reprovar: boolean,
+    status_aprovacao: string,
 }
 export type PagamentoAprovador = {
     id: number,
@@ -30,6 +31,7 @@ export type PagamentoGetAll = {
     dateTo: string,
     grupo: string,
     status: string,
+    situacao: string,
 }
 export type PagamentoAprovadoresGetAll = {
     id: number,
