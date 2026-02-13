@@ -38,6 +38,8 @@ export type PagamentoAprovadoresGetAll = {
 export type PagamentoAprovar = {
     id: number,
     aprovacao: string,
+    grupo?: string,
+    aprovar?: boolean,
     usuario?: string,
     nome?: string,
 }

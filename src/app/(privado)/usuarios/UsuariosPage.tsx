@@ -87,6 +87,9 @@ export default function PageUsuarios() {
       restrito: false,
       administrativo: false,
       solicitante: false,
+      pagamento_impostos: false,
+      pagamento_rh: false,
+      gestao_pessoas: false,
     }
   })
 
@@ -128,9 +131,6 @@ export default function PageUsuarios() {
     try {
       const dados = await getAllUsuarios()
       const qNorm = stripDiacritics(q.toLowerCase().trim())
-      console.log('q:', q)
-      console.log('qNorm:', stripDiacritics(q.toLowerCase().trim()))
-      console.log('dados exemplo:', dados[0])
       const filtrados = qNorm
         ? dados.filter(
           p =>
@@ -215,6 +215,9 @@ export default function PageUsuarios() {
         restrito: response.restrito,
         administrativo: response.administrativo,
         solicitante: response.solicitante,
+        pagamento_impostos: response.pagamento_impostos,
+        pagamento_rh: response.pagamento_rh,
+        gestao_pessoas: response.gestao_pessoas,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -243,6 +246,9 @@ export default function PageUsuarios() {
       externo: false,
       administrativo: false,
       solicitante: false,
+      pagamento_impostos: false,
+      pagamento_rh: false,
+      gestao_pessoas: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -501,7 +507,7 @@ export default function PageUsuarios() {
                   name="comunicados"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Comunicados</FormLabel>
+                      <FormLabel>Pagamentos</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -544,39 +550,7 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="externo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Externo</FormLabel>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="administrativo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Administrativo</FormLabel>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
+                {/* <FormField
                   control={form.control}
                   name="solicitante"
                   render={({ field }) => (
@@ -591,7 +565,7 @@ export default function PageUsuarios() {
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                /> */}
                 <FormField
                   control={form.control}
                   name="restrito"
@@ -608,6 +582,54 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="pagamento_impostos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pag. Impostos</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="pagamento_rh"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pag. RH</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* <FormField
+                  control={form.control}
+                  name="gestao_pessoas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gestão Pessoas</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                /> */}
               </div>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}
