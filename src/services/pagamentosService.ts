@@ -25,7 +25,7 @@ export async function getAllAprovadores(data: PagamentoAprovadoresGetAll): Promi
 }
 
 export async function aprovarPagamento(data: PagamentoAprovar): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const res = await fetch(`${API_BASE}/api/${caminho}/aprovar`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
