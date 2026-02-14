@@ -302,7 +302,7 @@ export default function Page() {
             { accessorKey: 'requisicao.idmov', header: 'ID' },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
-            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
                 id: 'actions',

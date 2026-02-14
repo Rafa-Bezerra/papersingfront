@@ -24,7 +24,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, SearchIcon, X, ZoomIn, ZoomOut, Search, Loader2 } from 'lucide-react'
+import { Check, Filter, RefreshCw, SearchIcon, X, ZoomIn, ZoomOut, Search, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
 
@@ -133,6 +133,14 @@ export default function Page() {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
     }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+
+    useEffect(() => {
+        if (!results.length || !dateFrom || !dateTo) return
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") handleSearch(query)
+        }, 60000)
+        return () => clearInterval(timer)
+    }, [results.length, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
 
     async function handleSearchClick() {
         setIsLoading(true)
@@ -359,7 +367,9 @@ export default function Page() {
                 aprovar: aprovar
             };
             await aprovarFiscal(data)
-            handleSearchClick()
+            setResults(prev => prev.filter(r => r.fiscal.idmov !== requisicao.fiscal.idmov))
+            toast.success("Aprovado! Lista atualizada.")
+            handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -419,7 +429,7 @@ export default function Page() {
             { accessorKey: 'fiscal.data_emissao', header: 'Emissão', accessorFn: (row) => safeDateLabel(row.fiscal.data_emissao) },
             { accessorKey: 'fiscal.movimento', header: 'Movimento' },
             { accessorKey: 'fiscal.tipo_movimento', header: 'Tipo movimento' },
-            { accessorKey: 'fiscal.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'fiscal.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.fiscal?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'fiscal.status', header: 'Situação' },
             {
                 id: 'actions',
@@ -656,9 +666,14 @@ export default function Page() {
                         )}
                     </div>
 
-                    <Button onClick={handleSearchClick} className="flex items-center">
-                        <SearchIcon className="mr-1 h-4 w-4" /> Buscar
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSearchClick} className="flex items-center">
+                            <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                        </Button>
+                        <Button variant="outline" onClick={() => handleSearch(query)} className="flex items-center" title="Atualizar lista">
+                            <RefreshCw className={`mr-1 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 

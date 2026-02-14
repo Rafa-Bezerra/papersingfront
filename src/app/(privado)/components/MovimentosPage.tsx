@@ -14,7 +14,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Filter, SearchIcon, X, ZoomIn, ZoomOut, Search } from 'lucide-react'
+import { Check, Filter, RefreshCw, SearchIcon, X, ZoomIn, ZoomOut, Search } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -211,6 +211,15 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
     }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+
+    // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível.
+    useEffect(() => {
+        if (!searched || !dateFrom || !dateTo) return
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") handleSearch(query)
+        }, 60000)
+        return () => clearInterval(timer)
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -410,7 +419,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         setIsLoading(true)
         try {
             await aprovar(id, atendimento)
-            handleSearchClick()
+            setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
+            toast.success("Aprovado! Lista atualizada.")
+            handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -619,7 +630,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             { accessorKey: 'requisicao.data_emissao', header: 'Emissão', accessorFn: (row) => safeDateLabel(row.requisicao.data_emissao) },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
-            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
                 id: 'actions',
@@ -930,9 +941,14 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                         )}
                     </div>
 
-                    <Button onClick={handleSearchClick} className="flex items-center">
-                        <SearchIcon className="mr-1 h-4 w-4" /> Buscar
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSearchClick} className="flex items-center">
+                            <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                        </Button>
+                        <Button variant="outline" onClick={() => handleSearch(query)} className="flex items-center" title="Atualizar lista">
+                            <RefreshCw className={`mr-1 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 

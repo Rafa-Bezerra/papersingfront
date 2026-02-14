@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Filter, SearchIcon, X, ZoomIn, ZoomOut, Search } from 'lucide-react'
+import { Check, Filter, RefreshCw, SearchIcon, X, ZoomIn, ZoomOut, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -282,6 +282,14 @@ export default function Page() {
         tipoMovimentoFiltrado
     ]);
 
+    useEffect(() => {
+        if (!searched || !dateFrom || !dateTo) return
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") handleSearch(query)
+        }, 60000)
+        return () => clearInterval(timer)
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, tipoMovimentoFiltrado])
+
     async function handleSearch(q: string) {
         setIsLoading(true);
         setError(null);
@@ -510,7 +518,9 @@ export default function Page() {
         setIsLoading(true)
         try {
             await aprovar(id, atendimento)
-            handleSearchClick()
+            setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
+            toast.success("Aprovado! Lista atualizada.")
+            handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
         } finally {
@@ -715,7 +725,7 @@ export default function Page() {
             { accessorKey: 'rotina', header: 'Rotina', accessorFn: (row) => rotinaTipoMovimento(row.requisicao.tipo_movimento) },
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
-            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
                 id: 'actions',
@@ -1021,9 +1031,14 @@ export default function Page() {
                         )}
                     </div>
 
-                    <Button onClick={handleSearchClick} className="flex items-center">
-                        <SearchIcon className="mr-1 h-4 w-4" /> Buscar
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSearchClick} className="flex items-center">
+                            <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                        </Button>
+                        <Button variant="outline" onClick={() => handleSearch(query)} className="flex items-center" title="Atualizar lista">
+                            <RefreshCw className={`mr-1 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
