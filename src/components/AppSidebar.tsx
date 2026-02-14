@@ -51,6 +51,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
+  const [userFiscal, setUserFiscal] = useState(false)
   const [userPagamentoRh, setPagamentoRh] = useState(false)
   const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
   const [userRestrito, setUserRestrito] = useState(false)
@@ -78,6 +79,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserRestrito(user.restrito);
         setUserBordero(user.bordero);
         setUserComunicados(user.comunicados);
+        setUserFiscal(user.fiscal);
         setPagamentoRh(user.pagamento_rh);
         setPagamentoImpostos(user.pagamento_impostos);
         setUserRdv(user.rdv);
@@ -130,6 +132,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Aprovadores Borderô': <Users className="w-5 h-5" />,
     'Alçadas': <Users className="w-5 h-5" />,
     'Centros de custos': <Settings className="w-5 h-5" />,
+    'Painel Fiscal': <Briefcase className="w-5 h-5" />,
     'Usuários': <User className="w-5 h-5" />,
     Configurações: <Settings className="w-5 h-5" />,
   }
@@ -237,6 +240,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/gestao-pessoas" && !userRestrito) return null;
                         if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
                         if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
+                        if (item.url === "/fiscal" && !userFiscal) return null;
                         if ([
                             "/alcadas", 
                             "/usuarios", 

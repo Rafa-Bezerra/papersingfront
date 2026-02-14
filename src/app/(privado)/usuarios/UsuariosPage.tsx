@@ -89,6 +89,7 @@ export default function PageUsuarios() {
       solicitante: false,
       pagamento_impostos: false,
       pagamento_rh: false,
+      fiscal: false,
       gestao_pessoas: false,
     }
   })
@@ -217,6 +218,7 @@ export default function PageUsuarios() {
         solicitante: response.solicitante,
         pagamento_impostos: response.pagamento_impostos,
         pagamento_rh: response.pagamento_rh,
+        fiscal: response.fiscal,
         gestao_pessoas: response.gestao_pessoas,
       })
       setIsModalOpen(true)
@@ -248,6 +250,7 @@ export default function PageUsuarios() {
       solicitante: false,
       pagamento_impostos: false,
       pagamento_rh: false,
+      fiscal: false,
       gestao_pessoas: false,
     })
     setUpdateMode(false)
@@ -614,12 +617,12 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
-                {/* <FormField
+                <FormField
                   control={form.control}
-                  name="gestao_pessoas"
+                  name="fiscal"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gestão Pessoas</FormLabel>
+                      <FormLabel>P. Fiscal</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -629,7 +632,7 @@ export default function PageUsuarios() {
                       <FormMessage />
                     </FormItem>
                   )}
-                /> */}
+                />
               </div>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}

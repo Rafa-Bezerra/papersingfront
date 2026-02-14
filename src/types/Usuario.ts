@@ -21,6 +21,7 @@ export type Usuario = {
     solicitante: boolean,
     pagamento_impostos: boolean,
     pagamento_rh: boolean,
+    fiscal: boolean,
     gestao_pessoas: boolean,
 }
 
