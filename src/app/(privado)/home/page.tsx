@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
+import { FileText, CheckCircle, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
