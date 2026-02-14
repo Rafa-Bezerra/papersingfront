@@ -355,12 +355,10 @@ export default function Page() {
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
-                    console.log("usuarioAprovou: " + usuarioAprovou);
 
                     const status_liberado = ['Em andamento'].includes(row.original.situacao);
-                    console.log("status_liberado: " + status_liberado);
-
-                    const podeAprovar = usuarioAprovador && status_liberado && !usuarioAprovou;
+                    const assinouOuSemArquivo = !row.original.arquivo || row.original.arquivo_assinado === true;
+                    const podeAprovar = usuarioAprovador && status_liberado && !usuarioAprovou && assinouOuSemArquivo;
                     // const podeAprovar = true;
 
                     return (

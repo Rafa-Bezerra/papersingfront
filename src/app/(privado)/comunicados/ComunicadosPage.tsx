@@ -460,7 +460,8 @@ export default function Page() {
                     const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
                     const status_bloqueado = ['Reprovado'].includes(row.original.situacao);
 
-                    const podeAprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado;
+                    const assinouOuSemAnexo = row.original.anexo !== "SIM" || row.original.documento_assinado === 1;
+                    const podeAprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado && assinouOuSemAnexo;
                     const podeReprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
