@@ -4,6 +4,10 @@ export interface DashboardStats {
   documentos: number;
   aprovados: number;
   pendentes: number;
+  pendentes_movimentos?: number;
+  pendentes_ci?: number;
+  pendentes_documentos?: number;
+  pendentes_rdv?: number;
   aprovados_hoje: number;
   em_andamento: number;
   concluido_a_responder: number;
