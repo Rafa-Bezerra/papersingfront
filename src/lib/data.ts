@@ -27,14 +27,13 @@ export const data = {
         { title: "Carrinho", url: "/carrinho" },
         { title: "RDV", url: "/rdv" },
         { title: "Aprovação RDV", url: "/aprovacaordv" },
-        // === MÓDULOS GESTÃO DE PESSOAS (3 novos - ver comentários nos services e páginas) ===
         { title: "Gestão de Pessoas", url: "/gestao-pessoas" },
         { title: "Pagamentos G. Pessoas", url: "/pagamentos-rh" },
         { title: "Pagamentos Impostos", url: "/pagamentos-impostos" },
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Aprovadores Restritos", url: "/restritoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
-        // Novo módulo de administração de centros de custos.
+        { title: "Painel Fiscal", url: "/fiscal" },
         { title: "Centros de custos", url: "/centros-custos" },
         { title: "Usuários", url: "/usuarios" },
       ],

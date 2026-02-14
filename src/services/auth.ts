@@ -22,6 +22,7 @@ export interface LoginResponse {
   administrativo: boolean;
   solicitante: boolean;
   ccusto: boolean;
+  fiscal: boolean;
   restrito: boolean;
 }
 
