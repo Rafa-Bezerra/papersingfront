@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap } from 'lucide-react';
+import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
@@ -78,24 +78,66 @@ export default function HomePage() {
         </p>
       </header>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      {/* Seção Pendentes do Gestor - em destaque */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
+          <p className="text-xs text-muted-foreground">
+            Documentos aguardando sua aprovação por tipo
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <DashboardCard
+            title="Pendentes Movimentos"
+            count={stats?.pendentes_movimentos ?? stats?.pendentes ?? 0}
+            icon={Package}
+            color="red"
+            description="Movimentações em andamento"
+            href="/geral?status=pendentes"
+          />
+          <DashboardCard
+            title="Pendentes C.I."
+            count={stats?.pendentes_ci ?? 0}
+            icon={Receipt}
+            color="yellow"
+            description="Pagamentos CI"
+            href="/comunicados"
+          />
+          <DashboardCard
+            title="Pendentes Documentos"
+            count={stats?.pendentes_documentos ?? 0}
+            icon={FileText}
+            color="blue"
+            description="Documentos para assinatura"
+            href="/documentos"
+          />
+          <DashboardCard
+            title="Pendentes RDV"
+            count={stats?.pendentes_rdv ?? 0}
+            icon={PenLine}
+            color="purple"
+            description="Assinatura de RDVs"
+            href="/aprovacaordv"
+          />
+        </div>
+      </section>
+
+      {/* Cards de Estatísticas - Status dos Processos */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">Status dos Processos</h2>
+          <p className="text-xs text-muted-foreground">
+            Visão geral de todos os status
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         <DashboardCard
           title="Documentos"
           count={stats?.documentos || 0}
           icon={FileText}
           color="blue"
-          description="Documentos"
+          description="Total de documentos"
           href="/geral?status=todos"
-        />
-
-        <DashboardCard
-          title="Pendentes"
-          count={stats?.pendentes || 0}
-          icon={Clock}
-          color="red"
-          description="Processos em andamento"
-          href="/geral?status=pendentes"
         />
 
         <DashboardCard
@@ -196,7 +238,8 @@ export default function HomePage() {
           description="Processos despertados"
           href="/geral?status=despertado"
         /> */}
-      </div>
+        </div>
+      </section>
 
       {/* Cards de Acesso Rápido */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${userAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 sm:gap-6`} >
@@ -293,31 +336,110 @@ export default function HomePage() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">Resumo de Atividades</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">Clique em um item para ver os detalhes</p>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+          <div className="space-y-2 sm:space-y-3">
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/geral?status=concluido_confirmado')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=concluido_confirmado')}
+            >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm font-medium">Documentos aprovados hoje</span>
               </div>
-              <span className="text-sm text-muted-foreground">{stats?.aprovados_hoje || 0}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.aprovados_hoje || 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/geral?status=pendentes')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=pendentes')}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <span className="text-sm font-medium">Pendentes movimentos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.pendentes_movimentos ?? stats?.pendentes ?? 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/comunicados')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/comunicados')}
+            >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm font-medium">Aguardando sua aprovação</span>
+                <span className="text-sm font-medium">Pendentes C.I.</span>
               </div>
-              <span className="text-sm text-muted-foreground">{stats?.pendentes || 0}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.pendentes_ci ?? 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/documentos')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/documentos')}
+            >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-sm font-medium">Pendentes documentos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.pendentes_documentos ?? 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/aprovacaordv')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/aprovacaordv')}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm font-medium">Pendentes RDV</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.pendentes_rdv ?? 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+              onClick={() => router.push('/geral?status=todos')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=todos')}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
                 <span className="text-sm font-medium">Total de documentos</span>
               </div>
-              <span className="text-sm text-muted-foreground">{stats?.documentos || 0}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{stats?.documentos || 0}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
           </div>
         </CardContent>
