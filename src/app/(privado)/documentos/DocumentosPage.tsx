@@ -507,8 +507,8 @@ export default function Page() {
                     const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
 
                     const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
-
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
+                    const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
                     return (
