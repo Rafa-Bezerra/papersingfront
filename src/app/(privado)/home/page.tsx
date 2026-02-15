@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
+import { FileText, CheckCircle, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
 import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
