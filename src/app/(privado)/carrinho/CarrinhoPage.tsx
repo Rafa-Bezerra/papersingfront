@@ -1,3 +1,7 @@
+/**
+ * CarrinhoPage - Página do Carrinho de Compras
+ * Permite criar novas requisições de compra com itens, anexos e consultar últimas requisições.
+ */
 'use client'
 
 import React, {
@@ -43,17 +47,22 @@ import { ColumnDef } from '@tanstack/react-table';
 
 export default function Page() {
     const titulo = 'Carrinho de Compras'
+
+    // Estados de loading e erro
     const [isLoading, setIsLoading] = useState(false)
+    // Dados carregados da API
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
     const [results, setResults] = useState<RequisicaoDto[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
     const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [produtos, setProdutos] = useState<Produto[]>([])
+    // Dados do formulário e itens a enviar
     const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [], anexos: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemCarrinho[]>([])
     const [anexosSubmit, setAnexosSubmit] = useState<AnexoCarrinho[]>([])
     const [error, setError] = useState<string | null>(null)
+    // Controle dos Popovers de busca
     const [openTmovSearch, setOpenTmovSearch] = useState(false)
     const [openProdutoSearch, setOpenProdutoSearch] = useState(false)
     const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
@@ -69,6 +78,7 @@ export default function Page() {
     const [zoomAnexo, setZoomAnexo] = useState(1.5);
     const [bloqueado, setBloqueado] = useState(true)
 
+    // Listener para mensagens do iframe do PDF (páginas totais)
     useEffect(() => {
         const handler = (event: MessageEvent) => {
             if (event.source !== iframeAnexoRef.current?.contentWindow) return;
@@ -81,11 +91,13 @@ export default function Page() {
         return () => window.removeEventListener("message", handler);
     }, []);
 
+    // Desbloqueia envio quando há pelo menos 1 produto
     useEffect(() => {
         setBloqueado(true);
         if (produtos.length > 0) setBloqueado(false);
     }, [produtos])
 
+    // Form principal do carrinho (tipo movimento, descrição)
     const form = useForm<Carrinho>({
         defaultValues: {
             descricao: "",
@@ -99,6 +111,7 @@ export default function Page() {
         }
     })
 
+    // Form de cada item a adicionar (produto, quantidade, valor)
     const formItem = useForm<ItemCarrinho>({
         defaultValues: {
             ccusto: "",
@@ -110,6 +123,7 @@ export default function Page() {
         }
     });
 
+    // Tipos de movimento disponíveis para requisição
     const movimentos = [
         { value: "1.1.01", label: "1.1.01 - Requisição de compra" },
         { value: "1.1.02", label: "1.1.02 - Requisições administrativas" },
@@ -120,11 +134,13 @@ export default function Page() {
         { value: "1.1.12", label: "1.1.12 - Requisição de estoque" },
     ];
 
+    // Carrega centros de custo e últimas requisições ao montar
     useEffect(() => {
         buscaCentrosDeCusto();
         buscaUltimasRequisicoes();
     }, [])
 
+    /** Busca centros de custo da API */
     async function buscaCentrosDeCusto() {
         setIsLoading(true)
         setError(null)
@@ -141,6 +157,7 @@ export default function Page() {
         }
     }
 
+    /** Busca últimas requisições para exibir na tabela */
     async function buscaUltimasRequisicoes() {
         setIsLoading(true)
         setError(null)
@@ -155,6 +172,7 @@ export default function Page() {
         }
     }
 
+    /** Ao selecionar centro de custo, busca contas financeiras vinculadas */
     async function handleSelectedCentroDeCusto(data: string) {
         setIsLoading(true)
         setError(null)
@@ -170,6 +188,7 @@ export default function Page() {
         }
     }
 
+    /** Ao selecionar conta financeira, busca produtos disponíveis */
     async function handleSelectedContaFinanceira(data: string) {
         setIsLoading(true)
         setError(null)
@@ -184,6 +203,7 @@ export default function Page() {
         }
     }
 
+    /** Envia o carrinho completo para a API */
     async function onSubmit() {
         setIsLoading(true)
         setError(null)
@@ -206,26 +226,28 @@ export default function Page() {
         }
     }
 
+    /** Adiciona item ao carrinho e reseta o form */
     function adicionarItem() {
-        console.log('adicionarItem');
         const item: ItemCarrinho = formItem.getValues()
         const produto = produtos.find(p => p.idprd === item.idprd)
         item.produto = produto?.produto ?? "";
-        console.log(item);
         setProdutosSubmit(prev => [...prev, item])
         formItem.reset()
     }
 
+    /** Remove item da lista de itens do carrinho */
     function removerItem(index: number) {
         setProdutosSubmit(prev => prev.filter((_, i) => i !== index))
     }
 
+    /** Abre modal com itens da requisição selecionada */
     async function handleItens(requisicao: RequisicaoDto) {
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
     }
 
+    /** Converte arquivo em base64 e adiciona à lista de anexos */
     async function handleAnexos() {
         setIsLoading(true)
         if (!file) return toast.error("Selecione um arquivo primeiro!")
@@ -238,10 +260,12 @@ export default function Page() {
         setIsLoading(false)
     }
 
+    /** Remove anexo da lista */
     function removerAnexo(index: number) {
         setAnexosSubmit(prev => prev.filter((_, i) => i !== index))
     }
 
+    /** Abre modal para visualizar PDF do anexo */
     async function handleVisualizarAnexo(anexo: AnexoCarrinho) {
         setIsLoading(true)
         try {
@@ -297,6 +321,7 @@ export default function Page() {
         }
     }
 
+    // Colunas da tabela de últimas requisições
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(
         () => [
             { accessorKey: 'requisicao.idmov', header: 'ID' },
@@ -321,6 +346,7 @@ export default function Page() {
         []
     )
 
+    // Colunas da tabela de itens no modal
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
         () => [
             { accessorKey: 'centro_custo', header: 'Centro de custo', accessorFn: (row) => row.centro_custo + ' - ' + (row.nome_centro_custo ?? '-') },
