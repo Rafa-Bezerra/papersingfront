@@ -2,10 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 // import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { KeyboardEvent } from "react";
 
 // Card do dashboard que mostra estatísticas
 // Pode clicar para navegar, tem cores diferentes e ícones
@@ -62,31 +61,24 @@ export function DashboardCard({
   href,
   className,
 }: DashboardCardProps) {
-  const router = useRouter();
   const colors = colorVariants[color];
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      router.push(href);
-    }
-  };
+  const [path, query] = href.split("?");
+  const basePath = path.endsWith("/") ? path : `${path}/`;
+  const hrefWithSlash = query ? `${basePath}?${query}` : basePath;
 
   return (
-    <Card
-      className={cn(
-        "cursor-pointer w-full transition-all duration-200",
-        "hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        colors.bg,
-        colors.border,
-        colors.hover,
-        className
-      )}
-      onClick={() => router.push(href)}
-      onKeyDown={handleKeyDown}
-      role="button"
-      tabIndex={0}
-    >
+    <Link href={hrefWithSlash}>
+      <Card
+        className={cn(
+          "cursor-pointer w-full transition-all duration-200",
+          "hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          colors.bg,
+          colors.border,
+          colors.hover,
+          className
+        )}
+        tabIndex={0}
+      >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2">
         <CardTitle className="text-xs font-medium text-foreground/70 leading-tight">
           {title}
@@ -103,5 +95,6 @@ export function DashboardCard({
         </p>
       </CardContent>
     </Card>
+    </Link>
   );
 }

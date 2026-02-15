@@ -359,7 +359,11 @@ export default function Page() {
 
             setResults(fitradosStatus);
         } catch (err) {
-            setError((err as Error).message);
+            const msg = (err as Error).message;
+            const mensagemAmigavel = msg === 'Failed to fetch'
+                ? 'Não foi possível conectar ao servidor. Verifique se a API está rodando e se a URL está correta (ex: http://localhost:5170 em desenvolvimento).'
+                : msg;
+            setError(mensagemAmigavel);
             setResults([]);
         } finally {
             setSearched(true);

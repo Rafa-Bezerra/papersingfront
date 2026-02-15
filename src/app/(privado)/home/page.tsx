@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { FileText, CheckCircle, Clock, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import './home.css';
 
 export default function HomePage() {
-  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [userAdmin, setUserAdmin] = useState(false)
@@ -243,32 +242,29 @@ export default function HomePage() {
 
       {/* Cards de Acesso Rápido */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${userAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 sm:gap-6`} >
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow w-full"
-          onClick={() => router.push('/carrinho')}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Solicitações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">Nova</div>
-                <p className="text-xs text-muted-foreground">
-                  Criar solicitação de compra
-                </p>
+        <Link href="/carrinho/">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow w-full h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Solicitações
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xl sm:text-2xl font-bold">Nova</div>
+                  <p className="text-xs text-muted-foreground">
+                    Criar solicitação de compra
+                  </p>
+                </div>
+                <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
               </div>
-              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow w-full"
-          onClick={() => router.push('/requisicoes')}
-        >
+        <Link href="/requisicoes/">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow w-full h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Recebimentos
@@ -286,6 +282,7 @@ export default function HomePage() {
             </div>
           </CardContent>
         </Card>
+        </Link>
 
         {/* <Card 
           className="cursor-pointer hover:shadow-md transition-shadow w-full"
@@ -309,27 +306,28 @@ export default function HomePage() {
           </CardContent>
         </Card> */}
 
-        {userAdmin && (<Card
-          className="cursor-pointer hover:shadow-md transition-shadow w-full"
-          onClick={() => router.push('/usuarios')}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Usuários
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">Admin</div>
-                <p className="text-xs text-muted-foreground">
-                  Gerenciar usuários
-                </p>
-              </div>
-              <CheckSquare className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>)}
+        {userAdmin && (
+          <Link href="/usuarios/">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow w-full h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Usuários
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xl sm:text-2xl font-bold">Admin</div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerenciar usuários
+                    </p>
+                  </div>
+                  <CheckSquare className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
       {/* Resumo de Atividades */}
@@ -340,12 +338,9 @@ export default function HomePage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2 sm:space-y-3">
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/geral/?status=concluido_confirmado"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/geral?status=concluido_confirmado')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=concluido_confirmado')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -355,14 +350,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.aprovados_hoje || 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
 
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/geral/?status=pendentes"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/geral?status=pendentes')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=pendentes')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-red-500 rounded-full"></div>
@@ -372,14 +364,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.pendentes_movimentos ?? stats?.pendentes ?? 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
 
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/comunicados/"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/comunicados')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/comunicados')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
@@ -389,14 +378,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.pendentes_ci ?? 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
 
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/documentos/"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/documentos')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/documentos')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -406,14 +392,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.pendentes_documentos ?? 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
 
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/aprovacaordv/"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/aprovacaordv')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/aprovacaordv')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -423,14 +406,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.pendentes_rdv ?? 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
 
-            <div
-              role="button"
-              tabIndex={0}
+            <Link
+              href="/geral/?status=todos"
               className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => router.push('/geral?status=todos')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/geral?status=todos')}
             >
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
@@ -440,7 +420,7 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground">{stats?.documentos || 0}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
+            </Link>
           </div>
         </CardContent>
       </Card>
