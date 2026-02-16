@@ -149,6 +149,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
     { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
     { title: 'Aprovadores Impostos', url: '/impostosaprovadores' },
+    { title: 'Aprovadores Fiscal', url: '/fiscalaprovadores' },
     { title: 'Aprovadores RH', url: '/rhaprovadores' },
     { title: 'Centros de custos', url: '/centros-custos' },
   ]
