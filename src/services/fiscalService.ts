@@ -41,8 +41,7 @@ export async function getAllAnexos(idmov: number): Promise<FiscalDocumento[]> {
 }
 
 export async function aprovarFiscal(data: FiscalAprovarDocumento): Promise<void> {
-    const acao = data.aprovar ? "aprovar" : "reprovar";
-    const res = await fetch(`${API_BASE}/api/Requisicoes/${acao}/${data.idmov}/${data.codigo_atendimento}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const res = await fetch(`${API_BASE}/api/${caminho}/aprovar`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
