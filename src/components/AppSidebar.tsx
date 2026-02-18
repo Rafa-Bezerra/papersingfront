@@ -51,6 +51,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userAdmin, setUserAdmin] = useState(false)
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
+  const [userExterno, setUserExterno] = useState(false)
   const [userComunicados, setUserComunicados] = useState(false)
   const [userFiscal, setUserFiscal] = useState(false)
   const [userPagamentoRh, setPagamentoRh] = useState(false)
@@ -80,6 +81,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserDocumentos(user.documentos);
         setUserRestrito(user.restrito);
         setUserBordero(user.bordero);
+        setUserExterno(user.externo);
         setUserComunicados(user.comunicados);
         setUserFiscal(user.fiscal);
         setPagamentoRh(user.pagamento_rh);
@@ -131,10 +133,10 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
     'RDV': <Truck className="w-5 h-5" />,
     'Aprovação RDV': <Truck className="w-5 h-5" />,
-    // Ícones dos 3 módulos novos (Gestão de Pessoas / Pagamentos G. Pessoas / Pagamentos Impostos)
     'Gestão de Pessoas': <User className="w-5 h-5" />,
     'Pagamentos G. Pessoas': <FileText className="w-5 h-5" />,
     'Pagamentos Impostos': <FileText className="w-5 h-5" />,
+    'Documentos Externos': <FileText className="w-5 h-5" />,
     'Aprovadores Borderô': <Users className="w-5 h-5" />,
     'Alçadas': <Users className="w-5 h-5" />,
     'Centros de custos': <Settings className="w-5 h-5" />,
@@ -152,6 +154,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     { title: 'Aprovadores Fiscal', url: '/fiscalaprovadores' },
     { title: 'Aprovadores RH', url: '/rhaprovadores' },
     { title: 'Centros de custos', url: '/centros-custos' },
+    { title: 'Cadastro de externos', url: '/cadastro-externos' },
   ]
 
   return (
@@ -245,6 +248,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/bordero" && !userBordero) return null;
                         if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/gestao-pessoas" && !userRestrito) return null;
+                        if (item.url === "/documentos-externos" && !userExterno) return null;
                         if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
                         if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
                         if (item.url === "/fiscal" && !userFiscal) return null;
@@ -255,7 +259,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                             '/restritoaprovadores',
                             '/impostosaprovadores',
                             '/rhaprovadores',
-                            '/centros-custos'
+                            '/centros-custos',
+                            '/cadastro-externos'
                           ].includes(item.url)) return null;
                       }
                       return (

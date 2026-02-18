@@ -89,7 +89,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           setIsAuthenticated(false);
           setIsAuthorized(false);
           // Redireciona para login se não estiver autenticado
-          if (normalizedPath !== "/login") {
+          if (normalizedPath !== "/login" && normalizedPath !== "/login-externo") {
             if (!sessionExpiredNotifiedRef.current) {
               sessionExpiredNotifiedRef.current = true;
               toast.info("Sua sessão expirou. Faça login novamente.");
@@ -159,7 +159,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     ? pathname.slice(0, -1) 
     : pathname;
 
-  if (normalizedPath === "/login") {
+  if (normalizedPath === "/login" || normalizedPath === "/login-externo") {
     return <>{children}</>;
   }
 

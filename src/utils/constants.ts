@@ -12,3 +12,8 @@ export const headers = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
 })
+
+export const headersExterno = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${sessionStorage.getItem("authTokenExterno")}`,
+})
