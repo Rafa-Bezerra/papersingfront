@@ -633,6 +633,22 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="externo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Doc. Externo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}

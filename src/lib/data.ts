@@ -30,6 +30,7 @@ export const data = {
         { title: "Gestão de Pessoas", url: "/gestao-pessoas" },
         { title: "Pagamentos G. Pessoas", url: "/pagamentos-rh" },
         { title: "Pagamentos Impostos", url: "/pagamentos-impostos" },
+        { title: "Documentos Externos", url: "/documentos-externos" },
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Aprovadores Restritos", url: "/restritoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
