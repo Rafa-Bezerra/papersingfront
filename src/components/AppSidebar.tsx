@@ -11,7 +11,6 @@ import {
   SidebarMenuButton
 } from '@/components/ui/sidebar'
 import { NavSection } from '@/lib/data'
-import { getDashboardStats } from '@/services/dashboardService'
 import { Button } from '@/components/ui/button'
 import {
   Home,
@@ -58,7 +57,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
   const [userRestrito, setUserRestrito] = useState(false)
   const [userRdv, setUserRdv] = useState(false)
-  const [pendentesCi, setPendentesCi] = useState(0)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -92,10 +90,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         console.error('Erro ao carregar dados do usuário:', error);
       }
     }
-  }, []);
-
-  useEffect(() => {
-    getDashboardStats().then((stats) => setPendentesCi(stats.pendentes_ci ?? 0)).catch(() => {});
   }, []);
 
   // Função para lidar com cliques duplos
@@ -244,7 +238,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       if (configItems.some(c => c.url === item.url)) return null
                       if (!userAdmin) {
                         if (item.url === "/documentos" && !userDocumentos) return null;
-                        if (item.url === "/comunicados" && !userComunicados && pendentesCi <= 0) return null;
+                        if (item.url === "/comunicados" && !userComunicados) return null;
                         if (item.url === "/bordero" && !userBordero) return null;
                         if (item.url === "/aprovacaordv" && !userRdv) return null;
                         if (item.url === "/gestao-pessoas" && !userRestrito) return null;

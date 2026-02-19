@@ -95,6 +95,7 @@ export default function Page() {
     const [deleteComunicadoId, setDeleteComunicadoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const [anexoParaAssinatura, setAnexoParaAssinatura] = useState<string>("")
     const carregou = useRef(false)
     const pdfStyle = pdfViewport
         ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
@@ -241,7 +242,7 @@ export default function Page() {
         try {
             const arquivo = await getAnexo(requisicao.id);
             console.log(arquivo);
-            
+            setAnexoParaAssinatura(arquivo);
             setIsLoading(true)
             setIsModalComunicadosOpen(true)
             setRequisicaoSelecionada(requisicao)
@@ -290,7 +291,7 @@ export default function Page() {
         try {
             const dadosAssinatura: ComunicadoAssinar = {
                 id: requisicaoSelecionada!.id,
-                anexo: requisicaoSelecionada!.anexo,
+                anexo: anexoParaAssinatura!,
                 pagina: currentPage,
                 posX: coords.x,
                 posY: coords.yI,
@@ -367,11 +368,11 @@ export default function Page() {
     async function submitComunicado(data: Comunicado) {
         setIsLoading(true)
         const html = gerarTemplateHTML(data);
-        const newWindow = window.open("", "_blank");
-        if (newWindow) {
-            newWindow.document.write(html);
-            newWindow.document.close();
-        }
+        // const newWindow = window.open("", "_blank");
+        // if (newWindow) {
+        //     newWindow.document.write(html);
+        //     newWindow.document.close();
+        // }
         const base64pdf = await htmlToPdfBase64(html);
         data.anexo = base64pdf;
         setError(null)
