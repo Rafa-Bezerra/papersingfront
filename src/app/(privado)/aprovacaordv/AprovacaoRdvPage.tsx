@@ -13,7 +13,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, Loader2, ZoomIn, ZoomOut, Search } from "lucide-react";
+import { Check, Filter, Loader2, ZoomIn, ZoomOut, Search, RefreshCwIcon } from "lucide-react";
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -29,9 +29,14 @@ import {
     DropdownMenuRadioItem,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Label } from '@radix-ui/react-label';
+import { Input } from '@/components/ui/input';
+import { getAnexoByIdmov } from '@/services/requisicoesService';
 
 export default function Page() {
     const titulo = 'Aprovação de RDV';
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [userCodusuario, setCodusuario] = useState("");
@@ -110,18 +115,31 @@ export default function Page() {
         }
     }, [])
 
+    {/** Set Datas */ }
     useEffect(() => {
-        buscaAprovacoesRdv();
-        console.log("situacaoFiltrada: " + situacaoFiltrada);
-        console.log("userCodusuario: " + userCodusuario);
+        const hoje = new Date().toISOString().substring(0, 10)
+        const quinzeDiasAtras = new Date(
+            new Date().setDate(new Date().getDate() - 15)
+        ).toISOString().substring(0, 10)
 
-    }, [situacaoFiltrada, userCodusuario])
+        setDateFrom(quinzeDiasAtras)
+        setDateTo(hoje)
+    }, [])
+
+    useEffect(() => {
+        if (!dateFrom || !dateTo || !userCodusuario) return
+        buscaAprovacoesRdv();
+    }, [situacaoFiltrada, userCodusuario, dateFrom, dateTo])
+
+    async function handleRefresh() {
+        buscaAprovacoesRdv();
+    }
 
     async function buscaAprovacoesRdv() {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAprovacoesRdv(situacaoFiltrada)
+            const dados = await getAprovacoesRdv(situacaoFiltrada, dateFrom, dateTo)
             setResults(dados)
         } catch (err) {
             setError((err as Error).message)
@@ -224,6 +242,9 @@ export default function Page() {
     }
 
     async function handleDocumento(aprovacao: Rdv) {
+        console.log(aprovacao);
+        
+        if (!aprovacao.idmov || !aprovacao.codigo_atendimento) return;
         setIsLoading(true)
         setCurrentPageDocumento(1);
         setTotalPagesDocumento(null);
@@ -232,14 +253,18 @@ export default function Page() {
         setPreviewCoords(null);
         setIsPreviewLocked(false);
         setPdfViewportDocumento(null);
+
+        const data = await getAnexoByIdmov(aprovacao.idmov, aprovacao.codigo_atendimento);
+        const arquivoBase64 = data.arquivo;
+
         const anexo: AnexoRdv = {
-            anexo: aprovacao.arquivo!,
+            anexo: arquivoBase64,
             nome: `Documento RDV n° ${aprovacao.id}`
         };
         setDocumentoSelecionado(anexo);
         setSelectedResult(aprovacao);
         try {
-            const pdfClean = aprovacao.arquivo!.replace(/^data:.*;base64,/, '').trim();
+            const pdfClean = arquivoBase64.replace(/^data:.*;base64,/, '').trim();
             setTimeout(() => {
                 iframeDocumentoRef.current?.contentWindow?.postMessage(
                     { pdfBase64: pdfClean },
@@ -348,9 +373,6 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
-                    console.log(row.original.aprovadores);
-                    console.log(userCodusuario);
-                    console.log("usuarioAprovador: " + usuarioAprovador);
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
@@ -360,10 +382,14 @@ export default function Page() {
                     const assinouOuSemArquivo = !row.original.arquivo || row.original.arquivo_assinado === true;
                     const podeAprovar = usuarioAprovador && status_liberado && !usuarioAprovou && assinouOuSemArquivo;
                     // const podeAprovar = true;
-
+                    const temDocumento = 
+                        row.original.codigo_atendimento !== null 
+                        && row.original.codigo_atendimento !== 0
+                        && row.original.idmov !== null
+                        && row.original.idmov !== 0;
                     return (
                         <div className="flex gap-2">
-                            {row.original.arquivo && (
+                            {temDocumento && (
                                 <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
                                     Documento {row.original.arquivo_assinado! == true && (
                                         <Check className="w-4 h-4 text-green-500" />
@@ -405,7 +431,6 @@ export default function Page() {
         [userCodusuario]
     )
 
-    // Itens RDV: Valor unit. (API), Total = qtd * valor; backend retorna I.DESCRICAO e quantidade=1
     const colunasItens = useMemo<ColumnDef<ItemRdv>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
@@ -455,17 +480,40 @@ export default function Page() {
 
     return (
         <div className="p-6">
-            {/* Main */}
+            {/* Filtros */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex justify-end items-end gap-4">
+                        {/* Data de */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateFrom">Data de</Label>
+                            <Input
+                                id="dateFrom"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+
+                        {/* Data até */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="dateTo">Data até</Label>
+                            <Input
+                                id="dateTo"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
                         {/* Botão de Filtros - Dropdown com checkboxes */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline">
                                     <Filter className="h-4 w-4 mr-2" />
-                                    <span className="hidden sm:inline">Filtros</span>
+                                    <span className="hidden sm:inline">Status</span>
                                 </Button>
                             </DropdownMenuTrigger>
 
@@ -479,10 +527,15 @@ export default function Page() {
                                 </DropdownMenuRadioGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        <Button onClick={handleRefresh} className="flex items-center">
+                            <RefreshCwIcon className="mr-1 h-4 w-4" /> Atualizar
+                        </Button>
                     </div>
                 </CardHeader>
             </Card>
 
+            {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     {userCodusuario && (

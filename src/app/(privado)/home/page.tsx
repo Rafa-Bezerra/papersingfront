@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, CheckCircle, CheckSquare, Bell, CalendarCheck, CalendarClock, Star, Users, XCircle, Zap, Package, Receipt, PenLine, ChevronRight } from 'lucide-react';
+import { FileText, CheckCircle, CheckSquare, Package, Receipt, PenLine } from 'lucide-react';
 import { DashboardCard } from '@/components/DashboardCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,15 @@ export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [userAdmin, setUserAdmin] = useState(false)
+  const [userDocumentos, setUserDocumentos] = useState(false)
+  const [userBordero, setUserBordero] = useState(false)
+  const [userExterno, setUserExterno] = useState(false)
+  const [userComunicados, setUserComunicados] = useState(false)
+  const [userFiscal, setUserFiscal] = useState(false)
+  const [userPagamentoRh, setPagamentoRh] = useState(false)
+  const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
+  const [userRestrito, setUserRestrito] = useState(false)
+  const [userRdv, setUserRdv] = useState(false)
 
   useEffect(() => {
     const storedUser = sessionStorage.getItem("userData");
@@ -20,6 +29,15 @@ export default function HomePage() {
       try {
         const user = JSON.parse(storedUser);
         setUserAdmin(user.admin);
+        setUserDocumentos(user.documentos);
+        setUserRestrito(user.restrito);
+        setUserBordero(user.bordero);
+        setUserExterno(user.externo);
+        setUserComunicados(user.comunicados);
+        setUserFiscal(user.fiscal);
+        setPagamentoRh(user.pagamento_rh);
+        setPagamentoImpostos(user.pagamento_impostos);
+        setUserRdv(user.rdv);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }
@@ -31,7 +49,7 @@ export default function HomePage() {
       try {
         const data = await getDashboardStats();
         console.log(data);
-        
+
         setStats(data);
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
@@ -78,7 +96,7 @@ export default function HomePage() {
       </header>
 
       {/* Seção Pendentes do Gestor - em destaque */}
-      <section className="space-y-4">
+      {stats && (<section className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
           <p className="text-xs text-muted-foreground">
@@ -87,158 +105,87 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <DashboardCard
-            title="Pendentes Movimentos"
-            count={stats?.pendentes_movimentos ?? stats?.pendentes ?? 0}
+            title="Movimentos"
+            count={stats.quantidade_movimentos}
             icon={Package}
             color="red"
             description="Movimentações em andamento"
             href="/geral?status=pendentes"
           />
-          <DashboardCard
-            title="Pendentes C.I."
-            count={stats?.pendentes_ci ?? 0}
+          {(userRestrito || userAdmin) && (<DashboardCard
+            title="Gestão de Pessoas"
+            count={stats.quantidade_restritos}
+            icon={PenLine}
+            color="purple"
+            description="Movimentos restritos"
+            href="/gestao-pessoas?filtro=pendentes"
+          />)}
+          {(userPagamentoRh || userAdmin) && (<DashboardCard
+            title="Pag. RH"
+            count={stats.quantidade_pagamentos_rh}
+            icon={PenLine}
+            color="purple"
+            description="Pagamentos RH"
+            href="/pagamentos-rh?filtro=pendentes"
+          />)}
+          {(userPagamentoImpostos || userAdmin) && (<DashboardCard
+            title="Pag. Impostos"
+            count={stats.quantidade_pagamentos_impostos}
+            icon={PenLine}
+            color="purple"
+            description="Pagamentos Impostos"
+            href="/pagamentos-impostos?filtro=pendentes"
+          />)}
+          {(userBordero || userAdmin) && (<DashboardCard
+            title="Borderô"
+            count={stats.quantidade_bordero}
+            icon={PenLine}
+            color="purple"
+            description="Autorização de Borderôs"
+            href="/bordero?filtro=pendentes"
+          />)}
+          {(userComunicados || userAdmin) && (<DashboardCard
+            title="C.I."
+            count={stats.quantidade_comunicados}
             icon={Receipt}
             color="yellow"
             description="Pagamentos CI"
             href="/comunicados"
-          />
-          <DashboardCard
-            title="Pendentes Documentos"
-            count={stats?.pendentes_documentos ?? 0}
-            icon={FileText}
-            color="blue"
-            description="Documentos para assinatura"
-            href="/documentos"
-          />
-          <DashboardCard
-            title="Pendentes RDV"
-            count={stats?.pendentes_rdv ?? 0}
+          />)}
+          {(userRdv || userAdmin) && (<DashboardCard
+            title="RDV"
+            count={stats.quantidade_rdv}
             icon={PenLine}
             color="purple"
             description="Assinatura de RDVs"
             href="/aprovacaordv"
-          />
+          />)}
+          {(userFiscal || userAdmin) && (<DashboardCard
+            title="Fiscal"
+            count={stats.quantidade_fiscal}
+            icon={PenLine}
+            color="purple"
+            description="Assinatura de Fiscal"
+            href="/fiscal"
+          />)}
+          {(userExterno || userAdmin) && (<DashboardCard
+            title="RDV"
+            count={stats.quantidade_externo}
+            icon={PenLine}
+            color="purple"
+            description="Assinatura de Externos"
+            href="/documentos-externos"
+          />)}
+          {(userDocumentos || userAdmin) && (<DashboardCard
+            title="Pendentes Documentos"
+            count={stats.quantidade_documentos}
+            icon={FileText}
+            color="blue"
+            description="Documentos para assinatura"
+            href="/documentos"
+          />)}
         </div>
-      </section>
-
-      {/* Cards de Estatísticas - Status dos Processos */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-1">Status dos Processos</h2>
-          <p className="text-xs text-muted-foreground">
-            Visão geral de todos os status
-          </p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-        <DashboardCard
-          title="Documentos"
-          count={stats?.documentos || 0}
-          icon={FileText}
-          color="blue"
-          description="Total de documentos"
-          href="/geral?status=todos"
-        />
-
-        <DashboardCard
-          title="Concluído a responder"
-          count={stats?.concluido_a_responder || 0}
-          icon={FileText}
-          color="green"
-          description="Aguardando resposta"
-          href="/geral?status=concluido_a_responder"
-        />
-
-        <DashboardCard
-          title="Concluído respondido"
-          count={stats?.concluido_respondido || 0}
-          icon={CheckCircle}
-          color="purple"
-          description="Respondidos"
-          href="/geral?status=concluido_respondido"
-        />
-
-        <DashboardCard
-          title="Concluído confirmado"
-          count={stats?.concluido_confirmado || 0}
-          icon={CheckSquare}
-          color="blue"
-          description="Confirmados"
-          href="/geral?status=concluido_confirmado"
-        />
-
-        <DashboardCard
-          title="Concluído automático"
-          count={stats?.concluido_automatico || 0}
-          icon={Zap}
-          color="yellow"
-          description="Finalizado pelo sistema"
-          href="/geral?status=concluido_automatico"
-        />
-
-        <DashboardCard
-          title="Avaliado"
-          count={stats?.avaliado || 0}
-          icon={Star}
-          color="yellow"
-          description="Processos avaliados"
-          href="/geral?status=avaliado"
-        />
-
-        <DashboardCard
-          title="Agendado a responder"
-          count={stats?.agendado_a_responder || 0}
-          icon={CalendarClock}
-          color="purple"
-          description="Resposta agendada"
-          href="/geral?status=agendado_a_responder"
-        />
-
-        <DashboardCard
-          title="Agendado respondido"
-          count={stats?.agendado_respondido || 0}
-          icon={CalendarCheck}
-          color="blue"
-          description="Agendados respondidos"
-          href="/geral?status=agendado_respondido"
-        />
-
-        <DashboardCard
-          title="Aguardando terceiros"
-          count={stats?.aguardando_terceiros || 0}
-          icon={Users}
-          color="yellow"
-          description="Dependência externa"
-          href="/geral?status=aguardando_terceiros"
-        />
-
-        <DashboardCard
-          title="Cancelado"
-          count={stats?.cancelado || 0}
-          icon={XCircle}
-          color="red"
-          description="Processos cancelados"
-          href="/geral?status=cancelado"
-        />
-
-        <DashboardCard
-          title="Em andamento"
-          count={stats?.em_andamento || 0}
-          icon={Bell}
-          color="purple"
-          description="Em andamento"
-          href="/geral?status=em_andamento"
-        />
-
-        {/* <DashboardCard
-          title="Despertado"
-          count={stats?.despertado || 0}
-          icon={Bell}
-          color="purple"
-          description="Processos despertados"
-          href="/geral?status=despertado"
-        /> */}
-        </div>
-      </section>
+      </section>)}
 
       {/* Cards de Acesso Rápido */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${userAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 sm:gap-6`} >
@@ -265,23 +212,23 @@ export default function HomePage() {
 
         <Link href="/requisicoes/">
           <Card className="cursor-pointer hover:shadow-md transition-shadow w-full h-full">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Recebimentos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">Ver</div>
-                <p className="text-xs text-muted-foreground">
-                  Gerenciar recebimentos
-                </p>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Recebimentos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xl sm:text-2xl font-bold">Ver</div>
+                  <p className="text-xs text-muted-foreground">
+                    Gerenciar recebimentos
+                  </p>
+                </div>
+                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
-              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         </Link>
 
         {/* <Card 
@@ -331,99 +278,35 @@ export default function HomePage() {
       </div>
 
       {/* Resumo de Atividades */}
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Resumo de Atividades</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">Clique em um item para ver os detalhes</p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 sm:space-y-3">
-            <Link
-              href="/geral/?status=concluido_confirmado"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-medium">Documentos aprovados hoje</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.aprovados_hoje || 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
+      {stats && stats.movimentos?.length > 0 && (
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">
+              Resumo de Atividades
+            </CardTitle>
+          </CardHeader>
 
-            <Link
-              href="/geral/?status=pendentes"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-sm font-medium">Pendentes movimentos</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.pendentes_movimentos ?? stats?.pendentes ?? 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
+          <CardContent>
+            <div className="space-y-2 sm:space-y-3">
+              {stats.movimentos.map((mov, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
+                  <span className="text-sm font-medium">
+                    {mov.status_movimento}
+                  </span>
 
-            <Link
-              href="/comunicados/"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm font-medium">Pendentes C.I.</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.pendentes_ci ?? 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
+                  <span className="text-sm text-muted-foreground">
+                    {mov.quantidade ?? 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-            <Link
-              href="/documentos/"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm font-medium">Pendentes documentos</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.pendentes_documentos ?? 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
-
-            <Link
-              href="/aprovacaordv/"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span className="text-sm font-medium">Pendentes RDV</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.pendentes_rdv ?? 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
-
-            <Link
-              href="/geral/?status=todos"
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-slate-500 rounded-full"></div>
-                <span className="text-sm font-medium">Total de documentos</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{stats?.documentos || 0}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

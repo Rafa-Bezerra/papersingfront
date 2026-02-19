@@ -1,26 +1,6 @@
+import { DashboardStats } from "@/types/Dashboard";
 import { API_BASE, headers } from "@/utils/constants";
 
-export interface DashboardStats {
-  documentos: number;
-  aprovados: number;
-  pendentes: number;
-  pendentes_movimentos?: number;
-  pendentes_ci?: number;
-  pendentes_documentos?: number;
-  pendentes_rdv?: number;
-  aprovados_hoje: number;
-  em_andamento: number;
-  concluido_a_responder: number;
-  concluido_respondido: number;
-  concluido_confirmado: number;
-  concluido_automatico: number;
-  avaliado: number;
-  agendado_a_responder: number;
-  agendado_respondido: number;
-  aguardando_terceiros: number;
-  cancelado: number;
-  despertado: number;
-}
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const res = await fetch(`${API_BASE}/api/Dashboard/stats`, { headers: headers(), });
@@ -32,3 +12,5 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   return await res.json();
 }
+
+export type { DashboardStats }

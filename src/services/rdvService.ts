@@ -29,10 +29,10 @@ export async function getUltimosRdvs(): Promise<Rdv[]> {
     return list;
 }
 
-export async function getAprovacoesRdv(situacao: string): Promise<Rdv[]> {
+export async function getAprovacoesRdv(situacao: string, dateFrom: string, dateTo: string): Promise<Rdv[]> {
     const url = new URL(`${API_BASE}/api/${caminho}/aprovacoes`);
 
-    const body = { situacao };
+    const body = { situacao, dateFrom, dateTo };
 
     const res = await fetch(url.toString(), {
         method: 'POST',
