@@ -340,28 +340,31 @@ export default function Page() {
             });
 
             const fitradosStatus = filtrados.filter(d => {
-                const nivelUsuario = d.requisicao_aprovacoes.find(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                )?.nivel ?? 1;
-                const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
-                const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
-                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
-                const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+                if (userAdmin == false) {
+                    const nivelUsuario = d.requisicao_aprovacoes.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    )?.nivel ?? 1;
+                    const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+                    const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
+                    const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
-                switch (filtroDashboard) {
-                    case "Aprovados":
-                        return d.requisicao_aprovacoes.some(a =>
-                            stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
-                            a.situacao === "A"
-                        );
+                    switch (filtroDashboard) {
+                        case "Aprovados":
+                            return d.requisicao_aprovacoes.some(a =>
+                                stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
+                                a.situacao === "A"
+                            );
 
-                    case "Pendentes":
-                        return d.requisicao_aprovacoes.some(a => stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado && a.situacao === "P" && podeAprovar);
-                    default:
-                        return true;
-                };
+                        case "Pendentes":
+                            return d.requisicao_aprovacoes.some(a => stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado && a.situacao === "P" && podeAprovar);
+                        default:
+                            return true;
+                    };
+                } else {
+                    return true
+                }
             });
-
             setResults(fitradosStatus);
         } catch (err) {
             const msg = (err as Error).message;

@@ -76,6 +76,7 @@ export async function assinar(data: AssinarRdv): Promise<void> {
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
     }
 }
+
 export async function getAnexoById(id: number): Promise<AnexoRdv> {
     const res = await fetch(`${API_BASE}/api/${caminho}/anexo/${id}`, { headers: headers(), });
     if (!res.ok) {
