@@ -876,7 +876,7 @@ export default function Page() {
                 )
             }
         ],
-        [userName]
+        [userCodusuario]
     )
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {

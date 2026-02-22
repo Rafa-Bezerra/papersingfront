@@ -744,29 +744,32 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {
                 id: 'actions',
                 header: 'Ações',
-                cell: ({ row }) => (
-                    <div className="flex gap-2">
-                        {row.original.anexo && (<Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleVisualizarAnexo(row.original)}
-                        >
-                            Visualizar {row.original.documento_assinado == 1 && (
-                                <Check className="w-4 h-4 text-green-500" />
-                            )}
-                        </Button>)}
-                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setDeleteAnexoId(row.original.id)}
-                        >
-                            Excluir
-                        </Button>)}
-                    </div>
-                )
+                cell: ({ row }) => {
+                    console.log(row.original.id+': '+row.original.usuario_criacao+' <> '+userCodusuario);
+                    return (
+                        <div className="flex gap-2">
+                            {row.original.anexo && (<Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleVisualizarAnexo(row.original)}
+                            >
+                                Visualizar {row.original.documento_assinado == 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>)}
+                            {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setDeleteAnexoId(row.original.id)}
+                            >
+                                Excluir
+                            </Button>)}
+                        </div>
+                    )
+                }
             }
         ],
-        []
+        [userCodusuario]
     )
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {
