@@ -996,13 +996,13 @@ export default function Page() {
                                                                         {usuarios.map((u) => (
                                                                             <CommandItem
                                                                                 key={u.codusuario}
-                                                                                value={u.codusuario}
+                                                                                value={`${u.codusuario} - ${u.nome}`}
                                                                                 onSelect={() => {
                                                                                     field.onChange(u.codusuario);
                                                                                     setOpenUsuarioSearch(false);
                                                                                 }}
                                                                             >
-                                                                                {u.nome}
+                                                                                {`${u.codusuario} - ${u.nome}`}
                                                                             </CommandItem>
                                                                         ))}
                                                                     </CommandGroup>

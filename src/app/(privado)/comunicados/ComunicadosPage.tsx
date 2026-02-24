@@ -948,14 +948,14 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
                                                                 {usuarios.map((u) => (
                                                                     <CommandItem
                                                                         key={u.codusuario}
-                                                                        value={u.codusuario}
+                                                                        value={`${u.codusuario} - ${u.nome}`}
                                                                         onSelect={() => {
                                                                             field.onChange(u.codusuario)
                                                                             form.setValue(`aprovadores.${index}.nome`, u.nome);
                                                                             setOpenIndex(null)
                                                                         }}
                                                                     >
-                                                                        {u.nome}
+                                                                        {`${u.codusuario} - ${u.nome}`}
                                                                     </CommandItem>
                                                                 ))}
                                                             </CommandGroup>
