@@ -218,7 +218,7 @@ export default function Page() {
                 const usuarioAprovador = d.aprovadores.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
-                return matchQuery && matchSituacao && usuarioAprovador
+                return matchQuery && matchSituacao && (usuarioAprovador || d.usuario_criacao == userCodusuario)
             })
 
             setResults(filtrados)
