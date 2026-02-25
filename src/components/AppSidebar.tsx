@@ -85,7 +85,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setPagamentoRh(user.pagamento_rh);
         setPagamentoImpostos(user.pagamento_impostos);
         setUserRdv(user.rdv);
-        // setUserSolicitante(user.solicitante);
+        // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }

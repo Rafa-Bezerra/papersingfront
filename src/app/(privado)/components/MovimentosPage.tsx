@@ -77,6 +77,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
+    const [userAdministrativo, setUserAdministrativo] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
@@ -198,6 +199,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
+            setUserAdministrativo(user.administrativo);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
         }
@@ -255,7 +257,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
 
-                if (userAdmin) { usuarioAprovador = true; }
+                if (userAdmin || userAdministrativo) { usuarioAprovador = true; }
                 return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento
             })
             setResults(filtrados)
