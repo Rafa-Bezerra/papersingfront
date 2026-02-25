@@ -73,6 +73,7 @@ export default function Page() {
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
+    const [userAdministrativo, setUserAdministrativo] = useState(false);
     const [filtroDashboard, setFiltroDashboard] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
@@ -193,7 +194,8 @@ export default function Page() {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);
+            setUserAdmin(user.admin);            
+            setUserAdministrativo(user.administrativo);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
         }
@@ -332,7 +334,7 @@ export default function Page() {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? "").includes(qNorm);
                 const matchSituacao = !situacaoFiltrada || d.requisicao.status_movimento === situacaoFiltrada;
-                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const usuarioAprovador = userAdmin || userAdministrativo || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 

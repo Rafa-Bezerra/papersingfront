@@ -17,7 +17,10 @@ export type Pagamento = {
     valor_original: number,
     pode_aprovar: boolean,
     pode_reprovar: boolean,
+    possui_documento: boolean,
+    documento_assinado: boolean,
     status_aprovacao: string,
+    caminho_anexo: string,
 }
 export type PagamentoAprovador = {
     id: number,
@@ -44,4 +47,24 @@ export type PagamentoAprovar = {
     aprovar?: boolean,
     usuario?: string,
     nome?: string,
+}
+export type PagamentoGerarDocumento = {
+    idlan: number,
+    grupo: string,
+    arquivo: string
+}
+export type PagamentoGetDocumento = {
+    idlan: number,
+    grupo: string
+}
+export type PagamentoAssinarDocumento = {
+    idlan: number
+    grupo: string
+    arquivo: string
+    caminho: string
+    pagina: number
+    posX: number
+    posY: number
+    largura: number
+    altura: number
 }

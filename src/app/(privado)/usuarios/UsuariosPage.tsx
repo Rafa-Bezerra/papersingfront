@@ -553,22 +553,6 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
-                {/* <FormField
-                  control={form.control}
-                  name="solicitante"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Solicitante</FormLabel>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                /> */}
                 <FormField
                   control={form.control}
                   name="restrito"
@@ -639,6 +623,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Doc. Externo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="administrativo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Administrativo</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}
