@@ -34,6 +34,7 @@ import {
     Requisicao_aprovacao,
     Requisicao_item,
     aprovar,
+    reprovar,
     getAll as getAllRequisicoes,
     getAnexoByIdmov,
     Requisicao_avaliacoes,
@@ -915,15 +916,24 @@ export default function Page() {
         }
     })
 
+    // Ao enviar a avaliação no modal de Reprovar: além de gravar o texto (createAvaliacao), passamos a chamar a API reprovar() para que o status seja atualizado no backend e no RM. Antes só salvava a avaliação e o movimento continuava "Em Andamento"; o gestor reprovava várias vezes e nada mudava, e o filtro "Avaliado" ficava vazio.
     async function handleAvaliar(data: Requisicao_avaliacoes) {
+        if (!avaliarRequisicao) return
+        const idmov = avaliarRequisicao.requisicao.idmov
+        const codigoAtendimento = Number(avaliarRequisicao.requisicao.codigo_atendimento)
         try {
             await createAvaliacao(data)
+            await reprovar(idmov, codigoAtendimento)
+            setResults(prev => prev.filter(r => r.requisicao.idmov !== idmov))
+            toast.success(`Avaliação enviada e requisição reprovada.`)
+            handleSearch(query)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            toast.success(`Avaliação enviada`)
             form.reset()
-            await handleAvaliacoes(requisicaoSelecionada!)
+            if (requisicaoSelecionada?.requisicao.idmov === idmov) {
+                handleAvaliacoes(requisicaoSelecionada).catch(() => {})
+            }
             setAvaliarRequisicao(null)
         }
     }
