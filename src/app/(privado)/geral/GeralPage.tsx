@@ -337,8 +337,13 @@ export default function Page() {
                 const usuarioAprovador = userAdmin || userAdministrativo || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
-
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento;
+                let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
+                    stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
+                );
+                if (userAdmin || userAdministrativo) {
+                    usuarioAprovou = false;
+                }
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovou;
             });
 
             const fitradosStatus = filtrados.filter(d => {
@@ -758,17 +763,20 @@ export default function Page() {
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
-                    // const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
-                    // );
+                    const usuarioAprovou = requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A')
+                    );
+                    const usuarioReprovou = requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'R')
+                    );
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
                     const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
 
                     // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
-                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioAprovou;
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioReprovou;
 
                     return (
                         <div className="flex gap-2">

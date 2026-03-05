@@ -252,13 +252,18 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
-
+                let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
+                    stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
+                );
                 let usuarioAprovador = d.requisicao_aprovacoes.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
 
-                if (userAdmin || userAdministrativo) { usuarioAprovador = true; }
-                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento
+                if (userAdmin || userAdministrativo) {
+                    usuarioAprovador = true;
+                    usuarioAprovou = false;
+                }
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovou
             })
             setResults(filtrados)
         } catch (err) {
@@ -649,17 +654,20 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
-                    // const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                    //     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
-                    // );
+                    const usuarioAprovou = requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A')
+                    );
+                    const usuarioReprovou = requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'R')
+                    );
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
                     const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
 
                     // const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
                     // const podeReprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado;
-                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
-                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
+                    const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioAprovou;
+                    const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioReprovou;
 
                     return (
                         <div className="flex gap-2">
@@ -747,7 +755,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
-                    console.log(row.original.id+': '+row.original.usuario_criacao+' <> '+userCodusuario);
+                    console.log(row.original.id + ': ' + row.original.usuario_criacao + ' <> ' + userCodusuario);
                     return (
                         <div className="flex gap-2">
                             {row.original.anexo && (<Button
