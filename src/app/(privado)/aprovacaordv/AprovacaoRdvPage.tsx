@@ -356,6 +356,7 @@ export default function Page() {
             altura: 30,
         };
         await handleAssinar(dadosAssinatura);
+        await handleRefresh()
     }
 
     const colunas = useMemo<ColumnDef<Rdv>[]>(
