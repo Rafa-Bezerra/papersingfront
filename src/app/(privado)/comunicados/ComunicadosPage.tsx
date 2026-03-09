@@ -57,12 +57,13 @@ import {
     CommandItem,
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
+import { ComunicadoPagamentos } from '@/types/Comunicado'
 
 export default function Page() {
     const titulo = 'Pagamentos CI'
     const router = useRouter()
     const searchParams = useSearchParams()
-
+    const [logo, setLogo] = useState("/way.jpg");
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
@@ -126,7 +127,12 @@ export default function Page() {
             id: 0,
             anexo: '',
             nome: '',
-            aprovadores: []
+            aprovadores: [],
+            pessoa_destinada: '',
+            cargo: '',
+            cidade_origem: '',
+            concessionaria: '',
+            pagamentos: [],
         }
     })
 
@@ -185,6 +191,26 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
+            switch (user.unidade) {
+                case "WAY 112":
+                    setLogo("/logos/way112.png");
+                    break;
+                case "WAY 153":
+                    setLogo("/logos/way153.png");
+                    break;
+                case "WAY 262":
+                    setLogo("/logos/way262.png");
+                    break;
+                case "WAY 306":
+                    setLogo("/logos/way306.png");
+                    break;
+                case "WAY 364":
+                    setLogo("/logos/way364.png");
+                    break;
+                default:
+                    setLogo("/way.jpg");
+                    break;
+            }
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -367,7 +393,7 @@ export default function Page() {
 
     async function submitComunicado(data: Comunicado) {
         setIsLoading(true)
-        const html = gerarTemplateHTML(data);
+        const html = gerarTemplateHTML(data, logo);
         // const newWindow = window.open("", "_blank");
         // if (newWindow) {
         //     newWindow.document.write(html);
@@ -762,28 +788,66 @@ export default function Page() {
                             />
                             <FormField
                                 control={form.control}
-                                name="anexo"
-                                rules={{ required: 'Anexo é obrigatório' }}
+                                name="cidade_origem"
+                                rules={{ required: 'Cidade de origem destinada é obrigatório' }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Corpo do documento</FormLabel>
+                                        <FormLabel>Cidade de origem</FormLabel>
                                         <FormControl>
-                                            <textarea
-                                                {...field}
-                                                className="w-full h-60 p-2 border rounded-md resize-none"
-                                                placeholder="Digite o conteúdo do documento aqui..."
-                                            />
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="pessoa_destinada"
+                                rules={{ required: 'Pessoa destinada é obrigatório' }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Pessoa destinada</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="cargo"
+                                rules={{ required: 'Cargo é obrigatório' }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cargo</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="concessionaria"
+                                rules={{ required: 'Concessionária é obrigatório' }}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Concessionária de origem</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
+                            <PagamentosComunicadosSection form={form} />
+
                             <AprovadoresComunicadosSection form={form} usuarios={usuarios} />
 
-                            <Button type="submit" disabled={isLoading}>
-                                {isLoading ? 'Salvando…' : 'Salvar'}
-                            </Button>
+                            <Button type="submit" disabled={isLoading}>{isLoading ? 'Salvando…' : 'Salvar'}</Button>
                         </form>
                     </Form>
                 </DialogContent>
@@ -994,76 +1058,272 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     );
 }
 
-export function gerarTemplateHTML(data: Comunicado): string {
+function PagamentosComunicadosSection({ form }: { form: UseFormReturn<Comunicado> }) {
+    const { control } = form;
+    const { fields, append, remove } = useFieldArray({ control, name: "pagamentos" });
+
+    return (
+        <div className="flex flex-col gap-2 border p-3 rounded-md">
+            <label className="font-semibold">Pagamentos</label>
+
+            {fields.map((field, index) => (
+                <div
+                    key={field.id}
+                    className="grid grid-cols-1 gap-2 items-end border p-2 rounded"
+                >
+                    <FormField
+                        control={form.control}
+                        name={`pagamentos.${index}.sequencia`}
+                        rules={{ required: "Sequência é obrigatório" }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Sequência</FormLabel>
+                                <FormControl>
+                                    <Input {...field} value={index + 1} readOnly />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name={`pagamentos.${index}.descricao`}
+                        rules={{ required: "Descrição é obrigatório" }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Descrição</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name={`pagamentos.${index}.referencia`}
+                        rules={{ required: "Referência é obrigatório" }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Referência</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name={`pagamentos.${index}.valor`}
+                        rules={{ required: "Valor é obrigatório" }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Valor</FormLabel>
+                                <FormControl>
+                                    <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* Remover */}
+                    <Button
+                        type="button"
+                        onClick={() => remove(index)}
+                        variant="destructive"
+                    >
+                        Remover
+                    </Button>
+                </div>
+            ))}
+
+            <Button
+                type="button"
+                variant="secondary"
+                onClick={() => append({
+                    sequencia: 0,
+                    descricao: "",
+                    referencia: "",
+                    valor: 0
+                })}
+            >
+                + Adicionar pagamento
+            </Button>
+        </div>
+    );
+}
+
+export function gerarTemplateHTML(data: Comunicado, logo: string): string {
+
     const aprovadores = data.aprovadores ?? [];
-    const dataAtual = new Date().toLocaleDateString("pt-BR");
+
+    const dataHoje = new Date();
+    const dia = dataHoje.getDate().toString().padStart(2, '0');
+    const mes = dataHoje.toLocaleDateString('pt-BR', { month: 'long' });
+    const ano = dataHoje.getFullYear();
+
+    const dataAtualExtenso = `${dia} de ${mes.charAt(0).toUpperCase() + mes.slice(1)} de ${ano}`;
 
     const primeiroAprovador = aprovadores.length > 0 ? aprovadores[0] : null;
     const demaisAprovadores = aprovadores.slice(1);
 
-    // Função para gerar as assinaturas em colunas de até 3, centralizadas
-    const gerarColunasAssinaturas = (lista: typeof demaisAprovadores) => {
-        let html = '<table style="width: 100%; text-align: center; margin: 40px 0 60px 0;"><tr>';
-        lista.forEach((ap, index) => {
+    const gerarLinhasPagamentos = (lista: ComunicadoPagamentos[]) => {
+        let html = "<ol style='margin-top:10px; padding-left:20px;'>";
+
+        lista.forEach(element => {
             html += `
-                <td style="padding: 20px; width: 33.33%;">
-                    <div style="display: inline-block; border-top: 1px solid #000; margin-top: 5px; font-size: 12px; padding-top: 5px;">
-                        ${ap.nome}
-                    </div>
-                </td>
-            `;
-            if ((index + 1) % 3 === 0 && index !== lista.length - 1) {
-                html += '</tr><tr>';
-            }
+            <li style="margin-bottom:6px;">
+                ${element.descricao}, no valor de <strong>R$ ${element.valor}</strong>
+                referente a ${element.referencia}
+            </li>`;
         });
-        html += '</tr></table>';
+
+        html += "</ol>";
+        return html;
+    }
+
+    const gerarColunasAssinaturas = (lista: typeof demaisAprovadores) => {
+
+        let html = '<table style="width:100%; margin-top:50px; text-align:center;"><tr>';
+
+        lista.forEach((ap, index) => {
+
+            html += `
+            <td style="padding:30px 20px; width:33%;">
+                <div style="border-top:1px solid #000; width:220px; margin:0 auto; padding-top:6px; font-size:12px;">
+                    ${ap.nome}
+                </div>
+            </td>
+            `;
+
+            if ((index + 1) % 3 === 0 && index !== lista.length - 1) {
+                html += "</tr><tr>";
+            }
+
+        });
+
+        html += "</tr></table>";
+
         return html;
     };
 
     return `
-<div style="width: 100%; font-family: Arial, sans-serif; color: #000; background: #fff;">
 
-    <!-- Cabeçalho -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <img src="/way.jpg" style="width: 120px;" />
-        <div style="text-align: center;">
-            <h2 style="margin: 0; font-size: 20px;">SOLICITAÇÃO DE PAGAMENTO</h2>
-            <div style="margin-top: 4px; font-size: 14px;">${dataAtual}</div>
-        </div>
-        <img src="/sgi.jpg" style="width: 120px;" />
-    </div>
+<div style="
+max-width:800px;
+margin:auto;
+padding:40px;
+font-family: Arial, Helvetica, sans-serif;
+font-size:14px;
+line-height:1.6;
+color:#000;
+background:#fff;
+">
 
-    <hr style="margin: 20px 0;" />
+<!-- CABEÇALHO -->
 
-    <!-- Corpo do Documento -->
-    <div style="margin-top: 10px; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">
-        ${data.anexo ?? ""}
-    </div>
+<table style="width:100%; margin-bottom:30px;">
+<tr>
 
-    <hr style="margin: 30px 0;" />
+<td style="width:20%">
+<img src="${logo}" style="width:110px"/>
+</td>
 
-    <span style="display: block; margin-bottom: 80px;">Atenciosamente,</span>
+<td style="text-align:center;">
+<h2 style="margin:0; font-size:20px;">
+SOLICITAÇÃO DE PAGAMENTO
+</h2>
+</td>
 
-    <!-- Demais aprovadores em colunas -->
-    ${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
+<td style="width:20%; text-align:right;">
+<img src="/sgi.jpg" style="width:110px"/>
+</td>
 
-    <span style="display: block; margin-bottom: 80px;">De acordo,</span>
+</tr>
+</table>
 
-    <!-- De acordo alinhado à direita, linha apenas sob o nome -->
-    ${primeiroAprovador
-            ? `
-        <table style="width: 100%; margin-bottom: 60px;">
-            <tr>
-                <td style="text-align: right; padding-right: 20px;">
-                    <div style="display: inline-block; border-top: 1px solid #000; font-size: 12px; padding-top: 5px;">
-                        ${primeiroAprovador.nome}
-                    </div>
-                </td>
-            </tr>
-        </table>
-        `
-            : ""
-        }
+<hr style="margin-bottom:30px">
+
+<!-- DATA -->
+
+<div style="text-align:right; margin-bottom:30px;">
+${data.cidade_origem ?? ""}, ${dataAtualExtenso}
+</div>
+
+<!-- DESTINATÁRIO -->
+
+<div style="margin-bottom:20px">
+
+<div>Ao Senhor (a)</div>
+<strong>${data.pessoa_destinada ?? ""}</strong><br>
+${data.cargo ?? ""}
+
+</div>
+
+<div style="margin-bottom:20px;">
+<strong>Assunto:</strong> ${data.nome ?? ""}
+</div>
+
+<!-- TEXTO -->
+
+<div style="text-align:justify;">
+
+<p>
+A CONCESSIONÁRIA ${data.concessionaria ?? ""}, em atenção à solicitação referenciada acima,
+vem através deste solicitar o seguinte pagamento:
+</p>
+
+${data.pagamentos.length > 0 ? gerarLinhasPagamentos(data.pagamentos) : ""}
+
+<p>
+Sem mais para o momento, a CONCESSIONÁRIA ${data.concessionaria ?? ""}
+permanece à disposição para prestar os esclarecimentos necessários.
+</p>
+
+</div>
+
+<!-- ATENCIOSAMENTE -->
+
+${demaisAprovadores.length > 0 ? `
+<div style="margin-top:40px;">
+Atenciosamente,
+</div>
+` : ""}
+
+${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
+
+<!-- DE ACORDO -->
+
+${primeiroAprovador ? `
+<div style="margin-top:40px;">
+De acordo,
+</div>
+
+<table style="width:100%; margin-top:60px;">
+<tr>
+<td style="text-align:right;">
+
+<div style="
+border-top:1px solid #000;
+width:250px;
+display:inline-block;
+padding-top:6px;
+font-size:12px;
+text-align:center;
+">
+${primeiroAprovador.nome}
+</div>
+
+</td>
+</tr>
+</table>
+` : ""}
+
 </div>
 `;
 }
