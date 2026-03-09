@@ -7,6 +7,18 @@ export type Comunicado = {
     nome: string,
     usuario_criacao: string,
     aprovadores: ComunicadoAprovacao[],
+    pessoa_destinada: string,
+    cargo: string,
+    cidade_origem: string,
+    concessionaria: string,
+    pagamentos: ComunicadoPagamentos[],
+}
+
+export type ComunicadoPagamentos = {
+    sequencia: number,
+    descricao: string,
+    referencia: string,
+    valor: number,
 }
 
 export type ComunicadoAprovacao = {
