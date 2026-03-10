@@ -4,6 +4,7 @@ export type Documento = {
     situacao: string,
     nome: string,
     usuario_criacao: string,
+    usuario_nome: string,
     anexos: DocumentoAnexo[],
     aprovadores: DocumentoAprovacao[],
 }
@@ -23,6 +24,7 @@ export type DocumentoAnexo = {
     nome: string,
     usuario_criacao?: string,
     documento_assinado?: number,
+    documento_principal?: boolean,
 }
 
 export type DocumentoAssinar = {

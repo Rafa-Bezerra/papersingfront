@@ -58,6 +58,9 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover';
 import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
 import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+
 
 export default function Page() {
     const titulo = 'Documentos para Assinatura'
@@ -91,7 +94,7 @@ export default function Page() {
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<DocumentoAnexo | null>(null)
-    /** Base64 do PDF do anexo (vindo de getAnexo). Enviado na assinatura; anexo.anexo é só o caminho. */
+    const [isDocumentoPrincipal, setDocumentoPrincipal] = useState(false)
     const [anexoPdfBase64ParaAssinatura, setAnexoPdfBase64ParaAssinatura] = useState<string | null>(null)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -248,10 +251,9 @@ export default function Page() {
     }
 
     async function handleAnexos(requisicao: Documento) {
-        console.log('requisicao', requisicao);
         setIsModalAnexosOpen(true)
         setRequisicaoSelecionada(requisicao)
-        setSelectedAnexosResult(requisicao.anexos)
+        setSelectedAnexosResult(requisicao.anexos.filter((a) => a.documento_principal != true))
     }
 
     async function handleAprovar(id: number, aprovado: number) {
@@ -294,6 +296,10 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
+            data.aprovadores = [
+                { usuario: userCodusuario, ordem: 1 },
+                ...data.aprovadores.filter(a => a.usuario !== userCodusuario)
+            ]
             data.anexos = anexosSubmit;
             await createElement(data)
         } catch (err) {
@@ -350,9 +356,13 @@ export default function Page() {
         const base64 = await toBase64(file)
         const anexo: DocumentoAnexo = {
             anexo: base64,
-            nome: fileName
+            nome: fileName,
+            documento_principal: isDocumentoPrincipal
         }
         setAnexosSubmit(prev => [...prev, anexo])
+        setFile(null)
+        setFileName("")
+        setDocumentoPrincipal(false)
         setIsLoading(false)
     }
 
@@ -366,7 +376,7 @@ export default function Page() {
             // anexo.anexo é o caminho (ex: /anexos/documentos/xxx); getAnexo retorna o PDF em base64
             const arquivo = await getAnexo(anexo.anexo);
             const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
-            
+
             setIsModalVisualizarAnexoOpen(true)
             setAnexoSelecionado(anexo);
             setAnexoPdfBase64ParaAssinatura(arquivo); // guarda para enviar na assinatura (evita "Base64 do PDF inválido")
@@ -484,8 +494,9 @@ export default function Page() {
     const colunas = useMemo<ColumnDef<Documento>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
-            { accessorKey: 'nome', header: 'Descrição' },
             { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
+            { accessorKey: 'usuario_nome', header: 'Solicitante' },
+            { accessorKey: 'nome', header: 'Descrição' },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'actions',
@@ -511,8 +522,16 @@ export default function Page() {
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
+                    const anexoPrincipal = row.original.anexos?.filter(a => a.documento_principal === true)[0];
+
                     return (
                         <div className="flex gap-2">
+                            {anexoPrincipal && (<Button size="sm" variant="outline" onClick={() => handleVisualizarAnexo(anexoPrincipal)}>
+                                Documento {anexoPrincipal.documento_assinado == 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>)}
+
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
                                 Anexos
                             </Button>
@@ -717,23 +736,37 @@ export default function Page() {
                             <CardTitle>Anexos</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <Input
-                                    type="file"
-                                    accept="application/pdf/*"
-                                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                    className="w-40"
-                                />
-                                <Input
-                                    type="text"
-                                    onChange={(e) => setFileName(e.target.value)}
-                                    className="w-40"
-                                    aria-label='Descrição do anexo'
-                                    placeholder='Descrição do anexo'
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="flex flex-col gap-1">
+                                    <Label>Arquivo</Label>
+                                    <Input
+                                        type="file"
+                                        accept="application/pdf/*"
+                                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                                        className="w-40"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <Label>Descrição do anexo</Label>
+                                    <Input
+                                        type="text"
+                                        value={fileName}
+                                        onChange={(e) => setFileName(e.target.value)}
+                                        className="w-40"
+                                        aria-label='Descrição do anexo'
+                                        placeholder='Descrição do anexo'
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        checked={isDocumentoPrincipal}
+                                        onCheckedChange={(value) => setDocumentoPrincipal(!!value)}
+                                    />
+                                    <Label>Documento principal</Label>
+                                </div>
                                 <Button
                                     onClick={handleSubmitAnexos}
-                                    disabled={!file || isLoading}
+                                    disabled={!file || isLoading || !fileName?.trim()}
                                     className="flex items-center"
                                 >
                                     {isLoading ? "Enviando..." : "Anexar documento"}
@@ -741,7 +774,7 @@ export default function Page() {
                             </div>
                             {anexosSubmit.map((item, i) => (
                                 <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
-                                    <span>{item.nome}</span>
+                                    <span>{item.nome}{item.documento_principal ? ' - Documento principal' : ''}</span>
                                     <div className="flex gap-2 justify-end">
                                         <Button variant="destructive" size="icon" onClick={() => removerAnexo(i)}>
                                             <Trash2 className="w-4 h-4" />
@@ -1032,16 +1065,11 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
     return (
         <div className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
-
             {fields.map((field, index) => (
-                <div
-                    key={field.id}
-                    className="grid grid-cols-3 gap-2 items-end border p-2 rounded"
-                >
+                <div key={field.id} className="grid grid-cols-3 gap-2 items-end border p-2 rounded">
                     {/* Usuário (Select com busca) */}
                     <div className="flex flex-col">
                         <label>Usuário</label>
-
                         <FormField
                             control={form.control}
                             name={`aprovadores.${index}.usuario`}
@@ -1096,7 +1124,6 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                             </PopoverPortal>
                                         </Popover>
                                     </FormControl>
-
                                     <FormMessage />
                                 </FormItem>
                             )}

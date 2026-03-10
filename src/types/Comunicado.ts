@@ -11,7 +11,11 @@ export type Comunicado = {
     cargo: string,
     cidade_origem: string,
     concessionaria: string,
+    codconta: string,
+    ccusto: string,
+    usuario_nome: string,
     pagamentos: ComunicadoPagamentos[],
+    anexos: ComunicadoAnexo[],
 }
 
 export type ComunicadoPagamentos = {
@@ -27,6 +31,7 @@ export type ComunicadoAprovacao = {
     aprovacao?: string,
     usuario: string,
     nome?: string,
+    usuario_nome?: string,
 }
 
 export type ComunicadoAssinar = {
@@ -37,4 +42,11 @@ export type ComunicadoAssinar = {
     posY: number
     largura: number
     altura: number
+}
+
+export type ComunicadoAnexo = {
+    id?: number,
+    anexo: string,
+    nome: string,
+    usuario_criacao?: string
 }
