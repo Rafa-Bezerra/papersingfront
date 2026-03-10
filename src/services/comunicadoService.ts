@@ -78,9 +78,20 @@ export async function aprovar(id: number, aprovado: number): Promise<void> {
     }
 }
 
-export async function getAnexo(id: number): Promise<string> {
+export async function getDocumento(id: number): Promise<string> {
     const body = { id };
     const res = await fetch(`${API_BASE}/api/${caminho}/anexo/${id}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+    }
+    const data = await res.text();
+    return data;
+}
+
+export async function getAnexo(caminho_anexo: string): Promise<string> {
+    const body = { caminho_anexo };
+    const res = await fetch(`${API_BASE}/api/${caminho}/anexo`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);

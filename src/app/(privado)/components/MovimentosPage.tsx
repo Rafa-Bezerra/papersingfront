@@ -1200,7 +1200,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                             />
                             <Button
                                 onClick={handleAnexarDocumento}
-                                disabled={!file || isLoading}
+                                disabled={!file || isLoading || !fileName?.trim()}
                                 className="flex items-center"
                             >
                                 {isLoading ? "Enviando..." : "Anexar documento"}
