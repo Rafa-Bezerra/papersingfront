@@ -249,6 +249,16 @@ export default function Page() {
         rdv.itens = produtosSubmit
         rdv.anexos = anexosSubmit
         rdv.aprovadores = aprovadoresSubmit
+        const usuario_codcfo = fornecedores.find(f => f.codcfo == rdv.codcfo)?.usuario
+        if (usuario_codcfo) {
+            if (!rdv.aprovadores.some(a => a.usuario === usuario_codcfo)) {
+                rdv.aprovadores = [
+                    { usuario: usuario_codcfo },
+                    ...rdv.aprovadores
+                ]
+            }            
+        }
+
         try {
             await createElement(rdv)
             toast.success('RDV enviado com sucesso!')

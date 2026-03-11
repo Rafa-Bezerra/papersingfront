@@ -296,10 +296,12 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            data.aprovadores = [
-                { usuario: userCodusuario, ordem: 1 },
-                ...data.aprovadores.filter(a => a.usuario !== userCodusuario)
-            ]
+            if (!data.aprovadores.some(a => a.usuario === userCodusuario)) {
+                data.aprovadores = [
+                    { usuario: userCodusuario, ordem: 1 },
+                    ...data.aprovadores
+                ];
+            }
             data.anexos = anexosSubmit;
             await createElement(data)
         } catch (err) {
