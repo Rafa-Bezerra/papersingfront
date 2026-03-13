@@ -67,6 +67,8 @@ export default function Page() {
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const [zoomAnexo, setZoomAnexo] = useState(1.5)
     const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
+    const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
     const pdfDocumentoStyle = pdfViewportDocumento
         ? { width: `${pdfViewportDocumento.width}px`, height: `${pdfViewportDocumento.height}px` }
         : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
@@ -191,7 +193,7 @@ export default function Page() {
             setTotalPagesAnexo(null);
             setPdfViewportAnexo(null);
             const pdfClean = data.anexo.replace(/^data:.*;base64,/, '').trim();
-
+            setAnexoParaImpressao(data.anexo);
             setTimeout(() => {
                 iframeAnexoRef.current?.contentWindow?.postMessage(
                     { pdfBase64: pdfClean },
@@ -228,17 +230,9 @@ export default function Page() {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeAnexoRef.current) return;
-
-        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleDocumento(aprovacao: Rdv) {
@@ -256,7 +250,7 @@ export default function Page() {
 
         const data = await getAnexoByIdmov(aprovacao.idmov, aprovacao.codigo_atendimento);
         const arquivoBase64 = data.arquivo;
-
+        setArquivoParaImpressao(arquivoBase64);
         const anexo: AnexoRdv = {
             anexo: arquivoBase64,
             nome: `Documento RDV n° ${aprovacao.id}`
@@ -302,17 +296,9 @@ export default function Page() {
     }
 
     function handleImprimirDocumento() {
-        if (!iframeDocumentoRef.current) return;
-
-        const iframe = iframeDocumentoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleAssinar(data: AssinarRdv) {
@@ -397,14 +383,14 @@ export default function Page() {
                                     )}
                                 </Button>
                             )}
+                            <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
+                                Anexos
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
                                 Itens
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleAprovadores(row.original)}>
                                 Aprovadores
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos
                             </Button>
                             {podeAprovar && (
                                 <Button

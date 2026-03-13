@@ -136,6 +136,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
+    const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -315,6 +317,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const arquivoBase64 = data.arquivo;
             setRequisicaoDocumentoSelecionada(arquivoBase64);
 
+            const pdfClean = arquivoBase64.replace(/^data:.*;base64,/, '').trim();
+            setArquivoParaImpressao(pdfClean);
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
                     { pdfBase64: arquivoBase64 },
@@ -394,17 +398,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
@@ -500,7 +496,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             setIsPreviewAnexoLocked(false);
             setPdfViewportAnexo(null);
             const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
-
+            setAnexoParaImpressao(pdfClean);
             setTimeout(() => {
                 iframeAnexoRef.current?.contentWindow?.postMessage(
                     { pdfBase64: pdfClean },
@@ -599,17 +595,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeAnexoRef.current) return;
-
-        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     const handleDownloadAll = async () => {
@@ -817,7 +805,6 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         }
     })
 
-    // Mesma correção do GeralPage: ao clicar em Avaliar no fluxo de Reprovar, chamar reprovar() para que a reprovação seja aplicada no backend e no RM (antes só gravava o texto da avaliação e o status não mudava).
     async function handleAvaliar(data: Requisicao_avaliacoes) {
         if (!avaliarRequisicao) return
         const idmov = avaliarRequisicao.requisicao.idmov
@@ -833,7 +820,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } finally {
             form.reset()
             if (requisicaoSelecionada?.requisicao.idmov === idmov) {
-                handleAvaliacoes(requisicaoSelecionada).catch(() => {})
+                handleAvaliacoes(requisicaoSelecionada).catch(() => { })
             }
             setAvaliarRequisicao(null)
         }
