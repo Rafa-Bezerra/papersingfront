@@ -412,17 +412,9 @@ export default function Page() {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoPdfBase64ParaAssinatura) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="${anexoPdfBase64ParaAssinatura}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleAssinarAnexo(data: DocumentoAnexoAssinar) {

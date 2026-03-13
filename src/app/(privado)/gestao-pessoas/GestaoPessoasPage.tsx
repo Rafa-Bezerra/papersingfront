@@ -131,6 +131,8 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
+    const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -408,11 +410,12 @@ export default function Page() {
         try {
             const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
             const arquivoBase64 = data.arquivo;
+            const pdfClean = arquivoBase64.replace(/^data:.*;base64,/, '').trim();
             setRequisicaoDocumentoSelecionada(arquivoBase64);
-
+            setArquivoParaImpressao(pdfClean);
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: arquivoBase64 },
+                    { pdfBase64: pdfClean },
                     '*'
                 );
             }, 500);
@@ -489,17 +492,9 @@ export default function Page() {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
@@ -595,6 +590,7 @@ export default function Page() {
         setPdfViewportAnexo(null);
 
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+        setAnexoParaImpressao(pdfClean);
         setTimeout(() => {
             iframeAnexoRef.current?.contentWindow?.postMessage(
                 { pdfBase64: pdfClean },
@@ -689,17 +685,9 @@ export default function Page() {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeAnexoRef.current) return;
-
-        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     const handleDownloadAll = async () => {

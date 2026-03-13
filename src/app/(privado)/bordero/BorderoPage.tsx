@@ -57,6 +57,7 @@ export default function Page() {
     const [itensResults, setItensResults] = useState<BorderoItem[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<Bordero>()
     const [requisicaoAprovacoesSelecionada, setRequisicaoAprovacoesSelecionada] = useState<BorderoAprovacao[]>([])
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
     const [aprovadores, setAprovadores] = useState<BorderoAprovacao[]>([])
     const [searched, setSearched] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -254,6 +255,7 @@ export default function Page() {
         try {
             const data = await getAnexoById(item.id_movimento_ligacao);
             const arquivoBase64 = data.arquivo!.replace(/^data:.*;base64,/, '').trim();
+            setArquivoParaImpressao(data.arquivo);
             setDocumentoItemSelecionado(arquivoBase64);
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
@@ -292,17 +294,9 @@ export default function Page() {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     function changePage(newPage: number) {

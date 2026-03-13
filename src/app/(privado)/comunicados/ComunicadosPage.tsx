@@ -103,6 +103,7 @@ export default function Page() {
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [anexoParaAssinatura, setAnexoParaAssinatura] = useState<string>("")
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
     const carregou = useRef(false)
     const pdfStyle = pdfViewport
         ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
@@ -124,6 +125,7 @@ export default function Page() {
     const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
     const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
+    const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
     const [zoomAnexo, setZoomAnexo] = useState(1.5);
     const pdfAnexoStyle = pdfViewportAnexo
         ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
@@ -337,8 +339,8 @@ export default function Page() {
         setIsLoading(true)
         try {
             const arquivo = await getDocumento(requisicao.id);
-            console.log(arquivo);
-            setAnexoParaAssinatura(arquivo);
+            setArquivoParaImpressao(arquivo);
+            // console.log(arquivo);
             setIsLoading(true)
             setIsModalComunicadosOpen(true)
             setRequisicaoSelecionada(requisicao)
@@ -350,6 +352,7 @@ export default function Page() {
             setIsPreviewLocked(false);
             const arquivoBase64 = arquivo.replace(/^data:.*;base64,/, '').trim();
             setRequisicaoComunicadoSelecionada(arquivoBase64);
+            setAnexoParaAssinatura(arquivoBase64);
 
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
@@ -550,13 +553,13 @@ export default function Page() {
         try {
             const arquivo = await getAnexo(anexo.anexo);
             const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
+            setAnexoParaImpressao(pdfClean);
 
             setIsModalVisualizarAnexoOpen(true)
             setAnexoSelecionado(anexo);
             setCurrentPageAnexo(1);
             setTotalPagesAnexo(null);
             setPdfViewportAnexo(null);
-
             setTimeout(() => {
                 iframeRefAnexo.current?.contentWindow?.postMessage(
                     { pdfBase64: pdfClean },
@@ -579,17 +582,9 @@ export default function Page() {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeRefAnexo.current) return;
-
-        const iframe = iframeRefAnexo.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     function handleZoomInAnexo() {

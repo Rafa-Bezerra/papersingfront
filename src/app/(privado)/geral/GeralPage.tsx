@@ -134,6 +134,8 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
+    const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
+    const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -195,7 +197,7 @@ export default function Page() {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);            
+            setUserAdmin(user.admin);
             setUserAdministrativo(user.administrativo);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
@@ -286,7 +288,6 @@ export default function Page() {
         tipoMovimentoFiltrado
     ]);
 
-    // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível (útil para pendentes em tempo real).
     useEffect(() => {
         if (!searched || !dateFrom || !dateTo) return;
         const interval = 60000; // 60 segundos
@@ -426,6 +427,8 @@ export default function Page() {
             const arquivoBase64 = data.arquivo;
             setRequisicaoDocumentoSelecionada(arquivoBase64);
 
+            const pdfClean = arquivoBase64.replace(/^data:.*;base64,/, '').trim();
+            setArquivoParaImpressao(pdfClean);
             setTimeout(() => {
                 iframeRef.current?.contentWindow?.postMessage(
                     { pdfBase64: arquivoBase64 },
@@ -505,17 +508,9 @@ export default function Page() {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
@@ -613,6 +608,7 @@ export default function Page() {
         setPdfViewportAnexo(null);
 
         const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
+        setAnexoParaImpressao(pdfClean);
         setTimeout(() => {
             iframeAnexoRef.current?.contentWindow?.postMessage(
                 { pdfBase64: pdfClean },
@@ -707,17 +703,9 @@ export default function Page() {
     }
 
     function handleImprimirAnexo() {
-        if (!iframeAnexoRef.current) return;
-
-        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
+        if (!anexoParaImpressao) return;
+        const win = window.open("");
+        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
     }
 
     const handleDownloadAll = async () => {
@@ -924,7 +912,6 @@ export default function Page() {
         }
     })
 
-    // Ao enviar a avaliação no modal de Reprovar: além de gravar o texto (createAvaliacao), passamos a chamar a API reprovar() para que o status seja atualizado no backend e no RM. Antes só salvava a avaliação e o movimento continuava "Em Andamento"; o gestor reprovava várias vezes e nada mudava, e o filtro "Avaliado" ficava vazio.
     async function handleAvaliar(data: Requisicao_avaliacoes) {
         if (!avaliarRequisicao) return
         const idmov = avaliarRequisicao.requisicao.idmov
@@ -940,7 +927,7 @@ export default function Page() {
         } finally {
             form.reset()
             if (requisicaoSelecionada?.requisicao.idmov === idmov) {
-                handleAvaliacoes(requisicaoSelecionada).catch(() => {})
+                handleAvaliacoes(requisicaoSelecionada).catch(() => { })
             }
             setAvaliarRequisicao(null)
         }
@@ -948,6 +935,7 @@ export default function Page() {
 
     return (
         <div className="p-6">
+            {/* Cabeçalho */}
             <Card className="mb-6">
                 {/* Filtros */}
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -1033,18 +1021,18 @@ export default function Page() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => { setSituacaoFiltrada("Em Andamento"); setFiltroDashboard("em_andamento"); } }>Em Andamento</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={() => { setSituacaoFiltrada("Concluído a responder"); setFiltroDashboard("concluido_a_responder"); } }>Concluído a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={() => { setSituacaoFiltrada("Concluído respondido"); setFiltroDashboard("concluido_respondido"); } }>Concluído respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={() => { setSituacaoFiltrada("Concluído confirmado"); setFiltroDashboard("concluido_confirmado"); } }>Concluído confirmado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={() => { setSituacaoFiltrada("Concluído automático(pelo sistema)"); setFiltroDashboard("concluido_automatico"); } }>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={() => { setSituacaoFiltrada("Avaliado"); setFiltroDashboard("avaliado"); } }>Avaliado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={() => { setSituacaoFiltrada("Agendado a responder"); setFiltroDashboard("agendado_a_responder"); } }>Agendado a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={() => { setSituacaoFiltrada("Agendado respondido"); setFiltroDashboard("agendado_respondido"); } }>Agendado respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={() => { setSituacaoFiltrada("Aguardando terceiros"); setFiltroDashboard("aguardando_terceiros"); } }>Aguardando terceiros</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={() => { setSituacaoFiltrada("Cancelado"); setFiltroDashboard("cancelado"); } }>Cancelado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={() => { setSituacaoFiltrada("Despertado"); setFiltroDashboard("despertado"); } }>Despertado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => { setSituacaoFiltrada(""); setFiltroDashboard("todos"); } }>Todos</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => { setSituacaoFiltrada("Em Andamento"); setFiltroDashboard("em_andamento"); }}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={() => { setSituacaoFiltrada("Concluído a responder"); setFiltroDashboard("concluido_a_responder"); }}>Concluído a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={() => { setSituacaoFiltrada("Concluído respondido"); setFiltroDashboard("concluido_respondido"); }}>Concluído respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={() => { setSituacaoFiltrada("Concluído confirmado"); setFiltroDashboard("concluido_confirmado"); }}>Concluído confirmado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={() => { setSituacaoFiltrada("Concluído automático(pelo sistema)"); setFiltroDashboard("concluido_automatico"); }}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={() => { setSituacaoFiltrada("Avaliado"); setFiltroDashboard("avaliado"); }}>Avaliado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={() => { setSituacaoFiltrada("Agendado a responder"); setFiltroDashboard("agendado_a_responder"); }}>Agendado a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={() => { setSituacaoFiltrada("Agendado respondido"); setFiltroDashboard("agendado_respondido"); }}>Agendado respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={() => { setSituacaoFiltrada("Aguardando terceiros"); setFiltroDashboard("aguardando_terceiros"); }}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={() => { setSituacaoFiltrada("Cancelado"); setFiltroDashboard("cancelado"); }}>Cancelado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={() => { setSituacaoFiltrada("Despertado"); setFiltroDashboard("despertado"); }}>Despertado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => { setSituacaoFiltrada(""); setFiltroDashboard("todos"); }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -1081,6 +1069,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
+            {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={loading} />
