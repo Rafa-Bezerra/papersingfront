@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from "@/components/ui/button";
 import { Pagamento, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoGerarDocumento, gerarDocumento, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento } from "@/services/pagamentosService";
-import { dateToIso, htmlToPdfBase64, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
+import { dateToIso, htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
 import { ColumnDef } from "@tanstack/react-table";
 import { useSearchParams } from "next/navigation";
 import { Label } from '@radix-ui/react-label';
@@ -56,6 +56,7 @@ export default function Page({ titulo, grupo }: Props) {
     const [coords, setCoords] = useState<PdfClickCoords | null>(null);
     const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
     const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
+    const [documentoParaImpressao, setDocumentoParaImpressao] = useState<string | null>(null)
     const [isPreviewLocked, setIsPreviewLocked] = useState(false);
     const [zoom, setZoom] = useState(1.5);
     const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
@@ -420,6 +421,8 @@ export default function Page({ titulo, grupo }: Props) {
                 grupo: grupo
             }
             const arquivo = await getDocumento(payload);
+            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
+            setDocumentoParaImpressao(pdfClean);
             setDocumentoParaAssinatura(arquivo);
             setIsLoading(true)
             setIsModalDocumentoOpen(true)
@@ -462,17 +465,10 @@ export default function Page({ titulo, grupo }: Props) {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o Pagamento para impressão.");
-        }
+        if (!documentoParaImpressao) return;
+        let base64 = documentoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {

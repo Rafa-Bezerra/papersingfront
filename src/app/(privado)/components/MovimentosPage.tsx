@@ -33,7 +33,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
+import { dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
 import { getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import {
     RequisicaoDto,
@@ -399,8 +399,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
     function handleImprimir() {
         if (!arquivoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = arquivoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
@@ -596,8 +597,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
     function handleImprimirAnexo() {
         if (!anexoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = anexoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     const handleDownloadAll = async () => {
@@ -744,7 +746,6 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
-                    console.log(row.original.id + ': ' + row.original.usuario_criacao + ' <> ' + userCodusuario);
                     return (
                         <div className="flex gap-2">
                             {row.original.anexo && (<Button

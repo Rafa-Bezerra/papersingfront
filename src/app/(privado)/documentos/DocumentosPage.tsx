@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, assinar, createElement, deleteElement, Documento, DocumentoAprovacao, getAll, getAnexo } from '@/services/documentoService';
@@ -413,8 +413,9 @@ export default function Page() {
 
     function handleImprimirAnexo() {
         if (!anexoPdfBase64ParaAssinatura) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="${anexoPdfBase64ParaAssinatura}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = anexoPdfBase64ParaAssinatura.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleAssinarAnexo(data: DocumentoAnexoAssinar) {

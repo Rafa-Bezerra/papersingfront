@@ -27,7 +27,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -493,8 +493,9 @@ export default function Page() {
 
     function handleImprimir() {
         if (!arquivoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = arquivoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
@@ -686,8 +687,9 @@ export default function Page() {
 
     function handleImprimirAnexo() {
         if (!anexoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = anexoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     const handleDownloadAll = async () => {

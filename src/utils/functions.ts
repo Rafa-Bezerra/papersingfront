@@ -202,28 +202,28 @@ export function toBase64(file: File): Promise<string> {
   })
 }
 export async function uint8ArraytoBase64(file: Uint8Array): Promise<string> {
-    let binary = '';
-    const bytes = new Uint8Array(file);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+  let binary = '';
+  const bytes = new Uint8Array(file);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 export async function htmlToPdfBase64(html: string): Promise<string> {
-    // cria container invisível
-    const div = document.createElement("div");
-    div.style.position = "fixed";
-    div.style.left = "-9999px";
-    div.style.top = "0";
-    div.style.width = "800px"; // largura aproximada A4
-    div.style.background = "#fff";
-    div.style.color = "#000";
-    div.style.fontFamily = "Arial, sans-serif";
+  // cria container invisível
+  const div = document.createElement("div");
+  div.style.position = "fixed";
+  div.style.left = "-9999px";
+  div.style.top = "0";
+  div.style.width = "800px"; // largura aproximada A4
+  div.style.background = "#fff";
+  div.style.color = "#000";
+  div.style.fontFamily = "Arial, sans-serif";
 
-    // força reset para TODAS as cores
-    div.innerHTML = `
+  // força reset para TODAS as cores
+  div.innerHTML = `
         <style>
             * {
                 color: #000 !important;
@@ -234,25 +234,25 @@ export async function htmlToPdfBase64(html: string): Promise<string> {
         ${html}
     `;
 
-    document.body.appendChild(div);
+  document.body.appendChild(div);
 
-    const canvas = await html2canvas(div, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#fff", // garante fundo branco
-    });
+  const canvas = await html2canvas(div, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: "#fff", // garante fundo branco
+  });
 
-    const imgData = canvas.toDataURL("image/png");
+  const imgData = canvas.toDataURL("image/png");
 
-    const pdf = new jsPDF("p", "pt", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+  const pdf = new jsPDF("p", "pt", "a4");
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+  pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
-    document.body.removeChild(div);
+  document.body.removeChild(div);
 
-    return pdf.output("datauristring").split(",")[1]; // base64 puro
+  return pdf.output("datauristring").split(",")[1]; // base64 puro
 }
 
 export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): string {
@@ -303,4 +303,37 @@ export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): 
     '1.2.90': 'Outras movimentações',
   };
   return mapa[tipo_movimento] ?? "Desconhecida";
+}
+
+export function imprimirPdfBase64(base64String: string) {
+  if (!base64String) return;
+
+  let base64 = base64String.trim();
+
+  // remove prefixo dataURL se existir
+  if (base64.startsWith("data:")) {
+    base64 = base64.split(",")[1];
+  }
+
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: "application/pdf" });
+
+  const url = URL.createObjectURL(blob);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = url;
+
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    iframe.contentWindow?.print();
+  };
 }
