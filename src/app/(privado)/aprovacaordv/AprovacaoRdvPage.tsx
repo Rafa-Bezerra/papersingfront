@@ -17,7 +17,7 @@ import { Check, Filter, Loader2, ZoomIn, ZoomOut, Search, RefreshCwIcon } from "
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { safeDateLabel, safeDateLabelAprovacao, stripDiacritics } from '@/utils/functions';
+import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics } from '@/utils/functions';
 import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -231,8 +231,9 @@ export default function Page() {
 
     function handleImprimirAnexo() {
         if (!anexoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = anexoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleDocumento(aprovacao: Rdv) {
@@ -297,8 +298,9 @@ export default function Page() {
 
     function handleImprimirDocumento() {
         if (!arquivoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = arquivoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleAssinar(data: AssinarRdv) {

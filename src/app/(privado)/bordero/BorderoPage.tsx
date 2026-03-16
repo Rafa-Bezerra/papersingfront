@@ -27,7 +27,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
+import { dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
 import { Loader2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
 import {
     aprovar,
@@ -295,8 +295,9 @@ export default function Page() {
 
     function handleImprimir() {
         if (!arquivoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="${arquivoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = arquivoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     function changePage(newPage: number) {

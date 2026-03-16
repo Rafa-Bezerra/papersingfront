@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { htmlToPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -339,7 +339,8 @@ export default function Page() {
         setIsLoading(true)
         try {
             const arquivo = await getDocumento(requisicao.id);
-            setArquivoParaImpressao(arquivo);
+            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
+            setArquivoParaImpressao(pdfClean);
             // console.log(arquivo);
             setIsLoading(true)
             setIsModalComunicadosOpen(true)
@@ -409,17 +410,10 @@ export default function Page() {
     }
 
     function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o Pagamento para impressão.");
-        }
+        if (!arquivoParaImpressao) return;
+        let base64 = arquivoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     async function handleAprovacoes(requisicao: Comunicado) {
@@ -583,8 +577,9 @@ export default function Page() {
 
     function handleImprimirAnexo() {
         if (!anexoParaImpressao) return;
-        const win = window.open("");
-        win?.document.write(`<iframe src="data:application/pdf;base64,${anexoParaImpressao}" style="width:100%;height:100%" onload="this.contentWindow.print()"></iframe>`);
+        let base64 = anexoParaImpressao.trim();
+        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
+        imprimirPdfBase64(base64);
     }
 
     function handleZoomInAnexo() {
