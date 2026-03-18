@@ -828,35 +828,36 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     return (
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
             {/* Cabeçalho */}
             <Card className="mb-6">
                 {/* Filtros */}
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    <div className="flex justify-end items-end gap-4">
-                        {/* Data de */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="dateFrom">Data de</Label>
-                            <Input
-                                id="dateFrom"
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="w-40"
-                            />
-                        </div>
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <CardTitle className="text-xl sm:text-2xl font-bold leading-tight">{titulo}</CardTitle>
+                    <div className="flex flex-wrap justify-start md:justify-end items-end gap-3 w-full md:w-auto">
+                        {/* Datas: no mobile em coluna, em telas maiores lado a lado */}
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <div className="flex flex-col flex-1 sm:flex-initial sm:w-40 min-w-0">
+                                <Label htmlFor="dateFrom">Data de</Label>
+                                <Input
+                                    id="dateFrom"
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    className="w-full min-w-[140px] max-w-[200px] sm:w-40"
+                                />
+                            </div>
 
-                        {/* Data até */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="dateTo">Data até</Label>
-                            <Input
-                                id="dateTo"
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                                className="w-40"
-                            />
+                            <div className="flex flex-col flex-1 sm:flex-initial sm:w-40 min-w-0">
+                                <Label htmlFor="dateTo">Data até</Label>
+                                <Input
+                                    id="dateTo"
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    className="w-full min-w-[140px] max-w-[200px] sm:w-40"
+                                />
+                            </div>
                         </div>
 
                         {/* Tipo de movimento */}
@@ -1040,7 +1041,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Documento */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
@@ -1174,7 +1175,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1219,7 +1220,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Assinatura de anexo */}
             {anexoSelecionado && (
                 <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}`}
