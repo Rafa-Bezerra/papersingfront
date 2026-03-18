@@ -217,7 +217,7 @@ export async function htmlToPdfBase64(html: string): Promise<string> {
   div.style.position = "fixed";
   div.style.left = "-9999px";
   div.style.top = "0";
-  div.style.width = "800px"; // largura aproximada A4
+  div.style.width = "794px"; // largura aproximada A4
   div.style.background = "#fff";
   div.style.color = "#000";
   div.style.fontFamily = "Arial, sans-serif";
@@ -230,12 +230,32 @@ export async function htmlToPdfBase64(html: string): Promise<string> {
                 background-color: #fff !important;
                 border-color: #000 !important;
             }
+
+            .table-bordada {
+                border-collapse: collapse;
+                width: 100%;
+            }
+    
+            .table-bordada td,
+            .table-bordada th {
+                border: 1px solid #000;
+            }
+    
+            .table-sem-borda {
+                border-collapse: collapse;
+                width: 100%;
+            }
+    
+            .table-sem-borda td,
+            .table-sem-borda th {
+                border: none !important;
+            }
         </style>
         ${html}
     `;
 
   document.body.appendChild(div);
-
+  await document.fonts.ready;
   const canvas = await html2canvas(div, {
     scale: 2,
     useCORS: true,
