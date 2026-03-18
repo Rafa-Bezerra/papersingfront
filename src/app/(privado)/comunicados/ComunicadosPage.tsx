@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -57,8 +57,8 @@ import {
     CommandItem,
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
-import { 
-    ComunicadoAnexo, 
+import {
+    ComunicadoAnexo,
     // ComunicadoPagamentos 
 } from '@/types/Comunicado'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService'
@@ -468,14 +468,92 @@ export default function Page() {
         setIsLoading(true)
         const proxId = Math.max(...results.map(x => x.id)) + 1;
         const html = gerarTemplateHTML(data, logo, proxId);
-        // const newWindow = window.open("", "_blank");
-        // if (newWindow) {
-        //     newWindow.document.write(html);
-        //     newWindow.document.close();
-        // }
-        const base64pdf = await htmlToPdfBase64(html);
-        data.anexo = base64pdf;
+
+        const newWindow = window.open("", "_blank");
+
+        if (!newWindow) return;
+
+        newWindow.document.write(`
+            <html>
+            <head>
+            <title>Documento</title>
+            </head>
+            <body>
+            ${html}
+
+            <script>
+                function loadScript(src) {
+                return new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+                }
+
+                (async function () {
+                console.log("iniciando script");
+
+                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
+
+                console.log("html2pdf carregado:", typeof html2pdf);
+
+                const element = document.body;
+
+                const opt = {
+                    margin: 0,
+                    filename: "doc.pdf",
+                    image: { type: "jpeg", quality: 1 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
+                };
+
+                const worker = html2pdf().set(opt).from(element);
+                const blob = await worker.output("blob");
+
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    const base64 = reader.result.split(",")[1];
+
+                    console.log("enviando base64");
+
+                    if (window.opener) {
+                    window.opener.postMessage({ base64 }, "*");
+                    setTimeout(() => {
+                    window.close();
+                    }, 300);
+                    } else {
+                    console.error("window.opener é null");
+                    }
+                };
+
+                reader.readAsDataURL(blob);
+                })();
+            </script>
+            </body>
+            </html>
+        `);
+
+        newWindow.document.close();
+        console.log("resolve");
+
+        const base64Promise = await new Promise<string>((resolve) => {
+            function handler(event: MessageEvent) {
+                console.log("EVENTO RECEBIDO:", event);
+
+                if (event.data?.base64) {
+                    window.removeEventListener("message", handler);
+                    resolve(event.data.base64);
+                }
+            }
+
+            window.addEventListener("message", handler);
+        });
+
+        data.anexo = base64Promise;
         data.anexos = anexosSubmit;
+
         setError(null)
         try {
             await createElement(data)
@@ -1534,327 +1612,16 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     );
 }
 
-// function PagamentosComunicadosSection({ form }: { form: UseFormReturn<Comunicado> }) {
-//     const { control } = form;
-//     const { fields, append, remove } = useFieldArray({ control, name: "pagamentos" });
-
-//     return (
-//         <div className="flex flex-col gap-2 border p-3 rounded-md">
-//             <label className="font-semibold">Pagamentos</label>
-
-//             {fields.map((field, index) => (
-//                 <div
-//                     key={field.id}
-//                     className="grid grid-cols-1 gap-2 items-end border p-2 rounded"
-//                 >
-//                     <FormField
-//                         control={form.control}
-//                         name={`pagamentos.${index}.sequencia`}
-//                         rules={{ required: "Sequência é obrigatório" }}
-//                         render={({ field }) => (
-//                             <FormItem>
-//                                 <FormLabel>Sequência</FormLabel>
-//                                 <FormControl>
-//                                     <Input {...field} value={index + 1} readOnly />
-//                                 </FormControl>
-//                                 <FormMessage />
-//                             </FormItem>
-//                         )}
-//                     />
-
-//                     <FormField
-//                         control={form.control}
-//                         name={`pagamentos.${index}.descricao`}
-//                         rules={{ required: "Descrição é obrigatório" }}
-//                         render={({ field }) => (
-//                             <FormItem>
-//                                 <FormLabel>Descrição</FormLabel>
-//                                 <FormControl>
-//                                     <Input {...field} />
-//                                 </FormControl>
-//                                 <FormMessage />
-//                             </FormItem>
-//                         )}
-//                     />
-
-//                     <FormField
-//                         control={form.control}
-//                         name={`pagamentos.${index}.referencia`}
-//                         rules={{ required: "Referência é obrigatório" }}
-//                         render={({ field }) => (
-//                             <FormItem>
-//                                 <FormLabel>Referência</FormLabel>
-//                                 <FormControl>
-//                                     <Input {...field} />
-//                                 </FormControl>
-//                                 <FormMessage />
-//                             </FormItem>
-//                         )}
-//                     />
-
-//                     <FormField
-//                         control={form.control}
-//                         name={`pagamentos.${index}.valor`}
-//                         rules={{ required: "Valor é obrigatório" }}
-//                         render={({ field }) => (
-//                             <FormItem>
-//                                 <FormLabel>Valor</FormLabel>
-//                                 <FormControl>
-//                                     <Input {...field} />
-//                                 </FormControl>
-//                                 <FormMessage />
-//                             </FormItem>
-//                         )}
-//                     />
-
-//                     {/* Remover */}
-//                     <Button
-//                         type="button"
-//                         onClick={() => remove(index)}
-//                         variant="destructive"
-//                     >
-//                         Remover
-//                     </Button>
-//                 </div>
-//             ))}
-
-//             <Button
-//                 type="button"
-//                 variant="secondary"
-//                 onClick={() => append({
-//                     sequencia: 0,
-//                     descricao: "",
-//                     referencia: "",
-//                     valor: 0
-//                 })}
-//             >
-//                 + Adicionar pagamento
-//             </Button>
-//         </div>
-//     );
-// }
-
-// export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number): string {
-
-//     const aprovadores = data.aprovadores ?? [];
-
-//     const dataHoje = new Date();
-//     const dia = dataHoje.getDate().toString().padStart(2, '0');
-//     const mes = dataHoje.toLocaleDateString('pt-BR', { month: 'long' });
-//     const ano = dataHoje.getFullYear();
-
-//     const dataAtualExtenso = `${dia} de ${mes.charAt(0).toUpperCase() + mes.slice(1)} de ${ano}`;
-
-//     const primeiroAprovador = aprovadores.length > 0 ? aprovadores[0] : null;
-//     const demaisAprovadores = aprovadores.slice(1);
-
-//     const gerarLinhasPagamentos = (lista: ComunicadoPagamentos[]) => {
-//         let html = "<ol style='margin-top:10px; padding-left:20px;'>";
-
-//         lista.forEach(element => {
-//             html += `
-//             <li style="margin-bottom:6px;">
-//                 ${element.descricao}, no valor de <strong>R$ ${element.valor}</strong>
-//                 referente a ${element.referencia}
-//             </li>`;
-//         });
-
-//         html += "</ol>";
-//         return html;
-//     }
-
-//     const gerarColunasAssinaturas = (lista: typeof demaisAprovadores) => {
-
-//         let html = '<table style="width:100%; margin-top:50px; text-align:center;"><tr>';
-
-//         lista.forEach((ap, index) => {
-
-//             html += `
-//             <td style="padding:30px 20px; width:33%;">
-//                 <div style="border-top:1px solid #000; width:220px; margin:0 auto; padding-top:6px; font-size:12px;">
-//                     ${ap.nome}
-//                 </div>
-//             </td>
-//             `;
-
-//             if ((index + 1) % 3 === 0 && index !== lista.length - 1) {
-//                 html += "</tr><tr>";
-//             }
-
-//         });
-
-//         html += "</tr></table>";
-
-//         return html;
-//     };
-
-//     return `
-
-// <div style="
-// max-width:800px;
-// margin:auto;
-// padding:40px;
-// font-family: Arial, Helvetica, sans-serif;
-// font-size:14px;
-// line-height:1.6;
-// color:#000;
-// background:#fff;
-// ">
-
-// <!-- CABEÇALHO -->
-
-// <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
-
-// <tr>
-//     <!-- LOGO ESQUERDA -->
-//     <td rowspan="3" style="width:20%; border:1px solid black; text-align:center;">
-//         <img src="${logo}" style="width:110px"/>
-//     </td>
-
-//     <!-- TÍTULO -->
-//     <td colspan="2" style="border:1px solid black; text-align:center; font-weight:bold; font-size:18px; padding:8px;">
-//         SOLICITAÇÃO DE PAGAMENTO
-//     </td>
-
-//     <!-- LOGO DIREITA -->
-//     <td rowspan="3" style="width:20%; border:1px solid black; text-align:center;">
-//         <img src="/sgi.jpg" style="width:110px"/>
-//     </td>
-// </tr>
-
-// <tr>
-//     <td style="border:1px solid black; padding:6px;">
-//         <b>Código RQ - </b> ${proxId}
-//     </td>
-
-//     <td style="border:1px solid black; padding:6px;">
-//         <b>Data de revisão:</b> ${new Date().toLocaleDateString('pt-BR')}
-//     </td>
-// </tr>
-
-// <tr>
-//     <td style="border:1px solid black; padding:6px;">
-//         <b>Data de emissão:</b> ${new Date().toLocaleDateString('pt-BR')}
-//     </td>
-
-//     <td style="border:1px solid black; padding:6px;">
-//         <b>Revisão:</b> 1
-//     </td>
-// </tr>
-
-// </table>
-
-// <!-- DATA -->
-
-// <div style="text-align:right; margin-bottom:30px;">
-// ${data.cidade_origem ?? ""}, ${dataAtualExtenso}
-// </div>
-
-// <!-- DESTINATÁRIO -->
-
-// <div style="margin-bottom:20px">
-
-// <div>Ao Senhor (a)</div>
-// <strong>${data.pessoa_destinada ?? ""}</strong><br>
-// ${data.cargo ?? ""}
-
-// </div>
-
-// <div style="margin-bottom:20px;">
-// <strong>Assunto:</strong> ${data.nome ?? ""}
-// </div>
-
-// <!-- TEXTO -->
-
-// <div style="text-align:justify;">
-
-// <p>
-// A CONCESSIONÁRIA ${data.concessionaria ?? ""}, em atenção à solicitação referenciada acima,
-// vem através deste solicitar o seguinte pagamento:
-// </p>
-
-// ${data.pagamentos.length > 0 ? gerarLinhasPagamentos(data.pagamentos) : ""}
-
-// <p>
-// Sem mais para o momento, a CONCESSIONÁRIA ${data.concessionaria ?? ""}
-// permanece à disposição para prestar os esclarecimentos necessários.
-// </p>
-
-// </div>
-
-// <!-- ATENCIOSAMENTE -->
-
-// ${demaisAprovadores.length > 0 ? `
-// <div style="margin-top:40px;">
-// Atenciosamente,
-// </div>
-// ` : ""}
-
-// ${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
-
-// <!-- DE ACORDO -->
-
-// ${primeiroAprovador ? `
-// <div style="margin-top:40px;">
-// De acordo,
-// </div>
-
-// <table style="width:100%; margin-top:60px;">
-// <tr>
-// <td style="text-align:right;">
-
-// <div style="
-// border-top:1px solid #000;
-// width:250px;
-// display:inline-block;
-// padding-top:6px;
-// font-size:12px;
-// text-align:center;
-// ">
-// ${primeiroAprovador.nome}
-// </div>
-
-// </td>
-// </tr>
-// </table>
-// ` : ""}
-
-// </div>
-// `;
-// }
-
 export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number): string {
 
     const aprovadores = data.aprovadores ?? [];
 
-    // const dataHoje = new Date();
-    // const dia = dataHoje.getDate().toString().padStart(2, '0');
-    // const mes = dataHoje.toLocaleDateString('pt-BR', { month: 'long' });
-    // const ano = dataHoje.getFullYear();
-
-    // const dataAtualExtenso = `${dia} de ${mes.charAt(0).toUpperCase() + mes.slice(1)} de ${ano}`;
-
     const primeiroAprovador = aprovadores.length > 0 ? aprovadores[0] : null;
     const demaisAprovadores = aprovadores.slice(1);
 
-    // const gerarLinhasPagamentos = (lista: ComunicadoPagamentos[]) => {
-    //     let html = "<ol style='margin-top:10px; padding-left:20px;'>";
-
-    //     lista.forEach(element => {
-    //         html += `
-    //         <li style="margin-bottom:6px;">
-    //             ${element.descricao}, no valor de <strong>R$ ${element.valor}</strong>
-    //             referente a ${element.referencia}
-    //         </li>`;
-    //     });
-
-    //     html += "</ol>";
-    //     return html;
-    // }
-
     const gerarColunasAssinaturas = (lista: typeof demaisAprovadores) => {
 
-        let html = '<table style="width:100%; margin-top:50px; text-align:center;"><tr>';
+        let html = '<table class="table-sem-borda" style="margin-top:50px; text-align:center;"><tr>';
 
         lista.forEach((ap, index) => {
 
@@ -1878,104 +1645,117 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
     };
 
     return `
+    <style>
+        .table-bordada {
+            border-collapse: collapse;
+            width: 100%;
+        }
 
-<div style="
-max-width:800px;
-margin:auto;
-padding:40px;
-font-family: Arial, Helvetica, sans-serif;
-font-size:14px;
-line-height:1.6;
-color:#000;
-background:#fff;
-">
+        .table-bordada td,
+        .table-bordada th {
+            border: 1px solid #000;
+        }
 
-<!-- CABEÇALHO -->
+        .table-sem-borda {
+            border-collapse: collapse;
+            width: 100%;
+        }
 
-<table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+        .table-sem-borda td,
+        .table-sem-borda th {
+            border: none !important;
+        }
+    </style>
+    <div style="
+        max-width:800px;
+        margin:auto;
+        padding:40px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size:14px;
+        line-height:1.6;
+        color:#000;
+        background:#fff;
+    ">
 
-<tr>
-    <!-- LOGO ESQUERDA -->
-    <td rowspan="3" style="width:20%; border:1px solid black; text-align:center;">
-        <img src="${logo}" style="width:110px"/>
-    </td>
+        <!-- CABEÇALHO -->
 
-    <!-- TÍTULO -->
-    <td colspan="2" style="border:1px solid black; text-align:center; font-weight:bold; font-size:18px; padding:8px;">
-        SOLICITAÇÃO DE PAGAMENTO
-    </td>
+        <table class="table-bordada" style="margin-bottom:30px;">
+            <tr>
+                <!-- LOGO ESQUERDA -->
+                <td rowspan="3" style="width:20%;  text-align:center;">
+                    <img src="${logo}" style="width:110px"/>
+                </td>
+                <!-- TÍTULO -->
+                <td colspan="2" style=" text-align:center; font-weight:bold; font-size:18px; padding:8px;">
+                    SOLICITAÇÃO DE PAGAMENTO
+                </td>
+                <!-- LOGO DIREITA -->
+                <td style="width:20%;  text-align:center;">
+                    <img src="/sgi.jpg" style="width:110px"/>
+                </td>
+            </tr>
+            <tr>
+                <td style=" padding:6px;">
+                    <b>Código RQ - </b> ${proxId}
+                </td>
+                <td style=" padding:6px;">
+                    <b>Revisão - </b> 00
+                </td>
+                <td style=" padding:6px;">
+                    <b>Data de revisão:</b> ${new Date().toLocaleDateString('pt-BR')}
+                </td>
+            </tr>
+            <tr>
+                <td style=" padding:6px;">
+                    <b>Data de emissão:</b> ${new Date().toLocaleDateString('pt-BR')}
+                </td>
 
-    <!-- LOGO DIREITA -->
-    <td rowspan="3" style="width:20%; border:1px solid black; text-align:center;">
-        <img src="/sgi.jpg" style="width:110px"/>
-    </td>
-</tr>
+                <td colspan="2" style=" padding:6px;">
+                    Pág.: 1 de 1
+                </td>
+            </tr>
+        </table>
 
-<tr>
-    <td style="border:1px solid black; padding:6px;">
-        <b>Código RQ - </b> ${proxId}
-    </td>
+        <!-- TEXTO -->
 
-    <td style="border:1px solid black; padding:6px;">
-        <b>Data de revisão:</b> ${new Date().toLocaleDateString('pt-BR')}
-    </td>
-</tr>
+        <div style="margin-top: 10px; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">
+            ${data.anexo ?? ""}
+        </div>
 
-<tr>
-    <td style="border:1px solid black; padding:6px;">
-        <b>Data de emissão:</b> ${new Date().toLocaleDateString('pt-BR')}
-    </td>
+        <!-- ATENCIOSAMENTE -->
 
-    <td style="border:1px solid black; padding:6px;">
-        <b>Revisão:</b> 1
-    </td>
-</tr>
+        ${demaisAprovadores.length > 0 ? `
+        <div style="margin-top:40px;">
+            Atenciosamente,
+        </div>`
+            : ""}
 
-</table>
+        ${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
 
-<!-- TEXTO -->
+        <!-- DE ACORDO -->
 
-<div style="margin-top: 10px; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">
-    ${data.anexo ?? ""}
-</div>
+        ${primeiroAprovador ? `
+        <div style="margin-top:40px;">
+            De acordo,
+        </div>
 
-<!-- ATENCIOSAMENTE -->
-
-${demaisAprovadores.length > 0 ? `
-<div style="margin-top:40px;">
-Atenciosamente,
-</div>
-` : ""}
-
-${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
-
-<!-- DE ACORDO -->
-
-${primeiroAprovador ? `
-<div style="margin-top:40px;">
-De acordo,
-</div>
-
-<table style="width:100%; margin-top:60px;">
-<tr>
-<td style="text-align:right;">
-
-<div style="
-border-top:1px solid #000;
-width:250px;
-display:inline-block;
-padding-top:6px;
-font-size:12px;
-text-align:center;
-">
-${primeiroAprovador.nome}
-</div>
-
-</td>
-</tr>
-</table>
-` : ""}
-
-</div>
-`;
+        <table class="table-sem-borda" style="width:100%; margin-top:60px;">
+            <tr>
+                <td style="text-align:right;">
+                    <div style="
+                        border-top:1px solid #000;
+                        width:250px;
+                        display:inline-block;
+                        padding-top:6px;
+                        font-size:12px;
+                        text-align:center;
+                    ">
+                    ${primeiroAprovador.nome}
+                    </div>
+                </td>
+            </tr>
+        </table>
+        ` : ""}
+    </div>
+    `;
 }
