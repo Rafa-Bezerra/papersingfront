@@ -468,34 +468,35 @@ export default function Page() {
     )
 
     return (
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
             {/* Filtros */}
             <Card className="mb-6">
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    <div className="flex justify-end items-end gap-4">
-                        {/* Data de */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="dateFrom">Data de</Label>
-                            <Input
-                                id="dateFrom"
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="w-40"
-                            />
-                        </div>
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <CardTitle className="text-xl sm:text-2xl font-bold leading-tight">{titulo}</CardTitle>
+                    <div className="flex flex-wrap justify-start md:justify-end items-end gap-3 w-full md:w-auto">
+                        {/* Datas: no mobile em coluna, em telas maiores lado a lado */}
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <div className="flex flex-col flex-1 sm:flex-initial sm:w-40 min-w-0">
+                                <Label htmlFor="dateFrom">Data de</Label>
+                                <Input
+                                    id="dateFrom"
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    className="w-full min-w-[140px] max-w-[200px] sm:w-40"
+                                />
+                            </div>
 
-                        {/* Data até */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="dateTo">Data até</Label>
-                            <Input
-                                id="dateTo"
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                                className="w-40"
-                            />
+                            <div className="flex flex-col flex-1 sm:flex-initial sm:w-40 min-w-0">
+                                <Label htmlFor="dateTo">Data até</Label>
+                                <Input
+                                    id="dateTo"
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    className="w-full min-w-[140px] max-w-[200px] sm:w-40"
+                                />
+                            </div>
                         </div>
                         {/* Botão de Filtros - Dropdown com checkboxes */}
                         <DropdownMenu>
