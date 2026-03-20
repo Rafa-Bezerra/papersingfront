@@ -1200,7 +1200,7 @@ export default function Page() {
             {/* Documento */}
             {rdvDocumentoSelecionada && selectedResult && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${selectedResult.idmov}`}
