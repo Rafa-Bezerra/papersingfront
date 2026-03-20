@@ -890,7 +890,11 @@ export default function Page() {
 
     async function handleAvaliar(data: Requisicao_avaliacoes) {
         try {
-            await createAvaliacao(data)
+            await createAvaliacao({
+                ...(data as any),
+                idmov: avaliarRequisicao!.requisicao.idmov,
+                codigo_atendimento: Number(avaliarRequisicao!.requisicao.codigo_atendimento),
+            } as Requisicao_avaliacoes)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
