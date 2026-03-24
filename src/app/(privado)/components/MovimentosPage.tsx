@@ -235,7 +235,11 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
-            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoFiltrada, "")
+            // "Avaliado" aqui significa "reprovado com motivo (avaliação)".
+            // Como nem sempre isso existe como status de movimento no backend,
+            // buscamos "Todos" e filtramos localmente.
+            const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
+            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoApi, "")
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -252,21 +256,34 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
-                const matchSituacao = situacaoFiltrada === "" || d.requisicao.status_movimento == situacaoFiltrada
+                const matchSituacao =
+                    situacaoFiltrada === "" ||
+                    situacaoFiltrada === "Avaliado" ||
+                    d.requisicao.status_movimento == situacaoFiltrada
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
-                let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
-                    stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
-                );
-                let usuarioAprovador = d.requisicao_aprovacoes.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                );
+                const userNorm = stripDiacritics(userCodusuario.toLowerCase().trim())
+                const usuarioAprovador = (userAdmin || userAdministrativo)
+                    ? true
+                    : d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === userNorm);
 
-                if (userAdmin || userAdministrativo) {
-                    usuarioAprovador = true;
-                    usuarioAprovou = false;
+                const usuarioAprovouOuReprovou = (userAdmin || userAdministrativo)
+                    ? false
+                    : d.requisicao_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === userNorm &&
+                        (ap.situacao === 'A' || ap.situacao === 'R')
+                    );
+
+                // Para o filtro "Avaliado", mostramos os movimentos que têm avaliação registrada.
+                // O motivo da reprovação fica na própria avaliação (AVALIACAO) e esse registro é criado
+                // no fluxo de reprovar.
+                const avaliadoComMotivo = d.requisicao.possui_avaliacoes == 1;
+
+                if (situacaoFiltrada === "Avaliado") {
+                    return matchQuery && matchTipos && matchSituacao && matchSolicitante && matchTipoMovimento && avaliadoComMotivo
                 }
-                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovou
+
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovouOuReprovou
             })
             setResults(filtrados)
         } catch (err) {
@@ -811,7 +828,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         const idmov = avaliarRequisicao.requisicao.idmov
         const codigoAtendimento = Number(avaliarRequisicao.requisicao.codigo_atendimento)
         try {
-            await createAvaliacao(data)
+            // O formulário de avaliação só registra o campo `avaliacao`, então garantimos
+            // que `idmov` e `codigo_atendimento` vão no payload para o backend.
+            await createAvaliacao({
+                ...(data as any),
+                idmov,
+                codigo_atendimento: codigoAtendimento,
+            } as Requisicao_avaliacoes)
             await reprovar(idmov, codigoAtendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== idmov))
             toast.success(`Avaliação enviada e requisição reprovada.`)
@@ -974,7 +997,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Itens */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1027,7 +1050,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1361,7 +1384,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Avaliações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAvaliacoesOpen} onOpenChange={setIsModalAvaliacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>

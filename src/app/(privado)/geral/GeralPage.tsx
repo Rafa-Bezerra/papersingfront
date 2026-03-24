@@ -919,7 +919,11 @@ export default function Page() {
         const idmov = avaliarRequisicao.requisicao.idmov
         const codigoAtendimento = Number(avaliarRequisicao.requisicao.codigo_atendimento)
         try {
-            await createAvaliacao(data)
+            await createAvaliacao({
+                ...(data as any),
+                idmov,
+                codigo_atendimento: codigoAtendimento,
+            } as Requisicao_avaliacoes)
             await reprovar(idmov, codigoAtendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== idmov))
             toast.success(`Avaliação enviada e requisição reprovada.`)

@@ -1109,7 +1109,7 @@ export default function Page() {
             {/* Itens ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1123,7 +1123,7 @@ export default function Page() {
             {/* Anexos ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1137,7 +1137,7 @@ export default function Page() {
             {/* Aprovadores ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovadores movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1151,7 +1151,7 @@ export default function Page() {
             {/* Visualizar anexo */}
             {anexoSelecionado && (
                 <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Anexo ${anexoSelecionado.nome}`}
@@ -1243,7 +1243,7 @@ export default function Page() {
             {/* Documento */}
             {rdvDocumentoSelecionada && selectedResult && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${selectedResult.idmov}`}
