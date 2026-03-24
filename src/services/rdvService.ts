@@ -12,6 +12,14 @@ export async function createElement(data: Rdv): Promise<void> {
     }
 }
 
+export async function updateElement(data: Rdv): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
+    }
+}
+
 export async function getUltimosRdvs(): Promise<Rdv[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
 

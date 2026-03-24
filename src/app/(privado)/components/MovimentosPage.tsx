@@ -1041,7 +1041,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Documento */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none min-w-[850px] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Documento movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}
@@ -1175,7 +1175,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
+                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] min-w-[750px] overflow-x-auto overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1220,7 +1220,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Assinatura de anexo */}
             {anexoSelecionado && (
                 <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
+                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none min-w-[850px] flex flex-col overflow-y-auto overflow-x-auto p-0">
                         <DialogHeader className="p-4 shrink-0 sticky top-0">
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {`Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}`}

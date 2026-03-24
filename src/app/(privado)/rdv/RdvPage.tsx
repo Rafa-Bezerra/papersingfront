@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, Search, Check } from "lucide-react";
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor } from '@/services/rdvService';
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor, updateElement } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -51,6 +51,8 @@ export default function Page() {
     const titulo = 'Lançamento de RDV';
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [editar, setEditar] = useState<number | null>(null)
+    const [userCodusuario, setCodusuario] = useState("");
 
     const [results, setResults] = useState<Rdv[]>([])
     const [selectedResult, setSelectedResult] = useState<Rdv>()
@@ -111,6 +113,12 @@ export default function Page() {
     }, []);
 
     useEffect(() => {
+        const storedUser = sessionStorage.getItem("userData");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            setCodusuario(user.codusuario);
+        }
+
         buscaCentrosDeCusto();
         buscaUsuarios();
         buscaFornecedores();
@@ -119,8 +127,8 @@ export default function Page() {
 
     useEffect(() => {
         setBloqueado(true);
-        if (produtos.length > 0 && aprovadoresSubmit.length > 0) setBloqueado(false);
-    }, [produtos, aprovadoresSubmit])
+        if (produtosSubmit.length > 0 && aprovadoresSubmit.length > 0) setBloqueado(false);
+    }, [produtosSubmit, aprovadoresSubmit, editar])
 
     const form = useForm<Rdv>({
         defaultValues: {
@@ -130,6 +138,7 @@ export default function Page() {
             origem: "",
             destino: "",
             codcfo: "",
+            idmov: 0,
             itens: [],
             anexos: [],
             aprovadores: [],
@@ -240,6 +249,10 @@ export default function Page() {
     async function onSubmit() {
         setIsLoading(true)
         setError(null)
+        if (editar != null) {
+            rdv.id = editar;
+            rdv.idmov = form.getValues("idmov");
+        }
         rdv.descricao = form.getValues("descricao")
         rdv.origem = form.getValues("origem")
         rdv.destino = form.getValues("destino")
@@ -260,7 +273,11 @@ export default function Page() {
         }
 
         try {
-            await createElement(rdv)
+            if (editar) {
+                await updateElement(rdv);
+            } else {
+                await createElement(rdv)
+            }
             toast.success('RDV enviado com sucesso!')
             window.location.reload()
         } catch (err) {
@@ -268,6 +285,26 @@ export default function Page() {
         } finally {
             setIsLoading(false)
         }
+    }
+
+    async function handleEditar(data: Rdv) {
+        console.log(data);
+        
+        setEditar(data.id ?? 0);
+        form.setValue("descricao", data.descricao);
+        form.setValue("origem", data.origem);
+        form.setValue("destino", data.destino);
+        form.setValue("periodo_de", data.periodo_de?.substring(0, 10));
+        form.setValue("periodo_ate", data.periodo_ate?.substring(0, 10));
+        form.setValue("codcfo", data.codcfo);
+        form.setValue("idmov", data.idmov);
+        setProdutosSubmit(data.itens);
+        setAnexosSubmit(data.anexos);
+        setAprovadoresSubmit(data.aprovadores);
+    }
+
+    async function cancelEditar() {
+        setEditar(null);
     }
 
     function adicionarItem() {
@@ -456,7 +493,8 @@ export default function Page() {
             {
                 id: 'actions',
                 header: 'Ações',
-                cell: ({ row }) => {
+                cell: ({ row }) => {                    
+                    const podeEditar = (row.original.usuario_criacao == userCodusuario) && (row.original.situacao == 'Em andamento');
                     return (
                         <div className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
@@ -473,15 +511,20 @@ export default function Page() {
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
                                 Anexos
                             </Button>
+                            {podeEditar && editar != row.original.id &&  (<Button size="sm" variant="destructive" onClick={() => handleEditar(row.original)}>
+                                Editar
+                            </Button>)}
+                            {podeEditar && editar == row.original.id &&  (<Button size="sm" variant="destructive" onClick={() => cancelEditar()}>
+                                Cancelar
+                            </Button>)}
                         </div>
                     );
                 }
             }
         ],
-        []
+        [userCodusuario, editar]
     )
 
-    // Tabela de itens do RDV: valor unit. (vem da API), Total = qtd * valor (evita confusão de "valor errado")
     const colunasItens = useMemo<ColumnDef<ItemRdv>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
@@ -529,7 +572,7 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <CardTitle className="text-2xl font-bold">{titulo}{ editar ? " - Editando " + editar : "" }</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Form {...form}>

@@ -1,4 +1,5 @@
 export type ItemRdv = {
+    id?: number;
     idprd: number;
     produto?: string;
     codconta: string;
@@ -22,6 +23,7 @@ export type Rdv = {
     idmov?: number;
     codigo_atendimento?: number;
     arquivo_assinado?: boolean;
+    usuario_criacao?: string;
     itens: ItemRdv[];
     anexos: AnexoRdv[];
     aprovadores: AprovadoresRdv[];
@@ -33,6 +35,7 @@ export type AnexoRdv = {
     usuario_criacao?: string;
 };
 export type AprovadoresRdv = {
+    id?: number;
     usuario: string;
     nome?: string;
     data_aprovacao?: string;
