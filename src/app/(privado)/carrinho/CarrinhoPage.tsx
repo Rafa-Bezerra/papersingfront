@@ -498,14 +498,14 @@ export default function Page() {
                                                                 {centrosDeCusto.map(c => (
                                                                     <CommandItem
                                                                         key={c.ccusto}
-                                                                        value={c.ccusto}
+                                                                        value={`${c.ccusto} - ${c.custo}`}
                                                                         onSelect={() => {
                                                                             field.onChange(c.ccusto)
                                                                             handleSelectedCentroDeCusto(c.ccusto)
                                                                             setOpenCcustoSearch(false)
                                                                         }}
                                                                     >
-                                                                        {c.ccusto} - {c.custo}
+                                                                        {`${c.ccusto} - ${c.custo}`}
                                                                     </CommandItem>
                                                                 ))}
                                                             </CommandGroup>
@@ -554,14 +554,14 @@ export default function Page() {
                                                                 {contasFinanceiras.map(x => (
                                                                     <CommandItem
                                                                         key={x.codconta}
-                                                                        value={x.codconta}
+                                                                        value={`${x.codconta} - ${x.contabil}`}
                                                                         onSelect={() => {
                                                                             field.onChange(x.codconta)
                                                                             handleSelectedContaFinanceira(x.codconta)
                                                                             setOpenCodcontaSearch(false)
                                                                         }}
                                                                     >
-                                                                        {x.codconta} - {x.contabil}
+                                                                        {`${x.codconta} - ${x.contabil}`}
                                                                     </CommandItem>
                                                                 ))}
                                                             </CommandGroup>
@@ -600,13 +600,13 @@ export default function Page() {
                                                                 {produtos.map(p => (
                                                                     <CommandItem
                                                                         key={p.idprd}
-                                                                        value={p.idprd.toString()}
+                                                                        value={`${p.idprd} - ${p.produto}`}
                                                                         onSelect={() => {
                                                                             field.onChange(p.idprd)
                                                                             setOpenProdutoSearch(false)
                                                                         }}
                                                                     >
-                                                                        {p.idprd} - {p.produto}
+                                                                        {`${p.idprd} - ${p.produto}`}
                                                                     </CommandItem>
                                                                 ))}
                                                             </CommandGroup>
@@ -727,7 +727,7 @@ export default function Page() {
                 <CardContent className="space-y-3">
                     {produtosSubmit.map((item, i) => (
                         <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
-                            <span>{item.quantidade}x - {item.produto} - {item.descricao}{item.valor ? " - "+ toMoney(item.valor ?? 0) : ""}</span>
+                            <span>{item.quantidade}x - {item.produto} - {item.descricao}{item.valor ? " - "+ toMoney(item.valor ?? 0) : ""} | ccusto: {item.ccusto} / codconta: {item.codconta}</span>
                             <Button variant="destructive" size="icon" onClick={() => removerItem(i)}>
                                 <Trash2 className="w-4 h-4" />
                             </Button>
