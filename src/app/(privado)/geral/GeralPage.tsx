@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
+import { Bell, Check, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,8 @@ import {
     getAnexoByIdmov,
     Requisicao_avaliacoes,
     getAllAvaliacoes,
-    createAvaliacao
+    createAvaliacao,
+    notificarAprovadores
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
@@ -431,6 +432,15 @@ export default function Page() {
         }
     }
 
+    async function handleNotificar(idmov: number, atendimento: number) {
+        try {
+            const msg = await notificarAprovadores(idmov, atendimento)
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     async function handleReprovar(requisicao: RequisicaoDto) {
         form.reset({
             avaliacao: '',
@@ -635,6 +645,17 @@ export default function Page() {
                                     onClick={() => handleReprovar(row.original)}
                                 >
                                     Reprovar
+                                </Button>
+                            )}
+
+                            {status_liberado && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    title="Notificar aprovadores pendentes por e-mail"
+                                    onClick={() => handleNotificar(requisicao.idmov, requisicao.codigo_atendimento)}
+                                >
+                                    <Bell className="w-4 h-4" />
                                 </Button>
                             )}
 

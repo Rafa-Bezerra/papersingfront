@@ -261,6 +261,16 @@ export default function PageUsuarios() {
       if (data.sequencial && data.sequencial !== 0) {
         await updateUsuario(data)
       } else {
+        const duplicado = results.some(
+          u =>
+            u.codusuario.trim().toLowerCase() === data.codusuario.trim().toLowerCase() &&
+            u.nome.trim().toLowerCase() === data.nome.trim().toLowerCase() &&
+            u.empresa.trim().toLowerCase() === data.empresa.trim().toLowerCase()
+        )
+        if (duplicado) {
+          toast.error('Já existe um usuário com essa matrícula, nome e unidade.')
+          return
+        }
         await createUsuario(data)
       }
     } catch (err) {
