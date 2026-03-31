@@ -80,4 +80,17 @@ export async function createAvaliacao(data: Requisicao_avaliacoes): Promise<void
     }
 }
 
+export async function notificarAprovadores(idmov: number, atendimento: number): Promise<string> {
+    const url = new URL(`${API_BASE}/api/${caminho}/notificar/${idmov}/${atendimento}`);
+    const res = await fetch(url.toString(), { method: 'POST', headers: headers() });
+
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao notificar aprovadores: ${msg}`);
+    }
+
+    const data = await res.json();
+    return data.message;
+}
+
 export type { RequisicaoDto, Requisicao_item, Requisicao_aprovacao, AnexoMovimento, Requisicao_avaliacoes }

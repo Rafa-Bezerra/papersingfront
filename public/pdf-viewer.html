@@ -111,9 +111,16 @@
                 pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
                     currentPdf = pdf;
                     currentPage = 1;
-                    currentScale = 1.5;
                     window.parent.postMessage({ totalPages: pdf.numPages }, "*");
-                    renderPage(currentPage, currentScale);
+                    // Calcula o zoom para preencher a largura do container
+                    pdf.getPage(1).then(page => {
+                        const naturalViewport = page.getViewport({ scale: 1 });
+                        const containerWidth = document.getElementById('pdfContainer').clientWidth;
+                        currentScale = containerWidth > 0
+                            ? containerWidth / naturalViewport.width
+                            : 1.5;
+                        renderPage(currentPage, currentScale);
+                    });
                 }).catch(err => console.error('Erro ao carregar PDF:', err));
             }
 

@@ -83,11 +83,14 @@ export default function PdfViewerDialog({
                 setTotalPages(event.data.totalPages)
             }
             if (event.data?.pdfViewport) {
+                const scale = event.data.pdfViewport.scale
                 setViewport({
                     width: event.data.pdfViewport.width,
                     height: event.data.pdfViewport.height,
-                    scale: event.data.pdfViewport.scale,
+                    scale,
                 })
+                // Sincroniza o indicador de zoom com o scale calculado pelo iframe
+                setZoom(prev => prev === 1.5 ? scale : prev)
             }
         }
         window.addEventListener('message', handler)
@@ -165,7 +168,7 @@ export default function PdfViewerDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-hidden p-0">
+            <DialogContent className="w-[60vw] h-[90vh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0">
                 <DialogHeader className="p-4 shrink-0 sticky top-0 z-10 bg-background border-b">
                     <DialogTitle className="text-lg font-semibold text-center">
                         {title}
