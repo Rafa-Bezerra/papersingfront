@@ -3,7 +3,6 @@
 import React, {
     useEffect,
     useMemo,
-    useRef,
     useState,
 } from 'react'
 import { NumericFormat } from "react-number-format";
@@ -14,7 +13,8 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, ZoomIn, ZoomOut, Search, Check } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, Check } from "lucide-react";
+import PdfViewerDialog from '@/components/PdfViewerDialog'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor, updateElement } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,6 @@ import { Usuario } from '@/types/Usuario';
 import { getAll } from '@/services/usuariosService';
 import { PopoverPortal } from '@radix-ui/react-popover';
 import { getAnexoByIdmov } from '@/services/requisicoesService';
-import { PdfViewport } from '@/utils/pdfCoords';
 
 export default function Page() {
     const titulo = 'Lançamento de RDV';
@@ -65,11 +64,9 @@ export default function Page() {
     const [selectedAnexosResult, setSelectedAnexosResult] = useState<AnexoRdv[]>([])
     const [file, setFile] = useState<File | null>(null)
     const [fileName, setFileName] = useState<string>("")
-    const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
-    const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
     const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoRdv | null>(null)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
-    const iframeAnexoRef = useRef<HTMLIFrameElement>(null);
+    const [anexoPdfBase64, setAnexoPdfBase64] = useState<string | null>(null)
 
     const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
@@ -86,31 +83,10 @@ export default function Page() {
     const [anexosSubmit, setAnexosSubmit] = useState<AnexoRdv[]>([])
     const [aprovadoresSubmit, setAprovadoresSubmit] = useState<AprovadoresRdv[]>([])
     const [openUsuarioSearch, setOpenUsuarioSearch] = useState(false)
-    const [zoomAnexo, setZoomAnexo] = useState(1.5);
     const [bloqueado, setBloqueado] = useState(true)
 
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState<number | null>(null);
-    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
-    const [rdvDocumentoSelecionada, setRdvDocumentoSelecionada] = useState<string>("")
-    const [zoomDocumento, setZoomDocumento] = useState(1.5);
+    const [rdvDocumentoSelecionada, setRdvDocumentoSelecionada] = useState<string | null>(null)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source !== iframeAnexoRef.current?.contentWindow) return;
-            if (event.data?.totalPages) {
-                setTotalPagesAnexo(event.data.totalPages);
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, []);
 
     useEffect(() => {
         const storedUser = sessionStorage.getItem("userData");
@@ -367,118 +343,22 @@ export default function Page() {
     }
 
     async function handleVisualizarAnexo(anexo: AnexoRdv) {
-        setIsLoading(true)
-        try {
-            setAnexoSelecionado(anexo);
-            const pdfClean = anexo.anexo.replace(/^data:.*;base64,/, '').trim();
-
-            setTimeout(() => {
-                iframeAnexoRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: pdfClean },
-                    '*'
-                );
-            }, 500);
-            setZoomAnexo(1.5);
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
-            setIsLoading(false)
-            setIsModalVisualizarAnexoOpen(true)
-        }
-    }
-
-    function handleZoomInAnexo() {
-        if (!iframeAnexoRef.current) return;
-        const newZoom = Math.min(5, zoomAnexo + 0.25);
-        setZoomAnexo(newZoom);
-        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOutAnexo() {
-        if (!iframeAnexoRef.current) return;
-        const newZoom = Math.max(0.5, zoomAnexo - 0.25);
-        setZoomAnexo(newZoom);
-        iframeAnexoRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function changePageAnexo(newPage: number) {
-        if (!iframeAnexoRef.current) return;
-        setCurrentPageAnexo(newPage);
-        iframeAnexoRef.current.contentWindow?.postMessage({ page: newPage }, "*");
+        setAnexoSelecionado(anexo);
+        setAnexoPdfBase64(anexo.anexo);
+        setIsModalVisualizarAnexoOpen(true);
     }
 
     async function handleDocumento(rdv: Rdv) {
         setIsLoading(true)
-        setCurrentPage(1);
-        setTotalPages(null);
-        setPdfViewport(null);
         setSelectedResult(rdv);
         try {
             const data = await getAnexoByIdmov(rdv.idmov!, rdv.codigo_atendimento!);
-            const arquivoBase64 = data.arquivo;
-            setRdvDocumentoSelecionada(arquivoBase64);
-
-            setTimeout(() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: arquivoBase64 },
-                    '*'
-                );
-            }, 500);
-
-            setZoomDocumento(1.5);
+            setRdvDocumentoSelecionada(data.arquivo);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
             setIsModalDocumentosOpen(true)
-        }
-    }
-
-    function handleZoomInDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.min(5, zoomDocumento + 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOutDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function changePage(newPage: number) {
-        if (!iframeRef.current) return;
-        setCurrentPage(newPage);
-        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
-    }
-
-    function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
-    }
-
-    function handleImprimirAnexo() {
-        if (!iframeAnexoRef.current) return;
-
-        const iframe = iframeAnexoRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
         }
     }
 
@@ -1149,185 +1029,20 @@ export default function Page() {
             )}
 
             {/* Visualizar anexo */}
-            {anexoSelecionado && (
-                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={setIsModalVisualizarAnexoOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {`Anexo ${anexoSelecionado.nome}`}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
-                            {anexoSelecionado ? (
-                                <>
-                                    {/* PDF sem overflow interno */}
-                                    <iframe
-                                        ref={iframeAnexoRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            maxWidth: '800px',
-                                            aspectRatio: '1/sqrt(2)', // Proporção A4
-                                        }}
-                                    />
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
-                            <Button
-                                disabled={currentPageAnexo <= 1}
-                                onClick={() => changePageAnexo(currentPageAnexo - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPageAnexo}
-                                {totalPagesAnexo ? ` / ${totalPagesAnexo}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPageAnexo >= (totalPagesAnexo == null ? 1 : totalPagesAnexo)}
-                                onClick={() => changePageAnexo(currentPageAnexo + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOutAnexo}
-                                    disabled={zoomAnexo <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoomAnexo * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomInAnexo}
-                                    disabled={zoomAnexo >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimirAnexo()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalVisualizarAnexoOpen}
+                onOpenChange={setIsModalVisualizarAnexoOpen}
+                title={anexoSelecionado ? `Anexo ${anexoSelecionado.nome}` : 'Anexo'}
+                pdfBase64={anexoPdfBase64}
+            />
 
             {/* Documento */}
-            {rdvDocumentoSelecionada && selectedResult && (
-                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col overflow-y-auto overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {`Documento movimentação n° ${selectedResult.idmov}`}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
-                            {rdvDocumentoSelecionada ? (
-                                <>
-                                    <div className="relative" style={pdfStyle}>
-                                        {/* PDF */}
-                                        <iframe
-                                            ref={iframeRef}
-                                            src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default pointer-events-none"
-                                            style={{ width: '100%', height: '100%' }}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
-                            <Button
-                                disabled={currentPage <= 1}
-                                onClick={() => changePage(currentPage - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPage}
-                                {totalPages ? ` / ${totalPages}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
-                                onClick={() => changePage(currentPage + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOutDocumento}
-                                    disabled={zoomDocumento <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoomDocumento * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomInDocumento}
-                                    disabled={zoomDocumento >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimir()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalDocumentosOpen}
+                onOpenChange={setIsModalDocumentosOpen}
+                title={selectedResult ? `Documento movimentação n° ${selectedResult.idmov}` : 'Documento'}
+                pdfBase64={rdvDocumentoSelecionada}
+            />
 
             {error && (<p className="mb-4 text-center text-sm text-destructive"> Erro: {error} </p>)}
         </div >

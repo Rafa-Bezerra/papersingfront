@@ -36,7 +36,6 @@ export default function PageAlterarSenha() {
 
   useEffect(() => {        
     handleSearch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSearch() {
@@ -72,7 +71,7 @@ export default function PageAlterarSenha() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       <Card>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
@@ -93,6 +92,7 @@ export default function PageAlterarSenha() {
                         penColor="black"
                         canvasProps={{
                           className: "w-full h-48 rounded-lg",
+                          style: { touchAction: 'none' },
                         }}
                       />
                     </div>

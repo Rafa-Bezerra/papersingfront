@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Filter, Search, SearchIcon, SquarePlus, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,7 @@ import {
     CommandItem,
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
-import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
+import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import { DocumentoExterno, DocumentoExternoAprovador, DocumentoExternoAssinar, DocumentoExternoCreateDTO, DocumentoExternoFiltro, aprovar, assinarDocumento, createElement, deleteElement, getAll, getAllAprovadores, getDocumento } from '@/services/documentoExternoService'
 import {
     Usuario,
@@ -95,45 +95,12 @@ export default function Page() {
     {/** Arquivo - visualização */ }
     const [selectedResultDocumento, setSelectedResultDocumento] = useState<string | null>(null);
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
-    const iframe = useRef<HTMLIFrameElement>(null);
-    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
-    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
-    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState<number | null>(null);
-    const [zoom, setZoom] = useState(1.5);
-    const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
 
     {/** Set externos e usuarios */ }
     useEffect(() => {
         buscaUsuarios();
         buscaExternos();
-    }, []);
-
-    {/** Retorno pdf */ }
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source === iframe.current?.contentWindow) {
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewport({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
     }, []);
 
     {/** Set Datas */ }
@@ -290,25 +257,7 @@ export default function Page() {
         setIsLoading(true)
         try {
             const arquivo = await getDocumento(data.id);
-            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
-
             setSelectedResultDocumento(arquivo);
-            setCurrentPage(1);
-            setTotalPages(null);
-            setCoords(null);
-            setSignatureCoords(null);
-            setPreviewCoords(null);
-            setIsPreviewLocked(false);
-            setPdfViewport(null);
-
-            setTimeout(() => {
-                iframe.current?.contentWindow?.postMessage(
-                    { pdfBase64: pdfClean },
-                    '*'
-                );
-            }, 500);
-
-            setZoom(1.5);
             setIsModalDocumentosOpen(true)
         } catch (err) {
             setError((err as Error).message)
@@ -374,53 +323,6 @@ export default function Page() {
         } finally {
             setIsLoading(false)
         }
-    }
-
-    function changePage(newPage: number) {
-        if (!iframe.current) return;
-        setCurrentPage(newPage);
-        iframe.current.contentWindow?.postMessage({ page: newPage }, "*");
-    }
-
-    function handleImprimir() {
-        if (!iframe.current) return;
-
-        const iframeRef = iframe.current as HTMLIFrameElement;
-        const iframeWindow = iframeRef.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
-    }
-
-    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const nextCoords = getPdfClickCoords(e, pdfViewport);
-        setCoords(nextCoords);
-        setSignatureCoords(nextCoords);
-        setPreviewCoords(null);
-        setIsPreviewLocked(true);
-    }
-
-    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
-        if (isPreviewLocked) return;
-        setPreviewCoords(getPdfClickCoords(e, pdfViewport));
-    }
-
-    function handleZoomIn() {
-        if (!iframe.current) return;
-        const newZoom = Math.min(5, zoom + 0.25);
-        setZoom(newZoom);
-        iframe.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOut() {
-        if (!iframe.current) return;
-        const newZoom = Math.max(0.5, zoom - 0.25);
-        setZoom(newZoom);
-        iframe.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     const colunas = useMemo<ColumnDef<DocumentoExterno>[]>(
@@ -490,12 +392,7 @@ export default function Page() {
         []
     )
 
-    async function confirmarAssinatura() {
-        if (!coords) {
-            toast.error("Clique no local onde deseja assinar o documento.");
-            return;
-        }
-
+    async function confirmarAssinatura(data: PdfSignData) {
         if (!selectedResult) {
             toast.error("Assinatura não enviada.");
             return;
@@ -503,11 +400,11 @@ export default function Page() {
 
         const dadosAssinatura: DocumentoExternoAssinar = {
             id: selectedResult.id,
-            pagina: currentPage,
-            posX: coords.x,
-            posY: coords.yI,
-            largura: 90,
-            altura: 30,
+            pagina: data.page,
+            posX: data.posX,
+            posY: data.posY,
+            largura: data.largura,
+            altura: data.altura,
         };
 
         try {
@@ -642,7 +539,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo documento
@@ -773,121 +670,18 @@ export default function Page() {
             )}
 
             {/* Visualizar anexo */}
-            {selectedResult && selectedResultDocumento && (
-                <Dialog open={isModalDocumentosOpen} onOpenChange={(open) => { if (!open) setSelectedResultDocumento(null); setIsModalDocumentosOpen(open); }}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {selectedResult.assunto}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
-                            {selectedResultDocumento ? (
-                                <>
-                                    <div className="relative" style={pdfStyle}>
-                                        {/* PDF */}
-                                        <iframe
-                                            ref={iframe}
-                                            src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default"
-                                            style={pdfStyle}
-                                        />
-
-                                        {/* Overlay */}
-                                        {selectedResult.pode_assinar && (<div
-                                            id="assinatura-overlay"
-                                            className="absolute inset-0 cursor-default"
-                                            onClick={handleClickPdf}
-                                            onMouseMove={handleHoverPdf}
-                                            onMouseLeave={() => {
-                                                if (!isPreviewLocked) setPreviewCoords(null);
-                                            }}
-                                            onWheel={handlePdfOverlayWheel}
-                                        />)}
-
-                                        {/* Pré-visualização da assinatura */}
-                                        {selectedResult.pode_assinar && !isPreviewLocked && previewCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(previewCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                        {selectedResult.pode_assinar && signatureCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
-                            <Button
-                                disabled={currentPage <= 1}
-                                onClick={() => changePage(currentPage - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPage}
-                                {totalPages ? ` / ${totalPages}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
-                                onClick={() => changePage(currentPage + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOut}
-                                    disabled={zoom <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoom * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomIn}
-                                    disabled={zoom >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            {(selectedResult.pode_assinar && <Button onClick={confirmarAssinatura} className="flex items-center">
-                                Assinar
-                            </Button>)}
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimir()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalDocumentosOpen}
+                onOpenChange={(open) => {
+                    if (!open) setSelectedResultDocumento(null);
+                    setIsModalDocumentosOpen(open);
+                }}
+                title={selectedResult?.assunto ?? ''}
+                pdfBase64={selectedResultDocumento}
+                canSign={selectedResult?.pode_assinar}
+                onSign={confirmarAssinatura}
+                isLoading={isLoading}
+            />
 
             {error && (
                 <p className="mb-4 text-center text-sm text-destructive">

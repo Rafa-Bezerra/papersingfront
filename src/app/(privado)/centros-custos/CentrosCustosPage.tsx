@@ -131,7 +131,6 @@ export default function Page() {
     buscaCentrosDeCusto()
     buscaContasFinanceiras()
     buscaUsuarios();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -148,7 +147,6 @@ export default function Page() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
   async function buscaCentrosDeCusto() {
@@ -470,12 +468,7 @@ export default function Page() {
       {/* Formulário */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent
-          className="
-            max-w-md
-            min-w-[800px]
-            max-h-[90vh]
-            overflow-y-auto
-          "
+          className="w-[98vw] max-w-md max-h-[90vh] overflow-y-auto"
         >
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-center">
