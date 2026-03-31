@@ -28,7 +28,8 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from '@/utils/functions'
-import { Loader2, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import PdfViewerDialog from '@/components/PdfViewerDialog'
 import {
     aprovar,
     Bordero,
@@ -41,7 +42,6 @@ import {
 } from '@/services/borderoService';
 import { Label } from '@radix-ui/react-label';
 import { toast } from 'sonner';
-import { PdfViewport } from '@/utils/pdfCoords'
 
 export default function Page() {
     const titulo = 'Borderôs'
@@ -73,36 +73,8 @@ export default function Page() {
     const [anexosResults, setAnexosResults] = useState<BorderoItem[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState<number | null>(null);
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [documentoItemSelecionado, setDocumentoItemSelecionado] = useState<string>("")
-    const [zoomDocumento, setZoomDocumento] = useState(1.5);
-    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
-    const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source === iframeRef.current?.contentWindow) {
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewport({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, []);
 
     function clearQuery() { setQuery('') }
 
@@ -156,7 +128,6 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, situacaoFiltrada, dateFrom, dateTo])
 
     async function handleSearch(q: string) {
@@ -248,23 +219,11 @@ export default function Page() {
 
     async function handleDocumento(item: BorderoItem) {
         setIsLoading(true)
-        setCurrentPage(1);
-        setTotalPages(null);
-        setPdfViewport(null);
         setItemSelecionado(item)
         try {
             const data = await getAnexoById(item.id_movimento_ligacao);
-            const arquivoBase64 = data.arquivo!.replace(/^data:.*;base64,/, '').trim();
-            setArquivoParaImpressao(data.arquivo);
-            setDocumentoItemSelecionado(arquivoBase64);
-            setTimeout(() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: arquivoBase64 },
-                    '*'
-                );
-            }, 500);
-
-            setZoomDocumento(1.5);
+            setArquivoParaImpressao(data.arquivo ?? null);
+            setDocumentoItemSelecionado(data.arquivo ?? "");
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -273,37 +232,11 @@ export default function Page() {
         }
     }
 
-    function handleZoomInDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.min(5, zoomDocumento + 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOutDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomResetDocumento() {
-        if (!iframeRef.current) return;
-        setZoomDocumento(1.5);
-        iframeRef.current.contentWindow?.postMessage({ zoomReset: true }, "*");
-    }
-
     function handleImprimir() {
         if (!arquivoParaImpressao) return;
         let base64 = arquivoParaImpressao.trim();
         if (base64.startsWith("data:")) base64 = base64.split(",")[1];
         imprimirPdfBase64(base64);
-    }
-
-    function changePage(newPage: number) {
-        if (!iframeRef.current) return;
-        setCurrentPage(newPage);
-        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
     }
 
     async function handleAnexos(requisicao: Bordero) {
@@ -600,7 +533,7 @@ export default function Page() {
             {/* Itens */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-left">{`Aprovações movimentação n° ${requisicaoSelecionada.id_bordero}`}</DialogTitle>
                         </DialogHeader>
@@ -635,97 +568,14 @@ export default function Page() {
 
             {/* Documento */}
             {itemSelecionado && (
-                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {`Documento item n° ${itemSelecionado.id_movimento_ligacao}`}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex justify-center bg-gray-50">
-                            {documentoItemSelecionado ? (
-                                <>
-                                    {/* PDF sem overflow interno */}
-                                    <iframe
-                                        ref={iframeRef}
-                                        src="/pdf-viewer.html"
-                                        className="relative border-none  cursor-crosshair"
-                                        style={pdfStyle}
-                                    />
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
-                            <Button
-                                disabled={currentPage <= 1}
-                                onClick={() => changePage(currentPage - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPage}
-                                {totalPages ? ` / ${totalPages}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
-                                onClick={() => changePage(currentPage + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOutDocumento}
-                                    disabled={zoomDocumento <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoomDocumento * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomInDocumento}
-                                    disabled={zoomDocumento >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomResetDocumento}
-                                    title="Resetar zoom"
-                                >
-                                    <RotateCcw className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimir()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <PdfViewerDialog
+                    open={isModalDocumentosOpen}
+                    onOpenChange={setIsModalDocumentosOpen}
+                    title={`Documento item n° ${itemSelecionado.id_movimento_ligacao}`}
+                    pdfBase64={documentoItemSelecionado || null}
+                    onPrint={handleImprimir}
+                    isLoading={isLoading}
+                />
             )}
 
             {/* Loading */}

@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Eye, Filter, Search, SearchIcon, SquarePlus, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, ChevronsUpDown, Eye, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -29,9 +29,9 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
-import { getPdfClickCoords, getSignaturePreviewStyle, handlePdfOverlayWheel, PdfClickCoords, PdfViewport } from "@/utils/pdfCoords";
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
+import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo, getDocumento } from '@/services/comunicadoService';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
@@ -86,16 +86,6 @@ export default function Page() {
     const [isModalComunicadosOpen, setIsModalComunicadosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const iframeRefAnexo = useRef<HTMLIFrameElement>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState<number | null>(null);
-    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
-    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
-    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
-    const [zoom, setZoom] = useState(1.5);
     const [isFormComunicadoOpen, setIsFormComunicadoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateComunicadoMode, setUpdateComunicadoMode] = useState(false)
@@ -105,9 +95,6 @@ export default function Page() {
     const [anexoParaAssinatura, setAnexoParaAssinatura] = useState<string>("")
     const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
     const carregou = useRef(false)
-    const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
 
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [openCodcontaSearch, setOpenCodcontaSearch] = useState(false)
@@ -122,54 +109,7 @@ export default function Page() {
     const [anexosSubmit, setAnexosSubmit] = useState<ComunicadoAnexo[]>([])
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const [anexoSelecionado, setAnexoSelecionado] = useState<ComunicadoAnexo | null>(null)
-    const [currentPageAnexo, setCurrentPageAnexo] = useState(1);
-    const [totalPagesAnexo, setTotalPagesAnexo] = useState<number | null>(null);
-    const [pdfViewportAnexo, setPdfViewportAnexo] = useState<PdfViewport | null>(null);
     const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
-    const [zoomAnexo, setZoomAnexo] = useState(1.5);
-    const pdfAnexoStyle = pdfViewportAnexo
-        ? { width: `${pdfViewportAnexo.width}px`, height: `${pdfViewportAnexo.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source === iframeRef.current?.contentWindow) {
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewport({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, []);
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source === iframeRefAnexo.current?.contentWindow) {
-                if (event.data?.totalPages) {
-                    setTotalPagesAnexo(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewportAnexo({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, []);
 
     const form = useForm<Comunicado>({
         defaultValues: {
@@ -195,12 +135,6 @@ export default function Page() {
             aprovacao: '',
         }
     })
-
-    function changePage(newPage: number) {
-        if (!iframeRef.current) return;
-        setCurrentPage(newPage);
-        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
-    }
 
     function clearQuery() { setQuery('') }
 
@@ -300,7 +234,6 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, situacaoFiltrada, dateFrom, dateTo])
 
     async function handleSearch(q: string) {
@@ -341,27 +274,10 @@ export default function Page() {
             const arquivo = await getDocumento(requisicao.id);
             const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
             setArquivoParaImpressao(pdfClean);
-            // console.log(arquivo);
-            setIsLoading(true)
-            setIsModalComunicadosOpen(true)
+            setRequisicaoComunicadoSelecionada(pdfClean);
+            setAnexoParaAssinatura(pdfClean);
             setRequisicaoSelecionada(requisicao)
-            setCurrentPage(1);
-            setTotalPages(null);
-            setCoords(null);
-            setSignatureCoords(null);
-            setPreviewCoords(null);
-            setIsPreviewLocked(false);
-            const arquivoBase64 = arquivo.replace(/^data:.*;base64,/, '').trim();
-            setRequisicaoComunicadoSelecionada(arquivoBase64);
-            setAnexoParaAssinatura(arquivoBase64);
-
-            setTimeout(() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: arquivoBase64 },
-                    '*'
-                );
-            }, 500);
-            setZoom(1.5);
+            setIsModalComunicadosOpen(true)
         } catch (err) {
             console.log(err);
         } finally {
@@ -369,34 +285,17 @@ export default function Page() {
         }
     }
 
-    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const nextCoords = getPdfClickCoords(e, pdfViewport);
-        setCoords(nextCoords);
-        setSignatureCoords(nextCoords);
-        setPreviewCoords(null);
-        setIsPreviewLocked(true);
-    }
-
-    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
-        if (isPreviewLocked) return;
-        setPreviewCoords(getPdfClickCoords(e, pdfViewport));
-    }
-
-    async function confirmarAssinatura() {
+    async function confirmarAssinatura(data: PdfSignData) {
         setIsLoading(true)
-        if (!coords) {
-            toast.error("Clique no local onde deseja assinar o Pagamento.");
-            return;
-        }
         try {
             const dadosAssinatura: ComunicadoAssinar = {
                 id: requisicaoSelecionada!.id,
                 anexo: anexoParaAssinatura!,
-                pagina: currentPage,
-                posX: coords.x,
-                posY: coords.yI,
-                largura: 90,
-                altura: 30,
+                pagina: data.page,
+                posX: data.posX,
+                posY: data.posY,
+                largura: data.largura,
+                altura: data.altura,
             };
             await updateElement(dadosAssinatura);
             handleSearchClick()
@@ -588,20 +487,6 @@ export default function Page() {
         }
     }
 
-    function handleZoomIn() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.min(5, zoom + 0.25);
-        setZoom(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOut() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.max(0.5, zoom - 0.25);
-        setZoom(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
     async function handleSubmitAnexos() {
         setIsLoading(true)
         if (!file) return toast.error("Selecione um arquivo primeiro!")
@@ -626,19 +511,8 @@ export default function Page() {
             const arquivo = await getAnexo(anexo.anexo);
             const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
             setAnexoParaImpressao(pdfClean);
-
-            setIsModalVisualizarAnexoOpen(true)
             setAnexoSelecionado(anexo);
-            setCurrentPageAnexo(1);
-            setTotalPagesAnexo(null);
-            setPdfViewportAnexo(null);
-            setTimeout(() => {
-                iframeRefAnexo.current?.contentWindow?.postMessage(
-                    { pdfBase64: pdfClean },
-                    '*'
-                );
-            }, 500);
-            setZoomAnexo(1.5);
+            setIsModalVisualizarAnexoOpen(true)
         } catch (err) {
             console.log(err);
             toast.error("Não foi possível carregar o anexo.");
@@ -647,31 +521,11 @@ export default function Page() {
         }
     }
 
-    function changePageAnexo(newPage: number) {
-        if (!iframeRefAnexo.current) return;
-        setCurrentPageAnexo(newPage);
-        iframeRefAnexo.current.contentWindow?.postMessage({ page: newPage }, "*");
-    }
-
     function handleImprimirAnexo() {
         if (!anexoParaImpressao) return;
         let base64 = anexoParaImpressao.trim();
         if (base64.startsWith("data:")) base64 = base64.split(",")[1];
         imprimirPdfBase64(base64);
-    }
-
-    function handleZoomInAnexo() {
-        if (!iframeRefAnexo.current) return;
-        const newZoom = Math.min(5, zoomAnexo + 0.25);
-        setZoomAnexo(newZoom);
-        iframeRefAnexo.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOutAnexo() {
-        if (!iframeRefAnexo.current) return;
-        const newZoom = Math.max(0.5, zoomAnexo - 0.25);
-        setZoomAnexo(newZoom);
-        iframeRefAnexo.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     async function submitAprovador(data: ComunicadoAprovacao) {
@@ -884,121 +738,16 @@ export default function Page() {
             )}
 
             {/* Comunicado */}
-            {requisicaoSelecionada && (
-                <Dialog open={isModalComunicadosOpen} onOpenChange={setIsModalComunicadosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {`Pagamento movimentação n° ${requisicaoSelecionada.id}`}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
-                            {requisicaoComunicadoSelecionada ? (
-                                <>
-                                    <div className="relative" style={pdfStyle}>
-                                        {/* PDF */}
-                                        <iframe
-                                            ref={iframeRef}
-                                            src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default"
-                                            style={pdfStyle}
-                                        />
-
-                                        {/* Overlay */}
-                                        <div
-                                            id="assinatura-overlay"
-                                            className="absolute inset-0 cursor-default"
-                                            onClick={handleClickPdf}
-                                            onMouseMove={handleHoverPdf}
-                                            onMouseLeave={() => {
-                                                if (!isPreviewLocked) setPreviewCoords(null);
-                                            }}
-                                            onWheel={handlePdfOverlayWheel}
-                                        />
-
-                                        {/* Pré-visualização da assinatura */}
-                                        {!isPreviewLocked && previewCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(previewCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                        {signatureCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none"
-                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum comunicado disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
-                            <Button
-                                disabled={currentPage <= 1}
-                                onClick={() => changePage(currentPage - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPage}
-                                {totalPages ? ` / ${totalPages}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
-                                onClick={() => changePage(currentPage + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOut}
-                                    disabled={zoom <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoom * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomIn}
-                                    disabled={zoom >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            {(requisicaoSelecionada.documento_assinado == 0 && <Button onClick={confirmarAssinatura} className="flex items-center">
-                                Assinar
-                            </Button>)}
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimir()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalComunicadosOpen}
+                onOpenChange={setIsModalComunicadosOpen}
+                title={requisicaoSelecionada ? `Pagamento movimentação n° ${requisicaoSelecionada.id}` : ''}
+                pdfBase64={requisicaoComunicadoSelecionada || null}
+                canSign={requisicaoSelecionada?.documento_assinado == 0}
+                onSign={confirmarAssinatura}
+                onPrint={handleImprimir}
+                isLoading={isLoading}
+            />
 
             {/* Loading */}
             <Dialog open={isLoading} onOpenChange={setIsLoading}>
@@ -1018,7 +767,7 @@ export default function Page() {
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="max-w-md min-w-[800px]">
+                <DialogContent className="max-w-md">
                     <div className="max-h-[90vh] overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
@@ -1339,92 +1088,14 @@ export default function Page() {
             </Dialog>
 
             {/* Visualizar anexo */}
-            {anexoSelecionado && (
-                <Dialog open={isModalVisualizarAnexoOpen} onOpenChange={(open) => { setIsModalVisualizarAnexoOpen(open); }}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0 z-10">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {`Anexo ${anexoSelecionado.nome}`}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
-                            {anexoSelecionado ? (
-                                <>
-                                    <div className="relative" style={pdfAnexoStyle}>
-                                        {/* PDF */}
-                                        <iframe
-                                            ref={iframeRefAnexo}
-                                            src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default"
-                                            style={pdfAnexoStyle}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
-                            <Button
-                                disabled={currentPageAnexo <= 1}
-                                onClick={() => changePageAnexo(currentPageAnexo - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPageAnexo}
-                                {totalPagesAnexo ? ` / ${totalPagesAnexo}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPageAnexo >= (totalPagesAnexo == null ? 1 : totalPagesAnexo)}
-                                onClick={() => changePageAnexo(currentPageAnexo + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOutAnexo}
-                                    disabled={zoomAnexo <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoomAnexo * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomInAnexo}
-                                    disabled={zoomAnexo >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimirAnexo()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalVisualizarAnexoOpen}
+                onOpenChange={setIsModalVisualizarAnexoOpen}
+                title={anexoSelecionado ? `Anexo ${anexoSelecionado.nome}` : ''}
+                pdfBase64={anexoParaImpressao}
+                onPrint={handleImprimirAnexo}
+                isLoading={isLoading}
+            />
 
             {/* Anexos */}
             {requisicaoSelecionada && (

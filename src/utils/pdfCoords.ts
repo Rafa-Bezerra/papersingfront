@@ -146,7 +146,10 @@ export function getPdfClickCoords(
 
 
 /**
- * Permite scroll do PDF usando o mouse wheel no overlay
+ * Permite scroll do PDF usando o mouse wheel no overlay.
+ * - Scroll normal: vertical
+ * - Shift + Scroll: horizontal
+ * - Trackpad (deltaX): horizontal
  */
 export function handlePdfOverlayWheel(
   e: WheelEvent<HTMLDivElement>
@@ -157,6 +160,10 @@ export function handlePdfOverlayWheel(
 
   if (!scrollContainer) return;
 
-  scrollContainer.scrollTop += e.deltaY;
-  scrollContainer.scrollLeft += e.deltaX;
+  if (e.shiftKey) {
+    scrollContainer.scrollLeft += e.deltaY;
+  } else {
+    scrollContainer.scrollTop += e.deltaY;
+    scrollContainer.scrollLeft += e.deltaX;
+  }
 }

@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
 import { getTrimmedImage } from "@/utils/functions";
 
-export default function PageAlterarSenha() {    
+export default function PageAlterarSenha() {
   const router = useRouter()
   const [loading, setLoading] = useState(false);
   const sigCanvas = useRef<SignatureCanvas>(null);
@@ -34,14 +34,13 @@ export default function PageAlterarSenha() {
     },
   });
 
-  useEffect(() => {        
+  useEffect(() => {
     handleSearch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSearch() {
     setLoading(true);
-    try {      
+    try {
       const assinaturaBase64 = await get();
       sigCanvas.current?.fromDataURL(`data:image/png;base64,${assinaturaBase64.assinatura}`);
     } catch (err) {
@@ -51,7 +50,7 @@ export default function PageAlterarSenha() {
     }
   }
 
-  
+
   async function onSubmit() {
     setLoading(true);
     try {
@@ -66,13 +65,13 @@ export default function PageAlterarSenha() {
       sigCanvas.current?.clear();
     } catch (err) {
       toast.error((err as Error).message)
-    } finally {      
+    } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       <Card>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
@@ -93,6 +92,7 @@ export default function PageAlterarSenha() {
                         penColor="black"
                         canvasProps={{
                           className: "w-full h-48 rounded-lg",
+                          style: { touchAction: 'none' },
                         }}
                       />
                     </div>

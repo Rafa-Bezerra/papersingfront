@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
 import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
-import { PdfClickCoords, PdfViewport, getPdfClickCoords, getSignaturePreviewStyle, getSignaturePreviewStyleFromPointer, handlePdfOverlayWheel } from "@/utils/pdfCoords";
+import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -24,7 +24,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, RefreshCw, SearchIcon, X, ZoomIn, ZoomOut, Search, Loader2 } from 'lucide-react'
+import { Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
 
@@ -50,52 +50,13 @@ export default function Page() {
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState<number | null>(null);
     const [isPending, startTransition] = useTransition()
-    const [coords, setCoords] = useState<PdfClickCoords | null>(null);
-    const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null);
-    const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null);
-    const [isPreviewLocked, setIsPreviewLocked] = useState(false);
-    const [pdfViewport, setPdfViewport] = useState<PdfViewport | null>(null);
-    const [zoomDocumento, setZoomDocumento] = useState(1.5);
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposMovimento, setTiposMovimento] = useState<string[]>([])
     const [podeAssinar, setPodeAssinar] = useState(false)
-    const pdfStyle = pdfViewport
-        ? { width: `${pdfViewport.width}px`, height: `${pdfViewport.height}px` }
-        : { width: '100%', height: '100%', maxWidth: '800px', aspectRatio: '1/sqrt(2)' };
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.source === iframeRef.current?.contentWindow) {
-                if (event.data?.totalPages) {
-                    setTotalPages(event.data.totalPages);
-                }
-                if (event.data?.pdfViewport) {
-                    setPdfViewport({
-                        width: event.data.pdfViewport.width,
-                        height: event.data.pdfViewport.height,
-                        scale: event.data.pdfViewport.scale
-                    });
-                }
-            }
-        };
-
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, []);
-
-    function changePage(newPage: number) {
-        if (!iframeRef.current) return;
-        setCurrentPage(newPage);
-        iframeRef.current.contentWindow?.postMessage({ page: newPage }, "*");
-    }
-
     function clearQuery() {
         setQuery('')
     }
@@ -218,13 +179,6 @@ export default function Page() {
 
     async function handleDocumento(requisicao: FiscalResponseDto, tipo: string) {
         setIsLoading(true)
-        setCurrentPage(1);
-        setTotalPages(null);
-        setCoords(null);
-        setSignatureCoords(null);
-        setPreviewCoords(null);
-        setIsPreviewLocked(false);
-        setPdfViewport(null);
         setPodeAssinar(false);
         setSelectedDocumentoTipo(tipo);
         const usuarioAprovador = requisicao.fiscal_aprovacoes.some(
@@ -245,19 +199,7 @@ export default function Page() {
                 tipo: tipo
             };
             const responseData = await getDocumento(data);
-            // console.log(responseData);
-            
-            // const arquivoBase64 = responseData;
             setSelectedDocumento(responseData);
-
-            setTimeout(() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: responseData },
-                    '*'
-                );
-            }, 500);
-
-            setZoomDocumento(1.5);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -268,47 +210,17 @@ export default function Page() {
 
     async function handleAnexo(requisicao: FiscalDocumento, tipo: string) {
         setIsLoading(true)
-        setCurrentPage(1);
-        setTotalPages(null);
-        setCoords(null);
-        setSignatureCoords(null);
-        setPreviewCoords(null);
-        setIsPreviewLocked(false);
-        setPdfViewport(null);
         setPodeAssinar(false);
         setSelectedDocumentoTipo(tipo);
         try {
             const arquivoBase64 = requisicao.anexo;
             setSelectedDocumento(arquivoBase64);
-
-            setTimeout(() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                    { pdfBase64: arquivoBase64 },
-                    '*'
-                );
-            }, 500);
-
-            setZoomDocumento(1.5);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
             setIsModalDocumentosOpen(true)
         }
-    }
-
-    function handleZoomInDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.min(5, zoomDocumento + 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
-    }
-
-    function handleZoomOutDocumento() {
-        if (!iframeRef.current) return;
-        const newZoom = Math.max(0.5, zoomDocumento - 0.25);
-        setZoomDocumento(newZoom);
-        iframeRef.current.contentWindow?.postMessage({ zoom: newZoom }, "*");
     }
 
     async function handleAssinar(data: FiscalAssinar) {
@@ -326,34 +238,17 @@ export default function Page() {
         }
     }
 
-    function handleClickPdf(e: React.MouseEvent<HTMLDivElement>) {
-        const nextCoords = getPdfClickCoords(e, pdfViewport);
-        setCoords(nextCoords);
-        setSignatureCoords(nextCoords);
-        setPreviewCoords(null);
-        setIsPreviewLocked(true);
-    }
-
-    function handleHoverPdf(e: React.MouseEvent<HTMLDivElement>) {
-        if (isPreviewLocked) return;
-        setPreviewCoords(getPdfClickCoords(e, pdfViewport));
-    }
-
-    async function confirmarAssinatura() {
+    async function confirmarAssinatura(data: PdfSignData) {
         if (!selectedResult || selectedDocumentoTipo != "fiscal" || !selectedDocumento) return;
-        if (!coords) {
-            toast.error("Clique no local onde deseja assinar o documento.");
-            return;
-        }
         const dadosAssinatura: FiscalAssinar = {
             idmov: selectedResult.fiscal.idmov,
             atendimento: selectedResult.movimento.codigo_atendimento,
             arquivo: selectedDocumento,
-            pagina: currentPage,
-            posX: coords.x,
-            posY: coords.yI,
-            largura: 90,
-            altura: 30,
+            pagina: data.page,
+            posX: data.posX,
+            posY: data.posY,
+            largura: data.largura,
+            altura: data.altura,
         };
         await handleAssinar(dadosAssinatura);
     }
@@ -408,20 +303,6 @@ export default function Page() {
             setIsModalAnexosOpen(true)
         }
     }    
-
-    function handleImprimir() {
-        if (!iframeRef.current) return;
-
-        const iframe = iframeRef.current as HTMLIFrameElement;
-        const iframeWindow = iframe.contentWindow;
-
-        if (iframeWindow) {
-            iframeWindow.focus();
-            iframeWindow.print();
-        } else {
-            toast.error("Não foi possível acessar o documento para impressão.");
-        }
-    }
 
     const colunas = useMemo<ColumnDef<FiscalResponseDto>[]>(
         () => [
@@ -687,7 +568,7 @@ export default function Page() {
             {/* Itens */}
             {resultItens && selectedResult && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[1000px] ">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] ">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${selectedResult.fiscal.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -761,133 +642,25 @@ export default function Page() {
             )}
 
             {/* Documento */}
-            {selectedResult && selectedDocumento && selectedDocumentoTipo && (
-                <Dialog open={isModalDocumentosOpen} onOpenChange={setIsModalDocumentosOpen}>
-                    <DialogContent className="w-[98vw] h-[98vh] max-w-none max-h-none flex flex-col overflow-y-auto  min-w-[850px]  overflow-x-auto p-0">
-                        <DialogHeader className="p-4 shrink-0 sticky top-0">
-                            <DialogTitle className="text-lg font-semibold text-center">
-                                {(() => {
-                                    switch (selectedDocumentoTipo) {
-                                        case "anexo":
-                                            return "Visualizar anexo";
-                                        case "movimento":
-                                            return `Documento movimentação n° ${selectedResult.movimento.idmov}`;
-                                        default:
-                                            return `Documento fiscal n° ${selectedResult.fiscal.idmov}`;
-                                    }
-                                })()}
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        {/* Área do PDF */}
-                        <div className="relative w-full flex-1 overflow-auto flex justify-center bg-gray-50" data-pdf-scroll="true">
-                            {selectedDocumento ? (
-                                <>
-                                    <div className="relative" style={pdfStyle}>
-                                        {/* PDF */}
-                                        <iframe
-                                            ref={iframeRef}
-                                            src="/pdf-viewer.html"
-                                            className="relative border-none cursor-default pointer-events-none"
-                                            style={{ width: '100%', height: '100%' }}
-                                        />
-
-                                        {/* Overlay */}
-                                        {selectedDocumentoTipo == "fiscal" && (
-                                            <div
-                                                id="assinatura-overlay"
-                                                className="absolute inset-0 cursor-default pointer-events-auto z-10"
-                                                onClick={handleClickPdf}
-                                                onMouseMove={handleHoverPdf}
-                                                onMouseLeave={() => {
-                                                    if (!isPreviewLocked) setPreviewCoords(null);
-                                                }}
-                                                onWheel={handlePdfOverlayWheel}
-                                            />
-                                        )}
-
-                                        {/* Pré-visualização da assinatura */}
-                                        {selectedDocumentoTipo == "fiscal" && !isPreviewLocked && previewCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-600/70 bg-blue-500/10 rounded-sm pointer-events-none z-20"
-                                                style={getSignaturePreviewStyleFromPointer(previewCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                        {selectedDocumentoTipo == "fiscal" && signatureCoords && (
-                                            <div
-                                                className="absolute border-2 border-blue-700 bg-blue-500/15 rounded-sm pointer-events-none z-20"
-                                                style={getSignaturePreviewStyle(signatureCoords, pdfViewport) ?? undefined}
-                                            />
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="flex items-center justify-center h-full py-10">
-                                    Nenhum documento disponível
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex justify-center items-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t flex-wrap">
-                            <Button
-                                disabled={currentPage <= 1}
-                                onClick={() => changePage(currentPage - 1)}
-                            >
-                                Anterior
-                            </Button>
-                            <span>
-                                Página {currentPage}
-                                {totalPages ? ` / ${totalPages}` : ""}
-                            </span>
-                            <Button
-                                disabled={currentPage >= (totalPages == null ? 1 : totalPages)}
-                                onClick={() => changePage(currentPage + 1)}
-                            >
-                                Próxima
-                            </Button>
-
-                            {/* Controles de Zoom */}
-                            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Zoom:</span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomOutDocumento}
-                                    disabled={zoomDocumento <= 0.5}
-                                    title="Diminuir zoom"
-                                >
-                                    <ZoomOut className="h-4 w-4" />
-                                </Button>
-                                <span className="text-sm min-w-[3rem] text-center font-medium">
-                                    {Math.round(zoomDocumento * 100)}%
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleZoomInDocumento}
-                                    disabled={zoomDocumento >= 5}
-                                    title="Aumentar zoom"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            {(selectedResult.fiscal.documento_assinado == 0 && podeAssinar && <Button onClick={confirmarAssinatura} className="flex items-center">
-                                Assinar
-                            </Button>)}
-                            <Button
-                                variant="outline"
-                                onClick={() => handleImprimir()}
-                                className="flex items-center"
-                            >
-                                Imprimir
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+            <PdfViewerDialog
+                open={isModalDocumentosOpen}
+                onOpenChange={setIsModalDocumentosOpen}
+                title={(() => {
+                    if (!selectedResult || !selectedDocumentoTipo) return "";
+                    switch (selectedDocumentoTipo) {
+                        case "anexo":
+                            return "Visualizar anexo";
+                        case "movimento":
+                            return `Documento movimentação n° ${selectedResult.movimento.idmov}`;
+                        default:
+                            return `Documento fiscal n° ${selectedResult.fiscal.idmov}`;
+                    }
+                })()}
+                pdfBase64={selectedDocumento || null}
+                canSign={selectedDocumentoTipo === "fiscal" && !!selectedResult && selectedResult.fiscal.documento_assinado == 0 && podeAssinar}
+                onSign={confirmarAssinatura}
+                isLoading={isLoading}
+            />
 
             {/* Loading */}
             <Dialog open={isLoading} onOpenChange={setIsLoading}>

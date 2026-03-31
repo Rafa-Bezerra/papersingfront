@@ -107,7 +107,6 @@ export default function PageUsuarios() {
   useEffect(() => {
     // on mount: run an initial search
     handleSearch(searchParams.get('q') ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -124,7 +123,6 @@ export default function PageUsuarios() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
   async function handleSearch(q: string) {

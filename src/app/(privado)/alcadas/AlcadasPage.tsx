@@ -108,7 +108,6 @@ export default function Page() {
 
     useEffect(() => {
         handleSearch(searchParams.get('q') ?? '')
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -125,7 +124,6 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query])
 
     async function handleSearch(q: string) {
@@ -407,7 +405,7 @@ export default function Page() {
             {/* Modal */}
             {alcadaSelecionada && (
                 <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Centro de custo - ${alcadaSelecionada.centro_custo}`}</DialogTitle>
 
@@ -468,7 +466,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAlcadaOpen} onOpenChange={setIsFormAlcadaOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh] min-w-[800px]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateAlcadaMode ? `${tituloUpdate}: ${alcadaSelecionada?.centro_custo}` : `${tituloInsert}`}
