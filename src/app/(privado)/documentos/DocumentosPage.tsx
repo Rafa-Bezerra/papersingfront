@@ -660,7 +660,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateDocumentoMode ? `Editar: ${requisicaoSelecionada?.nome}` : `Novo documento`}
@@ -715,7 +715,7 @@ export default function Page() {
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
                                         <Button
-                                            size="sm"
+                                            size="icon"
                                             variant="outline"
                                             onClick={() => handleVisualizarAnexo(item)}
                                         >
@@ -759,7 +759,7 @@ export default function Page() {
 
             {/* Form aprovadores */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo aprovador
@@ -898,9 +898,9 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
         <div className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
             {fields.map((field, index) => (
-                <div key={field.id} className="flex flex-col gap-2 border p-2 rounded">
+                <div key={field.id} className="flex items-end gap-2 border p-2 rounded">
                     {/* Usuário (Select com busca) */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1 min-w-0">
                         <label>Usuário</label>
                         <FormField
                             control={form.control}
@@ -917,13 +917,15 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    className="w-full justify-between"
+                                                    className="w-full justify-between min-w-0"
                                                 >
-                                                    {
-                                                        usuarios.find(u => u.codusuario === field.value)?.nome ??
-                                                        "Selecione o usuário"
-                                                    }
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                    <span className="truncate">
+                                                        {
+                                                            usuarios.find(u => u.codusuario === field.value)?.nome ??
+                                                            "Selecione o usuário"
+                                                        }
+                                                    </span>
+                                                    <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverPortal>
@@ -964,7 +966,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
 
 
                     {/* Ordem */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col w-20 shrink-0">
                         <label>Ordem</label>
                         <Input
                             type="number"
@@ -976,15 +978,15 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                     </div>
 
                     {/* Remover */}
-                    <div className="flex justify-end">
-                        <Button
-                            type="button"
-                            onClick={() => remove(index)}
-                            variant="destructive"
-                        >
-                            Remover
-                        </Button>
-                    </div>
+                    <Button
+                        type="button"
+                        onClick={() => remove(index)}
+                        variant="destructive"
+                        size="icon"
+                        className="shrink-0"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
                 </div>
             ))}
 
