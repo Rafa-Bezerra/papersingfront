@@ -41,7 +41,7 @@ import {
     Requisicao_avaliacoes,
     getAllAvaliacoes,
     createAvaliacao,
-    notificarAprovadores
+    notificarAprovador
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
@@ -432,9 +432,14 @@ export default function Page() {
         }
     }
 
-    async function handleNotificar(idmov: number, atendimento: number) {
+    async function handleNotificarAprovador(usuario: string) {
+        if (!requisicaoSelecionada) return
         try {
-            const msg = await notificarAprovadores(idmov, atendimento)
+            const msg = await notificarAprovador(
+                requisicaoSelecionada.requisicao.idmov,
+                requisicaoSelecionada.requisicao.codigo_atendimento,
+                usuario
+            )
             toast.success(msg)
         } catch (err) {
             toast.error((err as Error).message)
@@ -648,17 +653,6 @@ export default function Page() {
                                 </Button>
                             )}
 
-                            {status_liberado && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    title="Notificar aprovadores pendentes por e-mail"
-                                    onClick={() => handleNotificar(requisicao.idmov, requisicao.codigo_atendimento)}
-                                >
-                                    <Bell className="w-4 h-4" />
-                                </Button>
-                            )}
-
                             {requisicao.possui_avaliacoes == 1 && (
                                 <Button
                                     size="sm"
@@ -693,9 +687,23 @@ export default function Page() {
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'nome', header: 'Usuário' },
             { accessorKey: 'situacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.situacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     const colunasAnexos = useMemo<ColumnDef<Anexo>[]>(
@@ -935,7 +943,7 @@ export default function Page() {
             {/* Itens */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] ">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -988,7 +996,7 @@ export default function Page() {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1030,7 +1038,7 @@ export default function Page() {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1110,7 +1118,7 @@ export default function Page() {
             {/* Avaliações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAvaliacoesOpen} onOpenChange={setIsModalAvaliacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>

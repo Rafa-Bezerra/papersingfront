@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
+import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
 import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
@@ -24,7 +25,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
+import { Bell, Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
 
@@ -389,14 +390,42 @@ export default function Page() {
         []
     )
 
+    async function handleNotificarAprovador(usuario: string) {
+        if (!selectedResult) return
+        try {
+            const msg = await notificarAprovador(
+                selectedResult.movimento.idmov,
+                selectedResult.movimento.codigo_atendimento,
+                usuario
+            )
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     const colunasAprovacoes = useMemo<ColumnDef<FiscalAprovacao>[]>(
         () => [
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'nome', header: 'Usuário' },
             { accessorKey: 'situacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.situacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     const colunasAnexos = useMemo<ColumnDef<FiscalDocumento>[]>(
@@ -568,7 +597,7 @@ export default function Page() {
             {/* Itens */}
             {resultItens && selectedResult && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] ">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${selectedResult.fiscal.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -616,7 +645,7 @@ export default function Page() {
             {/* Aprovações */}
             {resultAprovacoes && selectedResult && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${selectedResult.fiscal.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -630,7 +659,7 @@ export default function Page() {
             {/* Anexos */}
             {resultAnexos && selectedResult && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${selectedResult.fiscal.idmov}`}</DialogTitle>
                         </DialogHeader>

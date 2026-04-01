@@ -989,7 +989,7 @@ export default function Page() {
             {/* Itens ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1003,7 +1003,7 @@ export default function Page() {
             {/* Anexos ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1017,7 +1017,7 @@ export default function Page() {
             {/* Aprovadores ultimos movimentos */}
             {selectedResult && (
                 <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
-                    <DialogContent className="w-[98vw] max-w-[98vw] max-h-[90vh] overflow-x-auto overflow-y-auto">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovadores movimentação n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
