@@ -796,8 +796,8 @@ export default function Page() {
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="max-w-md">
-                    <div className="max-h-[90vh] overflow-y-auto pr-2">
+                <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+                    <div className="overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
                                 {updateComunicadoMode ? `Editar: ${requisicaoSelecionada?.nome}` : `Novo Comunicado`}
@@ -1026,14 +1026,13 @@ export default function Page() {
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3">
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="flex flex-col gap-3">
                                             <div className="flex flex-col gap-1">
                                                 <Label>Arquivo</Label>
                                                 <Input
                                                     type="file"
                                                     accept="application/pdf/*"
                                                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                                    className="w-40"
                                                 />
                                             </div>
                                             <div className="flex flex-col gap-1">
@@ -1042,7 +1041,6 @@ export default function Page() {
                                                     type="text"
                                                     value={fileName}
                                                     onChange={(e) => setFileName(e.target.value)}
-                                                    className="w-40"
                                                     aria-label='Descrição do anexo'
                                                     placeholder='Descrição do anexo'
                                                 />
@@ -1064,7 +1062,7 @@ export default function Page() {
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                     <Button
-                                                        size="sm"
+                                                        size="icon"
                                                         variant="outline"
                                                         onClick={() => handleVisualizarAnexo(item)}
                                                     >
@@ -1085,7 +1083,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo aprovador
@@ -1222,10 +1220,10 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
             {fields.map((field, index) => (
                 <div
                     key={field.id}
-                    className="grid grid-cols-2 gap-2 items-end border p-2 rounded"
+                    className="flex items-end gap-2 border p-2 rounded"
                 >
                     {/* Usuário (Select com busca) */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1 min-w-0">
                         <label>Usuário</label>
 
                         <FormField
@@ -1243,13 +1241,15 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    className="w-full justify-between"
+                                                    className="w-full justify-between min-w-0"
                                                 >
-                                                    {
-                                                        usuarios.find(u => u.codusuario === field.value)?.nome ??
-                                                        "Selecione o usuário"
-                                                    }
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                    <span className="truncate">
+                                                        {
+                                                            usuarios.find(u => u.codusuario === field.value)?.nome ??
+                                                            "Selecione o usuário"
+                                                        }
+                                                    </span>
+                                                    <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverPortal>
@@ -1295,8 +1295,10 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
                         type="button"
                         onClick={() => remove(index)}
                         variant="destructive"
+                        size="icon"
+                        className="shrink-0"
                     >
-                        Remover
+                        <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
             ))}

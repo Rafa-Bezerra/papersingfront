@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -568,7 +568,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo documento
@@ -742,10 +742,10 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<DocumentoE
             {fields.map((field, index) => (
                 <div
                     key={field.id}
-                    className="grid grid-cols-3 gap-2 items-end border p-2 rounded"
+                    className="flex items-end gap-2 border p-2 rounded"
                 >
                     {/* Usuário (Select com busca) */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1 min-w-0">
                         <label>Usuário</label>
 
                         <FormField
@@ -763,13 +763,15 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<DocumentoE
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    className="w-full justify-between"
+                                                    className="w-full justify-between min-w-0"
                                                 >
-                                                    {
-                                                        usuarios.find(u => u.codusuario === field.value)?.nome ??
-                                                        "Selecione o usuário"
-                                                    }
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                    <span className="truncate">
+                                                        {
+                                                            usuarios.find(u => u.codusuario === field.value)?.nome ??
+                                                            "Selecione o usuário"
+                                                        }
+                                                    </span>
+                                                    <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverPortal>
@@ -811,7 +813,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<DocumentoE
 
 
                     {/* Nível */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col w-20 shrink-0">
                         <label>Nível</label>
                         <Input
                             type="number"
@@ -827,8 +829,10 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<DocumentoE
                         type="button"
                         onClick={() => remove(index)}
                         variant="destructive"
+                        size="icon"
+                        className="shrink-0"
                     >
-                        Remover
+                        <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
             ))}
