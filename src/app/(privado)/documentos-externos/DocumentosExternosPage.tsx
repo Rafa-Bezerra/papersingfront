@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, Filter, SearchIcon, SquarePlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -53,6 +53,7 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover';
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import { DocumentoExterno, DocumentoExternoAprovador, DocumentoExternoAssinar, DocumentoExternoCreateDTO, DocumentoExternoFiltro, aprovar, assinarDocumento, createElement, deleteElement, getAll, getAllAprovadores, getDocumento } from '@/services/documentoExternoService'
+import { notificarAprovador } from '@/services/requisicoesService'
 import {
     Usuario,
     getAll as getAllUsuarios
@@ -382,14 +383,42 @@ export default function Page() {
         []
     )
 
+    async function handleNotificarAprovador(usuario: string) {
+        if (!selectedResult) return
+        try {
+            const msg = await notificarAprovador(
+                selectedResult.id,
+                0,
+                usuario
+            )
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     const colunasAprovacoes = useMemo<ColumnDef<DocumentoExternoAprovador>[]>(
         () => [
             { accessorKey: 'nome', header: 'Usuário' },
             { accessorKey: 'nivel', header: 'Nível' },
             { accessorKey: 'aprovacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.aprovacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     async function confirmarAssinatura(data: PdfSignData) {
@@ -510,7 +539,7 @@ export default function Page() {
             {/* Aprovações */}
             {selectedResult && selectedResultAprovacoes && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações documento n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>

@@ -80,13 +80,13 @@ export async function createAvaliacao(data: Requisicao_avaliacoes): Promise<void
     }
 }
 
-export async function notificarAprovadores(idmov: number, atendimento: number): Promise<string> {
-    const url = new URL(`${API_BASE}/api/${caminho}/notificar/${idmov}/${atendimento}`);
+export async function notificarAprovador(idmov: number, atendimento: number, usuario: string): Promise<string> {
+    const url = new URL(`${API_BASE}/api/${caminho}/notificar/${idmov}/${atendimento}/${encodeURIComponent(usuario)}`);
     const res = await fetch(url.toString(), { method: 'POST', headers: headers() });
 
     if (!res.ok) {
         const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao notificar aprovadores: ${msg}`);
+        throw new Error(`Erro ${res.status} ao notificar aprovador: ${msg}`);
     }
 
     const data = await res.json();

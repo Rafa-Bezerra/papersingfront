@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, ChevronsUpDown, Eye, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, Eye, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacriti
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { adicionarAprovador, aprovar, assinar, createElement, deleteElement, Documento, DocumentoAprovacao, getAll, getAnexo } from '@/services/documentoService';
+import { notificarAprovador } from '@/services/requisicoesService';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
@@ -483,15 +484,43 @@ export default function Page() {
         [userName]
     )
 
+    async function handleNotificarAprovador(usuario: string) {
+        if (!requisicaoSelecionada) return
+        try {
+            const msg = await notificarAprovador(
+                requisicaoSelecionada.id,
+                0,
+                usuario
+            )
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     const colunasAprovacoes = useMemo<ColumnDef<DocumentoAprovacao>[]>(
         () => [
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'usuario_nome', header: 'Usuário' },
             { accessorKey: 'ordem', header: 'Ordem' },
             { accessorKey: 'aprovacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.aprovacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     const colunasAnexos = useMemo<ColumnDef<DocumentoAnexo>[]>(
@@ -585,7 +614,7 @@ export default function Page() {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                             <Button onClick={handleInserirAprovador} className="flex items-center">
@@ -602,7 +631,7 @@ export default function Page() {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>

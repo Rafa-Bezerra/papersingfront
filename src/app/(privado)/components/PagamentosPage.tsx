@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from "@/components/ui/button";
 import { Pagamento, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoGerarDocumento, gerarDocumento, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento } from "@/services/pagamentosService";
+import { notificarAprovador } from '@/services/requisicoesService';
 import { dateToIso, htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
 import { ColumnDef } from "@tanstack/react-table";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +23,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, Loader2, SearchIcon, X } from "lucide-react";
+import { Bell, Check, Filter, Loader2, SearchIcon, X } from "lucide-react";
 import { DataTable } from '@/components/ui/data-table'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { toast } from 'sonner';
@@ -499,14 +500,42 @@ export default function Page({ titulo, grupo }: Props) {
         [userName]
     )
 
+    async function handleNotificarAprovador(usuario: string) {
+        if (!selectedResult) return
+        try {
+            const msg = await notificarAprovador(
+                selectedResult.idlan,
+                0,
+                usuario
+            )
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     const colunasAprovacoes = useMemo<ColumnDef<PagamentoAprovador>[]>(
         () => [
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'nome', header: 'Usuário' },
             { accessorKey: 'aprovacao', header: 'Situação' },
-            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) }
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabel(row.data_aprovacao) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.aprovacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     return (
@@ -614,7 +643,7 @@ export default function Page({ titulo, grupo }: Props) {
             {/* Aprovações */}
             {selectedResult && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${selectedResult.idlan}`}</DialogTitle>
                         </DialogHeader>
