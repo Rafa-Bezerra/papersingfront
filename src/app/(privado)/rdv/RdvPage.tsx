@@ -1,6 +1,7 @@
 'use client'
 
 import React, {
+    useCallback,
     useEffect,
     useMemo,
     useState,
@@ -13,10 +14,10 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, Check } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, Check, AlertTriangle } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor, updateElement } from '@/services/rdvService';
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor, updateElement, getAnexoById } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -283,6 +284,22 @@ export default function Page() {
         setEditar(null);
     }
 
+    async function reenviarSoap(rdv: Rdv) {
+        setIsLoading(true)
+        try {
+            await updateElement({
+                ...rdv,
+                anexos: rdv.anexos.map(a => ({ ...a, anexo: a.anexo ?? "" })),
+            })
+            toast.success('RDV reenviado ao TOTVS com sucesso!')
+            await buscaUltimosRdvs()
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     function adicionarItem() {
         const item: ItemRdv = formItem.getValues()
         const produto = produtos.find(p => p.idprd === item.idprd)
@@ -348,6 +365,21 @@ export default function Page() {
         setIsModalVisualizarAnexoOpen(true);
     }
 
+    const handleVisualizarAnexoExistente = useCallback(async (anexo: AnexoRdv) => {
+        if (!anexo.id) return;
+        setIsLoading(true);
+        try {
+            const dados = await getAnexoById(anexo.id);
+            setAnexoSelecionado(dados);
+            setAnexoPdfBase64(dados.anexo);
+            setIsModalVisualizarAnexoOpen(true);
+        } catch (err) {
+            toast.error((err as Error).message);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [])
+
     async function handleDocumento(rdv: Rdv) {
         setIsLoading(true)
         setSelectedResult(rdv);
@@ -377,6 +409,18 @@ export default function Page() {
                     const podeEditar = (row.original.usuario_criacao == userCodusuario) && (row.original.situacao == 'Em andamento');
                     return (
                         <div className="flex gap-2">
+                            {row.original.idmov === 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                                    onClick={() => reenviarSoap(row.original)}
+                                    title="Não sincronizado com TOTVS — clique para reenviar"
+                                >
+                                    <AlertTriangle className="w-4 h-4 mr-1" />
+                                    Reenviar TOTVS
+                                </Button>
+                            )}
                             <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
                                 Documento {row.original.arquivo_assinado == true && (
                                     <Check className="w-4 h-4 text-green-500" />
@@ -433,8 +477,17 @@ export default function Page() {
         () => [
             { accessorKey: 'id', header: 'ID' },
             { accessorKey: 'nome', header: 'Descrição' },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => (
+                    <Button size="sm" variant="outline" onClick={() => handleVisualizarAnexoExistente(row.original)}>
+                        <Eye className="w-4 h-4" />
+                    </Button>
+                ),
+            },
         ],
-        []
+        [handleVisualizarAnexoExistente]
     )
 
     return (

@@ -89,7 +89,7 @@ export default function Page() {
         setError(null)
         try {
             const dados = await getAprovacoesRdv(situacaoFiltrada, dateFrom, dateTo)
-            setResults(dados)
+            setResults(dados.filter(r => r.idmov && r.idmov !== 0))
         } catch (err) {
             setError((err as Error).message)
         } finally {
