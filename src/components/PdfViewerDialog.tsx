@@ -168,7 +168,7 @@ export default function PdfViewerDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[60vw] h-[90vh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0">
+            <DialogContent className="w-[95vw] sm:w-[60vw] h-[90dvh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0">
                 <DialogHeader className="p-4 shrink-0 sticky top-0 z-10 bg-background border-b">
                     <DialogTitle className="text-lg font-semibold text-center">
                         {title}
@@ -219,7 +219,7 @@ export default function PdfViewerDialog({
                 </div>
 
                 {/* Barra de controles */}
-                <div className="flex justify-center items-center gap-4 p-3 border-t shrink-0 bg-background flex-wrap">
+                <div className="flex justify-center items-center gap-2 sm:gap-4 p-2 sm:p-3 border-t shrink-0 bg-background flex-wrap overflow-y-auto max-h-[35%]">
                     {/* Paginação */}
                     <Button
                         variant="outline"

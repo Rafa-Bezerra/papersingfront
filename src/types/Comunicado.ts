@@ -1,3 +1,10 @@
+export type ComunicadoItemFinanceiro = {
+    setor: string,
+    ccusto: string,
+    codconta: string,
+    valor: number,
+}
+
 export type Comunicado = {
     id: number,
     data_criacao: string,
@@ -11,8 +18,8 @@ export type Comunicado = {
     cargo: string,
     cidade_origem: string,
     concessionaria: string,
-    codconta: string,
-    ccusto: string,
+    itensFinanceiros: ComunicadoItemFinanceiro[],
+    rodape: string,
     usuario_nome: string,
     pagamentos: ComunicadoPagamentos[],
     anexos: ComunicadoAnexo[],

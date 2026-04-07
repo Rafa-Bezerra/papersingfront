@@ -125,6 +125,12 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
             </DropdownMenuItem>
 
             <DropdownMenuItem asChild>
+              <Link href="/alterar-email" className="w-full">
+                Alterar e-mail
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
               <Link href="/assinatura" className="w-full">
                 Assinatura
               </Link>

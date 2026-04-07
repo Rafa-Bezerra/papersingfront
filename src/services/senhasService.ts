@@ -21,4 +21,17 @@ export async function updateSenhaExterno(
     }
 }
 
+export async function updateEmail(novoEmail: string) {
+    const res = await fetch(`${API_BASE}/api/Usuarios/alterar_email`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ novo_email: novoEmail })
+    })
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao atualizar e-mail: ${msg}`);
+    }
+    return res.json();
+}
+
 export type { AlterarSenha }

@@ -308,7 +308,7 @@ export default function PageUsuarios() {
 
             {/* Form */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateMode

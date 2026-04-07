@@ -346,7 +346,7 @@ export default function Page() {
             {/* Aprovações */}
             {selectedResult && selectedResultAprovacoes && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações documento n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>

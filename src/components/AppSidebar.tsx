@@ -92,6 +92,18 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     }
   }, []);
 
+  // Trava o scroll do body quando o sidebar mobile está aberto
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileOpen])
+
   // Função para lidar com cliques duplos
   const handleMobileToggle = () => {
     if (!isMobileDevice) return
@@ -162,7 +174,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       )}
 
       {/* Container do sidebar com botão de toggle */}
-      <div className={`relative h-full ${mobileOpen ? 'block' : 'hidden'} lg:block`}>
+      <div className={`relative ${mobileOpen ? 'block' : 'hidden'} lg:block lg:h-full`}>
         {/* Sidebar para mobile e desktop */}
         <div className={`sidebar-container relative transition-all duration-300 ease-in-out flex-shrink-0 h-full ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'
           } border-r bg-card ${mobileOpen ? 'fixed left-0 top-0 z-50 w-64' : ''}`}>
@@ -221,7 +233,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
             )}
 
             {/* Menu de navegação */}
-            <SidebarGroup>
+            <SidebarGroup className="flex-1 overflow-y-auto">
               <SidebarMenu className="space-y-1">
                 {navMain.map(section => (
                   <div key={section.title}>

@@ -32,7 +32,7 @@ import { imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/u
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
-import { adicionarAprovador, aprovar, createElement, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo, getDocumento } from '@/services/comunicadoService';
+import { adicionarAprovador, aprovar, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo, getDocumento, createElement } from '@/services/comunicadoService';
 import { notificarAprovador } from '@/services/requisicoesService';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
@@ -60,7 +60,7 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover';
 import {
     ComunicadoAnexo,
-    // ComunicadoPagamentos 
+    // ComunicadoPagamentos
 } from '@/types/Comunicado'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService'
 import { Label } from '@/components/ui/label'
@@ -98,9 +98,9 @@ export default function Page() {
     const carregou = useRef(false)
 
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
-    const [openCodcontaSearch, setOpenCodcontaSearch] = useState(false)
+    const [openCodcontaIndex, setOpenCodcontaIndex] = useState<number | null>(null)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
-    const [openCcustoSearch, setOpenCcustoSearch] = useState(false)
+    const [openCcustoIndex, setOpenCcustoIndex] = useState<number | null>(null)
     const [file, setFile] = useState<File | null>(null)
     const [fileName, setFileName] = useState<string>("")
 
@@ -122,8 +122,8 @@ export default function Page() {
             cargo: '',
             cidade_origem: '',
             concessionaria: '',
-            codconta: '',
-            ccusto: '',
+            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0 }],
+            rodape: '',
             pagamentos: [],
         }
     })
@@ -345,7 +345,8 @@ export default function Page() {
             id: 0,
             anexo: '',
             nome: '',
-            aprovadores: []
+            aprovadores: [],
+            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0 }],
         })
         setUpdateComunicadoMode(false)
         setIsFormComunicadoOpen(true)
@@ -366,92 +367,77 @@ export default function Page() {
 
     async function submitComunicado(data: Comunicado) {
         setIsLoading(true)
-        const proxId = Math.max(...results.map(x => x.id)) + 1;
-        const html = gerarTemplateHTML(data, logo, proxId);
 
-        const newWindow = window.open("", "_blank");
+        const proxId = results.length > 0 ? Math.max(...results.map(x => x.id)) + 1 : 1;
+        const html = gerarTemplateHTML(data, logo, proxId, centrosDeCusto, contasFinanceiras);
 
-        if (!newWindow) return;
+        // Carrega html2pdf.js na página atual se ainda não estiver carregado
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await new Promise<void>((resolve, reject) => {
+            if (typeof (window as unknown as Record<string, unknown>).html2pdf !== 'undefined') { resolve(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            s.onload = () => resolve();
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
 
-        newWindow.document.write(`
-            <html>
-            <head>
-            <title>Documento</title>
-            </head>
-            <body>
-            ${html}
+        // Abre um popup mínimo (não uma aba) — sem CSS do Tailwind, evita erro oklch no html2canvas
+        const popup = window.open('', '', 'width=10,height=10,left=-200,top=-200,toolbar=no,menubar=no,scrollbars=no,resizable=no');
 
-            <script>
-                function loadScript(src) {
-                return new Promise((resolve, reject) => {
-                    const s = document.createElement('script');
-                    s.src = src;
-                    s.onload = resolve;
-                    s.onerror = reject;
-                    document.head.appendChild(s);
-                });
+        if (!popup) {
+            toast.error('Popup bloqueado pelo navegador. Permita popups para este site.');
+            setIsLoading(false);
+            return;
+        }
+
+        popup.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gerando PDF...</title></head><body style="margin:0;padding:0;background:#fff;">
+${html}
+<script>
+(function () {
+    function loadScript(src) {
+        return new Promise(function(resolve, reject) {
+            var s = document.createElement('script');
+            s.src = src; s.onload = resolve; s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    }
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js').then(function () {
+        var opt = {
+            margin: 0,
+            filename: 'doc.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(document.body).output('blob').then(function (blob) {
+            var reader = new FileReader();
+            reader.onloadend = function () {
+                var base64 = reader.result.split(',')[1];
+                if (window.opener) {
+                    window.opener.postMessage({ base64: base64 }, '*');
+                    setTimeout(function () { window.close(); }, 200);
                 }
+            };
+            reader.readAsDataURL(blob);
+        });
+    });
+})();
+<\/script>
+</body></html>`);
+        popup.document.close();
 
-                (async function () {
-                console.log("iniciando script");
-
-                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js");
-
-                console.log("html2pdf carregado:", typeof html2pdf);
-
-                const element = document.body;
-
-                const opt = {
-                    margin: 0,
-                    filename: "doc.pdf",
-                    image: { type: "jpeg", quality: 1 },
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: "pt", format: "a4", orientation: "portrait" }
-                };
-
-                const worker = html2pdf().set(opt).from(element);
-                const blob = await worker.output("blob");
-
-                const reader = new FileReader();
-                reader.onloadend = function () {
-                    const base64 = reader.result.split(",")[1];
-
-                    console.log("enviando base64");
-
-                    if (window.opener) {
-                    window.opener.postMessage({ base64 }, "*");
-                    setTimeout(() => {
-                    window.close();
-                    }, 300);
-                    } else {
-                    console.error("window.opener é null");
-                    }
-                };
-
-                reader.readAsDataURL(blob);
-                })();
-            </script>
-            </body>
-            </html>
-        `);
-
-        newWindow.document.close();
-        console.log("resolve");
-
-        const base64Promise = await new Promise<string>((resolve) => {
+        const base64 = await new Promise<string>((resolve) => {
             function handler(event: MessageEvent) {
-                console.log("EVENTO RECEBIDO:", event);
-
                 if (event.data?.base64) {
-                    window.removeEventListener("message", handler);
+                    window.removeEventListener('message', handler);
                     resolve(event.data.base64);
                 }
             }
-
-            window.addEventListener("message", handler);
+            window.addEventListener('message', handler);
         });
 
-        data.anexo = base64Promise;
+        data.anexo = base64;
         data.anexos = anexosSubmit;
 
         setError(null)
@@ -464,6 +450,7 @@ export default function Page() {
             form.reset()
             await handleSearchClick()
             setIsFormComunicadoOpen(false)
+            setIsLoading(false)
         }
     }
 
@@ -550,8 +537,8 @@ export default function Page() {
             { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
             { accessorKey: 'usuario_nome', header: 'Solicitante' },
             { accessorKey: 'nome', header: 'Descrição' },
-            { accessorKey: 'ccusto', header: 'Centro de custo' },
-            { accessorKey: 'codconta', header: 'Conta' },
+            { id: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.itensFinanceiros?.[0]?.ccusto ?? '' },
+            { id: 'codconta', header: 'Conta', accessorFn: (row) => row.itensFinanceiros?.[0]?.codconta ?? '' },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'actions',
@@ -752,7 +739,7 @@ export default function Page() {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                             <Button onClick={handleInserirAprovador} className="flex items-center">
@@ -796,7 +783,7 @@ export default function Page() {
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-y-auto max-h-[90dvh]">
                     <div className="overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
@@ -886,117 +873,6 @@ export default function Page() {
                                     )}
                                 /> */}
 
-                                {/** ccusto */}
-                                <FormField
-                                    control={form.control}
-                                    name="ccusto"
-                                    rules={{ required: "Centro de custo obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Centro de Custo</FormLabel>
-                                            <FormControl>
-                                                <Popover open={openCcustoSearch} onOpenChange={setOpenCcustoSearch} modal={false}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoSearch(true)}>
-                                                            {centrosDeCusto.find(c => c.ccusto === field.value)?.custo ?? "Selecione"}
-                                                            <ChevronsUpDown className="opacity-50 size-4" />
-                                                        </Button>
-                                                    </PopoverTrigger>
-
-                                                    <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                        <Command
-                                                            filter={(value, search) => {
-                                                                const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ""
-                                                                const searchLower = search.toLowerCase()
-
-                                                                return (
-                                                                    label.toLowerCase().includes(searchLower) ||
-                                                                    value.toLowerCase().includes(searchLower)
-                                                                ) ? 1 : 0
-                                                            }}
-                                                        >                                                    <CommandInput placeholder="Buscar centro..." />
-                                                            <CommandList>
-                                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                                <CommandGroup>
-                                                                    {centrosDeCusto.map(c => (
-                                                                        <CommandItem
-                                                                            key={c.ccusto}
-                                                                            value={c.ccusto}
-                                                                            onSelect={() => {
-                                                                                field.onChange(c.ccusto)
-                                                                                setOpenCcustoSearch(false)
-                                                                            }}
-                                                                        >
-                                                                            {c.ccusto} - {c.custo}
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </CommandList>
-                                                        </Command>
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                {/** conta */}
-                                <FormField
-                                    control={form.control}
-                                    name="codconta"
-                                    rules={{ required: "Conta financeira obrigatória" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Conta Financeira</FormLabel>
-                                            <FormControl>
-                                                <Popover open={openCodcontaSearch} onOpenChange={setOpenCodcontaSearch} modal={false}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaSearch(true)}>
-                                                            {contasFinanceiras.find(x => x.codconta === field.value)?.contabil ?? "Selecione"}
-                                                            <ChevronsUpDown className="opacity-50 size-4" />
-                                                        </Button>
-                                                    </PopoverTrigger>
-
-                                                    <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                        <Command
-                                                            filter={(value, search) => {
-                                                                const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ""
-                                                                const searchLower = search.toLowerCase()
-
-                                                                return (
-                                                                    label.toLowerCase().includes(searchLower) ||
-                                                                    value.toLowerCase().includes(searchLower)
-                                                                ) ? 1 : 0
-                                                            }}
-                                                        >
-                                                            <CommandInput placeholder="Buscar conta..." />
-                                                            <CommandList>
-                                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                                <CommandGroup>
-                                                                    {contasFinanceiras.map(x => (
-                                                                        <CommandItem
-                                                                            key={x.codconta}
-                                                                            value={x.codconta}
-                                                                            onSelect={() => {
-                                                                                field.onChange(x.codconta)
-                                                                                setOpenCodcontaSearch(false)
-                                                                            }}
-                                                                        >
-                                                                            {x.codconta} - {x.contabil}
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </CommandList>
-                                                        </Command>
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
                                 <FormField
                                     control={form.control}
                                     name="anexo"
@@ -1016,9 +892,37 @@ export default function Page() {
                                     )}
                                 />
 
-                                {/* <PagamentosComunicadosSection form={form} /> */}
-
                                 <AprovadoresComunicadosSection form={form} usuarios={usuarios} />
+
+                                {/* Bloco financeiro: múltiplos itens */}
+                                <ItensFinanceirosSection
+                                    form={form}
+                                    centrosDeCusto={centrosDeCusto}
+                                    contasFinanceiras={contasFinanceiras}
+                                    openCcustoIndex={openCcustoIndex}
+                                    setOpenCcustoIndex={setOpenCcustoIndex}
+                                    openCodcontaIndex={openCodcontaIndex}
+                                    setOpenCodcontaIndex={setOpenCodcontaIndex}
+                                />
+
+                                {/** rodapé */}
+                                <FormField
+                                    control={form.control}
+                                    name="rodape"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Rodapé do documento</FormLabel>
+                                            <FormControl>
+                                                <textarea
+                                                    {...field}
+                                                    className="w-full h-32 p-2 border rounded-md resize-none"
+                                                    placeholder="Digite o texto do rodapé..."
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
                                 {/* Anexos */}
                                 <Card className="mb-6">
@@ -1083,7 +987,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo aprovador
@@ -1127,7 +1031,7 @@ export default function Page() {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>
@@ -1314,7 +1218,174 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     );
 }
 
-export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number): string {
+function ItensFinanceirosSection({
+    form,
+    centrosDeCusto,
+    contasFinanceiras,
+    openCcustoIndex,
+    setOpenCcustoIndex,
+    openCodcontaIndex,
+    setOpenCodcontaIndex,
+}: {
+    form: UseFormReturn<Comunicado>,
+    centrosDeCusto: CentroDeCusto[],
+    contasFinanceiras: ContaFinanceira[],
+    openCcustoIndex: number | null,
+    setOpenCcustoIndex: (v: number | null) => void,
+    openCodcontaIndex: number | null,
+    setOpenCodcontaIndex: (v: number | null) => void,
+}) {
+    const { control } = form;
+    const { fields, append, remove } = useFieldArray({ control, name: 'itensFinanceiros' });
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">Dados Financeiros</CardTitle>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ setor: '', ccusto: '', codconta: '', valor: 0 })}
+                >
+                    + Adicionar item
+                </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="border rounded-md p-3 flex flex-col gap-3 relative">
+                        {fields.length > 1 && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-2 right-2 h-7 w-7"
+                                onClick={() => remove(index)}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        )}
+                        <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+
+                        {/* Setor */}
+                        <FormField
+                            control={control}
+                            name={`itensFinanceiros.${index}.setor`}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Setor</FormLabel>
+                                    <FormControl>
+                                        <Input {...f} placeholder="Ex: Tecnologia da Informação" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Centro de Custo */}
+                        <FormField
+                            control={control}
+                            name={`itensFinanceiros.${index}.ccusto`}
+                            rules={{ required: 'Centro de custo obrigatório' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Centro de Custo</FormLabel>
+                                    <FormControl>
+                                        <Popover open={openCcustoIndex === index} onOpenChange={open => setOpenCcustoIndex(open ? index : null)} modal={false}>
+                                            <PopoverTrigger asChild>
+                                                <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(index)}>
+                                                    {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar centro..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {centrosDeCusto.map(c => (
+                                                                <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
+                                                                    {c.ccusto} - {c.custo}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Conta Contábil */}
+                        <FormField
+                            control={control}
+                            name={`itensFinanceiros.${index}.codconta`}
+                            rules={{ required: 'Conta contábil obrigatória' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Conta Contábil</FormLabel>
+                                    <FormControl>
+                                        <Popover open={openCodcontaIndex === index} onOpenChange={open => setOpenCodcontaIndex(open ? index : null)} modal={false}>
+                                            <PopoverTrigger asChild>
+                                                <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(index)}>
+                                                    {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar conta..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {contasFinanceiras.map(x => (
+                                                                <CommandItem key={x.codconta} value={x.codconta} onSelect={() => { f.onChange(x.codconta); setOpenCodcontaIndex(null) }}>
+                                                                    {x.codconta} - {x.contabil}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* Valor */}
+                        <FormField
+                            control={control}
+                            name={`itensFinanceiros.${index}.valor`}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Valor (R$)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.01" min="0" {...f} onChange={e => f.onChange(parseFloat(e.target.value) || 0)} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number, centrosDeCusto: CentroDeCusto[] = [], contasFinanceiras: ContaFinanceira[] = []): string {
 
     const aprovadores = data.aprovadores ?? [];
 
@@ -1424,6 +1495,35 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
             ${data.anexo ?? ""}
         </div>
 
+        <!-- ITENS FINANCEIROS -->
+
+        ${(data.itensFinanceiros ?? []).length > 0 ? `
+        <table class="table-bordada" style="margin-top:20px; font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:6px 8px; text-align:center; background:#f0f0f0;">Seq.</th>
+                    <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Setor</th>
+                    <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Centro de Custo</th>
+                    <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Conta Contábil</th>
+                    <th style="padding:6px 8px; text-align:right; background:#f0f0f0;">Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(data.itensFinanceiros ?? []).map((item, i) => `
+                <tr>
+                    <td style="padding:5px 8px; text-align:center;">${i + 1}</td>
+                    <td style="padding:5px 8px;">${item.setor ?? ""}</td>
+                    <td style="padding:5px 8px;">${item.ccusto ?? ""}${(() => { const desc = centrosDeCusto.find(c => c.ccusto === item.ccusto)?.custo; return desc ? ` - ${desc}` : ''; })()}</td>
+                    <td style="padding:5px 8px;">${item.codconta ?? ""}${(() => { const desc = contasFinanceiras.find(c => c.codconta === item.codconta)?.contabil; return desc ? ` - ${desc}` : ''; })()}</td>
+                    <td style="padding:5px 8px; text-align:right;">${item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>`).join("")}
+            </tbody>
+        </table>` : ""}
+
+        <div style="margin-top:40px; white-space:pre-wrap;">
+            ${data.rodape ?? ""}
+        </div>
+        
         <!-- ATENCIOSAMENTE -->
 
         ${demaisAprovadores.length > 0 ? `
@@ -1437,9 +1537,6 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
         <!-- DE ACORDO -->
 
         ${primeiroAprovador ? `
-        <div style="margin-top:40px;">
-            De acordo,
-        </div>
 
         <table class="table-sem-borda" style="width:100%; margin-top:60px;">
             <tr>
