@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
 import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
-import { dateToIso, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
+import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,6 +28,7 @@ import {
 import { Bell, Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
+import { createElement as createAnexo } from "@/services/anexoService";
 
 export default function Page() {
     const router = useRouter()
@@ -58,6 +59,8 @@ export default function Page() {
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposMovimento, setTiposMovimento] = useState<string[]>([])
     const [podeAssinar, setPodeAssinar] = useState(false)
+    const [novoAnexoFile, setNovoAnexoFile] = useState<File | null>(null)
+    const [novoAnexoNome, setNovoAnexoNome] = useState<string>("")
     function clearQuery() {
         setQuery('')
     }
@@ -301,9 +304,38 @@ export default function Page() {
             setResults([])
         } finally {
             setIsLoading(false)
+            setNovoAnexoFile(null)
+            setNovoAnexoNome("")
             setIsModalAnexosOpen(true)
         }
     }    
+
+    async function handleAnexarNovoAnexo() {
+        if (!selectedResult) return;
+        if (!novoAnexoFile) return toast.error("Selecione um arquivo para anexar.");
+
+        setIsLoading(true)
+        try {
+            const base64 = await toBase64(novoAnexoFile)
+            const nome = (novoAnexoNome || novoAnexoFile.name || "anexo").trim()
+
+            await createAnexo({
+                idmov: selectedResult.movimento.idmov,
+                anexo: base64,
+                nome: nome,
+            })
+
+            const dados = await getAllAnexos(selectedResult.movimento.idmov)
+            setResultAnexos(dados)
+            setNovoAnexoFile(null)
+            setNovoAnexoNome("")
+            toast.success("Anexo incluído com sucesso!")
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     const colunas = useMemo<ColumnDef<FiscalResponseDto>[]>(
         () => [
@@ -664,6 +696,41 @@ export default function Page() {
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${selectedResult.fiscal.idmov}`}</DialogTitle>
                         </DialogHeader>
                         <div className="w-full">
+                            <Card className="p-4 mb-4">
+                                <div className="flex flex-col gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                                        <div className="flex flex-col gap-1">
+                                            <Label>Arquivo</Label>
+                                            <Input
+                                                type="file"
+                                                accept="application/pdf,image/*"
+                                                onChange={(e) => {
+                                                    const f = e.target.files?.[0] ?? null
+                                                    setNovoAnexoFile(f)
+                                                    if (f && !novoAnexoNome) setNovoAnexoNome(f.name)
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1 md:col-span-2">
+                                            <Label>Nome do anexo</Label>
+                                            <Input
+                                                value={novoAnexoNome}
+                                                onChange={(e) => setNovoAnexoNome(e.target.value)}
+                                                placeholder="Ex.: Nota fiscal, Comprovante, Foto..."
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="button"
+                                            onClick={handleAnexarNovoAnexo}
+                                            disabled={isLoading || !novoAnexoFile}
+                                        >
+                                            {isLoading ? "Anexando..." : "Anexar"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
                             <DataTable columns={colunasAnexos} data={resultAnexos} loading={isLoading} />
                         </div>
                     </DialogContent>
