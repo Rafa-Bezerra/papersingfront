@@ -693,7 +693,7 @@ export default function Page() {
             {/* Itens ultimos movimentos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh] ">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90dvh] ">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>

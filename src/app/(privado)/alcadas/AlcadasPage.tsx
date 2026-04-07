@@ -405,7 +405,7 @@ export default function Page() {
             {/* Modal */}
             {alcadaSelecionada && (
                 <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Centro de custo - ${alcadaSelecionada.centro_custo}`}</DialogTitle>
 
@@ -466,7 +466,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAlcadaOpen} onOpenChange={setIsFormAlcadaOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateAlcadaMode ? `${tituloUpdate}: ${alcadaSelecionada?.centro_custo}` : `${tituloInsert}`}
@@ -514,7 +514,7 @@ export default function Page() {
 
             {/* Modal */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
-                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateAprovadoresMode ? `${tituloUpdateAprovador}: ${aprovadorSelecionado?.usuario}` : `${tituloInsertAprovador}`}

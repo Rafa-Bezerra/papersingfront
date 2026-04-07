@@ -343,12 +343,17 @@ export default function Page() {
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
         try {
-            // anexo.anexo é o caminho (ex: /anexos/documentos/xxx); getAnexo retorna o PDF em base64
-            const arquivo = await getAnexo(anexo.anexo);
-
-            setIsModalVisualizarAnexoOpen(true)
+            let arquivo: string;
+            if (anexo.anexo.startsWith('data:') || anexo.anexo.length > 500) {
+                // Já é base64 (anexo local adicionado no formulário, ainda não salvo)
+                arquivo = anexo.anexo;
+            } else {
+                // É um caminho de servidor; faz o download
+                arquivo = await getAnexo(anexo.anexo);
+            }
             setAnexoSelecionado(anexo);
-            setAnexoPdfBase64ParaAssinatura(arquivo); // guarda para enviar na assinatura (evita "Base64 do PDF inválido")
+            setAnexoPdfBase64ParaAssinatura(arquivo);
+            setIsModalVisualizarAnexoOpen(true)
         } catch (err) {
             console.log(err);
             toast.error("Não foi possível carregar o anexo.");
@@ -614,7 +619,7 @@ export default function Page() {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                             <Button onClick={handleInserirAprovador} className="flex items-center">
@@ -631,7 +636,7 @@ export default function Page() {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>
@@ -660,7 +665,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateDocumentoMode ? `Editar: ${requisicaoSelecionada?.nome}` : `Novo documento`}
@@ -759,7 +764,7 @@ export default function Page() {
 
             {/* Form aprovadores */}
             <Dialog open={isFormAprovadoresOpen} onOpenChange={setIsFormAprovadoresOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo aprovador

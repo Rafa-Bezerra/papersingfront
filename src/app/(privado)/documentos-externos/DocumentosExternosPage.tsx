@@ -539,7 +539,7 @@ export default function Page() {
             {/* Aprovações */}
             {selectedResult && selectedResultAprovacoes && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90vh]">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações documento n° ${selectedResult.id}`}</DialogTitle>
                         </DialogHeader>
@@ -568,7 +568,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90vh]">
+                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo documento
