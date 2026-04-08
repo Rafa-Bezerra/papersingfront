@@ -111,6 +111,7 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
+    const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
     function clearQuery() {
         setQuery('')
     }
@@ -221,7 +222,8 @@ export default function Page() {
         userAdmin,
         userCodusuario,
         solicitanteFiltrado,
-        tipoMovimentoFiltrado
+        tipoMovimentoFiltrado,
+        entregaFiltrada
     ]);
 
     useEffect(() => {
@@ -233,7 +235,7 @@ export default function Page() {
             }
         }, interval);
         return () => clearInterval(timer);
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, tipoMovimentoFiltrado]);
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada]);
 
     async function handleSearch(q: string) {
         setIsLoading(true);
@@ -245,7 +247,7 @@ export default function Page() {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10);
             const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10);
-            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada, "");
+            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada, "", entregaFiltrada);
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -585,6 +587,19 @@ export default function Page() {
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
+                accessorKey: 'requisicao.situacao_entrega',
+                header: 'Entrega',
+                cell: ({ row }) => {
+                    const val = row.original.requisicao.situacao_entrega
+                    return (
+                        <span className="flex items-center gap-1">
+                            {val ?? '—'}
+                            {val === 'Recebido' && <Check className="w-4 h-4 text-green-500" />}
+                        </span>
+                    )
+                }
+            },
+            {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
@@ -849,6 +864,23 @@ export default function Page() {
                                     </DropdownMenuCheckboxItem>
                                 ))}
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={tipoMovimentoFiltrado == ""} onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Entrega */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Filtrar por entrega">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Entrega</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Entrega</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Pendente"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Pendente") }}>Pendente</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Parc. Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Parc. Recebido") }}>Parc. Recebido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Recebido") }}>Recebido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === ""} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 

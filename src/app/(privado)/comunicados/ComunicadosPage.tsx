@@ -111,6 +111,8 @@ export default function Page() {
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const [anexoSelecionado, setAnexoSelecionado] = useState<ComunicadoAnexo | null>(null)
     const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
+    const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
+    const [solicitantes, setSolicitantes] = useState<string[]>([])
 
     const form = useForm<Comunicado>({
         defaultValues: {
@@ -235,18 +237,31 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [query, situacaoFiltrada, dateFrom, dateTo])
+    }, [query, situacaoFiltrada, dateFrom, dateTo, solicitanteFiltrado])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
         setError(null)
         try {
             const dados = await getAll()
+
+            const solicitantesUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.usuario_nome)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+            setSolicitantes(solicitantesUnicos)
+
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.nome ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.situacao == situacaoFiltrada
-                return matchQuery && matchSituacao
+                const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
+                const matchDateFrom = dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
+                const matchDateTo = dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
+                return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)
@@ -678,9 +693,53 @@ ${html}
     return (
         <div className="p-6">
             <Card className="mb-6">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    <div className="flex justify-end items-end gap-4">
+                    <div className="flex flex-wrap justify-end items-end gap-3">
+                        {/* Data de */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="comDateFrom">Data de</Label>
+                            <Input
+                                id="comDateFrom"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+                        {/* Data até */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="comDateTo">Data até</Label>
+                            <Input
+                                id="comDateTo"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="w-40"
+                            />
+                        </div>
+                        {/* Solicitante */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Filtrar por solicitante">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Solicitante</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Solicitante</DropdownMenuLabel>
+                                {solicitantes.map((s) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={s}
+                                        checked={solicitanteFiltrado === s}
+                                        onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado(s) }}
+                                    >
+                                        {s}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem checked={solicitanteFiltrado === ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {/* Botão de Filtros - Dropdown com checkboxes */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>

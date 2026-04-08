@@ -113,6 +113,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
 
     function clearQuery() {
         setQuery('')
@@ -152,7 +153,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
 
     // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível.
     useEffect(() => {
@@ -161,7 +162,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             if (document.visibilityState === "visible") handleSearch(query)
         }, 60000)
         return () => clearInterval(timer)
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -176,7 +177,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             // Como nem sempre isso existe como status de movimento no backend,
             // buscamos "Todos" e filtramos localmente.
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
-            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoApi, "")
+            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -496,6 +497,19 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
             { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
             {
+                accessorKey: 'requisicao.situacao_entrega',
+                header: 'Entrega',
+                cell: ({ row }) => {
+                    const val = row.original.requisicao.situacao_entrega
+                    return (
+                        <span className="flex items-center gap-1">
+                            {val ?? '—'}
+                            {val === 'Recebido' && <Check className="w-4 h-4 text-green-500" />}
+                        </span>
+                    )
+                }
+            },
+            {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
@@ -765,6 +779,23 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                     </DropdownMenuCheckboxItem>
                                 ))}
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={tipoMovimentoFiltrado == ""} onCheckedChange={(checked) => { if (checked) setTipoMovimentoFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Entrega */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Filtrar por entrega">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Entrega</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Entrega</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Pendente"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Pendente") }}>Pendente</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Parc. Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Parc. Recebido") }}>Parc. Recebido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === "Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Recebido") }}>Recebido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem checked={entregaFiltrada === ""} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
