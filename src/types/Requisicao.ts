@@ -22,6 +22,7 @@ export type Requisicao = {
     arquivo: string,
     possui_avaliacoes: number,
     quantidade_anexos: number,
+    situacao_entrega?: string,
     requisicao_itens: Requisicao_item[],
     requisicao_aprovacoes?: Requisicao_aprovacao[]
 }
