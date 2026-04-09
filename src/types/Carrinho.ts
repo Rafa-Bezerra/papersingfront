@@ -8,6 +8,7 @@ export type ItemCarrinho = {
     quantidade?: number;
     valor?: number;
     descricao?: string;
+    nseqitmmov?: number;
 };
 
 export type Carrinho = {
@@ -39,6 +40,7 @@ export type Produto = {
 };
 
 export type AnexoCarrinho = {
+    id?: number;
     anexo: string;
     descricao: string;
 };

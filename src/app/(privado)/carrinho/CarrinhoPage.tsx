@@ -16,9 +16,10 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2 } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, Check } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
-import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -40,7 +41,6 @@ import {
     CommandGroup,
     CommandItem,
 } from "@/components/ui/command"
-import { Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -74,12 +74,18 @@ export default function Page() {
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const [anexoPdfBase64, setAnexoPdfBase64] = useState<string | null>(null)
     const [bloqueado, setBloqueado] = useState(true)
+    const [editar, setEditar] = useState<number | null>(null)
+    const [isModalAprovadoresOpen, setIsModalAprovadoresOpen] = useState(false)
+    const [selectedAprovadoresResult, setSelectedAprovadoresResult] = useState<Requisicao_aprovacao[]>([])
+    const [carrinhoDocumento, setCarrinhoDocumento] = useState<string | null>(null)
+    const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
 
-    // Desbloqueia envio quando há pelo menos 1 produto
+    // Desbloqueia envio quando há pelo menos 1 produto disponível (novo) ou 1 item já adicionado (edição)
     useEffect(() => {
         setBloqueado(true);
         if (produtos.length > 0) setBloqueado(false);
-    }, [produtos])
+        if (editar != null && produtosSubmit.length > 0) setBloqueado(false);
+    }, [produtos, editar, produtosSubmit])
 
     // Form principal do carrinho (tipo movimento, descrição)
     const form = useForm<Carrinho>({
@@ -200,7 +206,11 @@ export default function Page() {
         carrinho.itens = produtosSubmit
         carrinho.anexos = anexosSubmit
         try {
-            await createElement(carrinho)
+            if (editar != null) {
+                await updateElement(editar, carrinho)
+            } else {
+                await createElement(carrinho)
+            }
             toast.success('Carrinho enviado com sucesso!')
             window.location.reload()
         } catch (err) {
@@ -229,6 +239,59 @@ export default function Page() {
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
+    }
+
+    /** Abre modal com aprovadores da requisição selecionada */
+    function handleAprovadores(requisicao: RequisicaoDto) {
+        setSelectedAprovadoresResult(requisicao.requisicao_aprovacoes ?? [])
+        setIsModalAprovadoresOpen(true)
+    }
+
+    /** Busca e exibe o documento PDF da requisição */
+    async function handleDocumento(requisicao: RequisicaoDto) {
+        setIsLoading(true)
+        try {
+            const data = await getAnexoByIdmov(requisicao.requisicao.idmov, Number(requisicao.requisicao.codigo_atendimento))
+            setCarrinhoDocumento(data.arquivo)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+            setIsModalDocumentosOpen(true)
+        }
+    }
+
+    /** Popula o formulário com dados da requisição para edição */
+    async function handleEditar(requisicao: RequisicaoDto) {
+        setEditar(requisicao.requisicao.idmov)
+        form.setValue("tipo_movimento", requisicao.requisicao.tipo_movimento)
+        form.setValue("descricao", requisicao.requisicao.historico_movimento)
+        const itens: ItemCarrinho[] = requisicao.requisicao_itens.map(item => ({
+            idprd: item.codigo_item_movimento,
+            produto: item.historico_item || item.nome_natureza_orcamentaria,
+            ccusto: item.centro_custo,
+            codconta: item.codigo_natureza_orcamentaria,
+            quantidade: Number(item.item_quantidade),
+            valor: Number(item.item_preco_unitario),
+            descricao: item.historico_item,
+            nseqitmmov: item.codigo_item_movimento,
+        }))
+        setProdutosSubmit(itens)
+        try {
+            const anexos = await getAnexos(requisicao.requisicao.idmov)
+            setAnexosSubmit(anexos)
+        } catch {
+            setAnexosSubmit([])
+        }
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }
+
+    /** Cancela o modo de edição e reseta o formulário */
+    function cancelEditar() {
+        setEditar(null)
+        form.reset()
+        setProdutosSubmit([])
+        setAnexosSubmit([])
     }
 
     /** Converte arquivo em base64 e adiciona à lista de anexos */
@@ -268,17 +331,37 @@ export default function Page() {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
+                    const isEditingThis = editar === row.original.requisicao.idmov
+                    const podeEditar = row.original.requisicao.status_movimento === 'Em Andamento'
                     return (
                         <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                Documento {row.original.requisicao.documento_assinado === 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handleItens(row.original)}>
                                 Itens
                             </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleAprovadores(row.original)}>
+                                Aprovadores
+                            </Button>
+                            {podeEditar && !isEditingThis && (
+                                <Button size="sm" variant="destructive" onClick={() => handleEditar(row.original)}>
+                                    Editar
+                                </Button>
+                            )}
+                            {podeEditar && isEditingThis && (
+                                <Button size="sm" variant="destructive" onClick={() => cancelEditar()}>
+                                    Cancelar
+                                </Button>
+                            )}
                         </div>
                     );
                 }
             }
         ],
-        []
+        [editar]
     )
 
     // Colunas da tabela de itens no modal
@@ -290,6 +373,18 @@ export default function Page() {
             { accessorKey: 'item_quantidade', header: 'Quantidade' },
             { accessorKey: 'item_total', header: 'Total' },
             // { accessorKey: 'historico_item', header: 'Histórico' }
+        ],
+        []
+    )
+
+    // Colunas da tabela de aprovadores no modal
+    const colunasAprovadores = useMemo<ColumnDef<Requisicao_aprovacao>[]>(
+        () => [
+            { accessorKey: 'id', header: 'ID' },
+            { accessorKey: 'nome', header: 'Aprovador' },
+            { accessorKey: 'nivel', header: 'Nível' },
+            { accessorKey: 'situacao', header: 'Situação' },
+            { accessorKey: 'data_aprovacao', header: 'Data aprovação' },
         ],
         []
     )
@@ -309,7 +404,9 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <CardTitle className="text-2xl font-bold">
+                        {editar != null ? `Editando requisição #${editar}` : titulo}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Form {...form}>
@@ -668,7 +765,7 @@ export default function Page() {
                         </div>
                     ))}
                     <Button onClick={onSubmit} disabled={isLoading || bloqueado}>
-                        {isLoading ? 'Enviando…' : 'Enviar carrinho'}
+                        {isLoading ? 'Enviando…' : editar != null ? 'Atualizar requisição' : 'Enviar carrinho'}
                     </Button>
                 </CardContent>
             </Card>
@@ -693,7 +790,7 @@ export default function Page() {
             {/* Itens ultimos movimentos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-full overflow-x-auto overflow-y-auto max-h-[90dvh] ">
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -749,6 +846,26 @@ export default function Page() {
                 onOpenChange={setIsModalVisualizarAnexoOpen}
                 title={anexoSelecionado ? `Anexo ${anexoSelecionado.descricao}` : 'Anexo'}
                 pdfBase64={anexoPdfBase64}
+            />
+
+            {/* Aprovadores */}
+            <Dialog open={isModalAprovadoresOpen} onOpenChange={setIsModalAprovadoresOpen}>
+                <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-center">Aprovadores</DialogTitle>
+                    </DialogHeader>
+                    <div className="w-full">
+                        <DataTable columns={colunasAprovadores} data={selectedAprovadoresResult} loading={isLoading} />
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Documento */}
+            <PdfViewerDialog
+                open={isModalDocumentosOpen}
+                onOpenChange={setIsModalDocumentosOpen}
+                title="Documento"
+                pdfBase64={carrinhoDocumento}
             />
 
             {error && (<p className="mb-4 text-center text-sm text-destructive"> Erro: {error} </p>)}

@@ -45,6 +45,23 @@ export async function createElement(data: Carrinho): Promise<void> {
     }
 }
 
+export async function updateElement(idmov: number, data: Carrinho): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/${idmov}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+    }
+}
+
+export async function getAnexos(idmov: number): Promise<AnexoCarrinho[]> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/anexos/${idmov}`, { headers: headers() });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar anexos: ${msg}`);
+    }
+    return res.json();
+}
+
 export async function getUltimasRequisicoes(): Promise<RequisicaoDto[]> {
     const url = new URL(`${API_BASE}/api/${caminho}/ultimasrequisicoes`);
 
