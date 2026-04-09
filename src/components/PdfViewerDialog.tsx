@@ -70,6 +70,8 @@ export default function PdfViewerDialog({
     const [signatureCoords, setSignatureCoords] = useState<PdfClickCoords | null>(null)
     const [previewCoords, setPreviewCoords] = useState<PdfClickCoords | null>(null)
     const [isPreviewLocked, setIsPreviewLocked] = useState(false)
+    const [iframeKey, setIframeKey] = useState(0)
+    const [iframeLoaded, setIframeLoaded] = useState(false)
 
     const pdfStyle = viewport
         ? { width: `${viewport.width}px`, height: `${viewport.height}px` }
@@ -100,18 +102,34 @@ export default function PdfViewerDialog({
     // Quando o pdfBase64 muda, envia ao iframe e reinicia o estado de visualização
     useEffect(() => {
         resetViewState()
-        if (!pdfBase64) return
-        const clean = pdfBase64.replace(/^data:.*;base64,/, '').trim()
-        const timer = setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage({ pdfBase64: clean }, '*')
-        }, 500)
-        return () => clearTimeout(timer)
     }, [pdfBase64])
 
     // Reinicia o estado de visualização quando o diálogo fecha
     useEffect(() => {
-        if (!open) resetViewState()
+        if (!open) {
+            resetViewState()
+            setIframeLoaded(false)
+            return
+        }
+
+        // Ao abrir, força recriação do iframe para evitar estado “travado”
+        // quando o mesmo documento é aberto repetidas vezes.
+        setIframeKey(k => k + 1)
     }, [open])
+
+    function postPdfToIframe() {
+        if (!open || !pdfBase64) return
+        const clean = pdfBase64.replace(/^data:.*;base64,/, '').trim()
+        iframeRef.current?.contentWindow?.postMessage({ pdfBase64: clean }, '*')
+    }
+
+    // Sempre que o diálogo abrir (mesmo PDF), reenvia o PDF quando o iframe estiver pronto.
+    useEffect(() => {
+        if (!open || !pdfBase64 || !iframeLoaded) return
+        // Pequeno delay para garantir layout/medidas após animação do dialog
+        const timer = setTimeout(() => postPdfToIframe(), 100)
+        return () => clearTimeout(timer)
+    }, [open, pdfBase64, iframeLoaded])
 
     function resetViewState() {
         setViewport(null)
@@ -183,10 +201,12 @@ export default function PdfViewerDialog({
                     <div className="relative mx-auto shrink-0" style={pdfStyle}>
                         {/* iframe do PDF */}
                         <iframe
+                            key={iframeKey}
                             ref={iframeRef}
                             src="/pdf-viewer.html"
                             className="relative border-none cursor-default"
                             style={pdfStyle}
+                            onLoad={() => setIframeLoaded(true)}
                         />
 
                         {/* Overlay de interação */}
