@@ -827,7 +827,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" aria-label="Abrir filtros">
                                     <Filter className="h-4 w-4 mr-2" />
-                                    <span className="hidden sm:inline">Filtros</span>
+                                    <span className="hidden sm:inline">Status</span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
