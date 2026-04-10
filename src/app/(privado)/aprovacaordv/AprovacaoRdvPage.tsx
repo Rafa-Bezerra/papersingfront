@@ -199,7 +199,7 @@ export default function Page() {
     async function confirmarAssinatura(signData: PdfSignData) {
         const dadosAssinatura: AssinarRdv = {
             idrdv: selectedResult!.id!,
-            arquivo: selectedResult!.arquivo!,
+            arquivo: documentoSelecionado!.anexo,
             pagina: signData.page,
             posX: signData.posX,
             posY: signData.posY,
