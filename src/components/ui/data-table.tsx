@@ -28,6 +28,8 @@ interface DataTableProps<TData> {
   globalFilterAccessorKey?: (keyof TData)[];
   searchPlaceholder?: string;
   loading?: boolean;
+  /** Conteúdo extra à direita do texto da página, antes do botão Próxima (ex.: Baixar todos). */
+  paginationExtra?: React.ReactNode;
 }
 
 export function DataTable<TData>({
@@ -36,6 +38,7 @@ export function DataTable<TData>({
   globalFilterAccessorKey,
   searchPlaceholder = "Pesquisar...",
   loading,
+  paginationExtra,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -127,7 +130,7 @@ export function DataTable<TData>({
         </TableFooter>
       </Table>
       {/* Pagination */}
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex items-center justify-between gap-2 pt-4">
         <Button
           size="sm"
           variant="outline"
@@ -136,17 +139,20 @@ export function DataTable<TData>({
         >
           Anterior
         </Button>
-        <span className="text-sm">
+        <span className="text-sm flex-1 text-center">
           Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
         </span>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage() || loading}
-        >
-          Próxima
-        </Button>
+        <div className="flex items-center gap-2">
+          {paginationExtra}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage() || loading}
+          >
+            Próxima
+          </Button>
+        </div>
       </div>
     </div>
   );

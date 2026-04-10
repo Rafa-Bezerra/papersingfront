@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
 import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
-import { dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
+import { base64ToBlob, dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
     DropdownMenu,
@@ -29,6 +31,33 @@ import { Bell, Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-r
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
 import { createElement as createAnexo } from "@/services/anexoService";
+
+function parseFiscalAnexoBase64(anexo: string): { base64: string; mime: string } {
+    const t = anexo.trim();
+    if (t.startsWith("data:")) {
+        const semi = t.indexOf(";");
+        const comma = t.indexOf(",");
+        if (comma > semi && semi > 0) {
+            return { mime: t.slice(5, semi), base64: t.slice(comma + 1) };
+        }
+    }
+    return { base64: t.replace(/^data:.*;base64,/, ""), mime: "application/pdf" };
+}
+
+function extForMime(mime: string): string {
+    if (mime === "application/pdf") return ".pdf";
+    if (mime === "image/png") return ".png";
+    if (mime === "image/jpeg" || mime === "image/jpg") return ".jpg";
+    if (mime === "image/gif") return ".gif";
+    if (mime === "image/webp") return ".webp";
+    if (mime.startsWith("image/")) return ".img";
+    return ".bin";
+}
+
+function safeAnexoFileName(nome: string, id: number): string {
+    const base = (nome || `anexo_${id}`).replace(/[/\\?%*:|"<>]/g, "_").trim() || `anexo_${id}`;
+    return base;
+}
 
 export default function Page() {
     const router = useRouter()
@@ -337,6 +366,46 @@ export default function Page() {
         }
     }
 
+    const handleDownloadAnexoFiscal = useCallback((doc: FiscalDocumento) => {
+        if (!doc.anexo) return;
+        try {
+            const { base64, mime } = parseFiscalAnexoBase64(doc.anexo);
+            const blob = base64ToBlob(base64, mime);
+            const ext = extForMime(mime);
+            let name = safeAnexoFileName(doc.nome, doc.id);
+            if (!name.toLowerCase().endsWith(ext)) name += ext;
+            saveAs(blob, name);
+        } catch (err) {
+            toast.error((err as Error).message || "Não foi possível baixar o anexo.");
+        }
+    }, []);
+
+    const handleDownloadAllAnexosFiscal = useCallback(async () => {
+        if (!resultAnexos?.length || !selectedResult) return;
+        try {
+            const zip = new JSZip();
+            const folder = zip.folder("anexos");
+            if (!folder) throw new Error("Não foi possível criar o arquivo ZIP.");
+            for (const doc of resultAnexos) {
+                if (!doc.anexo) continue;
+                try {
+                    const { base64, mime } = parseFiscalAnexoBase64(doc.anexo);
+                    const blob = base64ToBlob(base64, mime);
+                    const ext = extForMime(mime);
+                    let name = safeAnexoFileName(doc.nome, doc.id);
+                    if (!name.toLowerCase().endsWith(ext)) name += ext;
+                    folder.file(name, blob);
+                } catch (e) {
+                    console.error("Erro ao incluir anexo no ZIP:", doc, e);
+                }
+            }
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, `anexos_mov_${selectedResult.fiscal.idmov}.zip`);
+        } catch (err) {
+            toast.error((err as Error).message || "Não foi possível gerar o arquivo ZIP.");
+        }
+    }, [resultAnexos, selectedResult]);
+
     const colunas = useMemo<ColumnDef<FiscalResponseDto>[]>(
         () => [
             { accessorKey: 'fiscal.idmov', header: 'ID' },
@@ -468,19 +537,31 @@ export default function Page() {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => (
-                    <div className="flex gap-2">
-                        {row.original.anexo && (<Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAnexo(row.original, "anexo")}
-                        >
-                            Visualizar
-                        </Button>)}
+                    <div className="flex gap-2 flex-wrap">
+                        {row.original.anexo && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAnexo(row.original, "anexo")}
+                            >
+                                Visualizar
+                            </Button>
+                        )}
+                        {row.original.anexo && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-amber-400 border-amber-500/50 hover:bg-amber-500/10"
+                                onClick={() => handleDownloadAnexoFiscal(row.original)}
+                            >
+                                Baixar
+                            </Button>
+                        )}
                     </div>
                 )
             }
         ],
-        []
+        [handleDownloadAnexoFiscal]
     )
 
     return (
@@ -731,7 +812,23 @@ export default function Page() {
                                     </div>
                                 </div>
                             </Card>
-                            <DataTable columns={colunasAnexos} data={resultAnexos} loading={isLoading} />
+                            <DataTable
+                                columns={colunasAnexos}
+                                data={resultAnexos}
+                                loading={isLoading}
+                                paginationExtra={
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!resultAnexos.length || isLoading}
+                                        className="text-amber-400 border-amber-500/50 hover:bg-amber-500/10"
+                                        onClick={() => void handleDownloadAllAnexosFiscal()}
+                                    >
+                                        Baixar Todos
+                                    </Button>
+                                }
+                            />
                         </div>
                     </DialogContent>
                 </Dialog>
