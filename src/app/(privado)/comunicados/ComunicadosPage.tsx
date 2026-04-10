@@ -387,7 +387,6 @@ export default function Page() {
         const html = gerarTemplateHTML(data, logo, proxId, centrosDeCusto, contasFinanceiras);
 
         // Carrega html2pdf.js na página atual se ainda não estiver carregado
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await new Promise<void>((resolve, reject) => {
             if (typeof (window as unknown as Record<string, unknown>).html2pdf !== 'undefined') { resolve(); return; }
             const s = document.createElement('script');

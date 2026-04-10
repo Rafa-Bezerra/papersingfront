@@ -214,7 +214,7 @@ export default function Page() {
             toast.success('Carrinho enviado com sucesso!')
             window.location.reload()
         } catch (err) {
-            setError((err as Error).message)
+            toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
         }

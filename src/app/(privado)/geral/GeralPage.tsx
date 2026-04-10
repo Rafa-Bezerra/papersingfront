@@ -817,9 +817,9 @@ export default function Page() {
             {/* Cabeçalho */}
             <Card className="mb-6">
                 {/* Filtros */}
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                    <div className="flex justify-end items-end gap-4">
+                    <div className="flex flex-wrap justify-end items-end gap-4">
                         {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="dateFrom">Data de</Label>

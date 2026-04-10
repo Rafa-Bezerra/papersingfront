@@ -258,7 +258,7 @@ export default function Page() {
             toast.success('RDV enviado com sucesso!')
             window.location.reload()
         } catch (err) {
-            setError((err as Error).message)
+            toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
         }

@@ -99,6 +99,7 @@ export default function Page() {
     const [anexosSubmit, setAnexosSubmit] = useState<DocumentoAnexo[]>([])
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [openUsuarioAprovadorSearch, setOpenUsuarioAprovadorSearch] = useState(false)
 
     const form = useForm<Documento>({
         defaultValues: {
@@ -840,7 +841,47 @@ export default function Page() {
                                     <FormItem>
                                         <FormLabel>Usuário</FormLabel>
                                         <FormControl>
-                                            <Input {...field} />
+                                            <Popover open={openUsuarioAprovadorSearch} onOpenChange={setOpenUsuarioAprovadorSearch}>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="w-full justify-between"
+                                                    >
+                                                        {field.value
+                                                            ? `${field.value} - ${usuarios.find(u => u.codusuario === field.value)?.nome ?? ''}`
+                                                            : 'Selecione o usuário'}
+                                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverPortal>
+                                                    <PopoverContent
+                                                        className="p-0 w-[400px] pointer-events-auto z-[9999]"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <Command>
+                                                            <CommandInput placeholder="Buscar usuário..." />
+                                                            <CommandList>
+                                                                <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                                                                <CommandGroup>
+                                                                    {usuarios.map((u) => (
+                                                                        <CommandItem
+                                                                            key={u.codusuario}
+                                                                            value={`${u.codusuario} ${u.nome}`}
+                                                                            onSelect={() => {
+                                                                                field.onChange(u.codusuario)
+                                                                                setOpenUsuarioAprovadorSearch(false)
+                                                                            }}
+                                                                        >
+                                                                            {u.codusuario} - {u.nome}
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </PopoverPortal>
+                                            </Popover>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

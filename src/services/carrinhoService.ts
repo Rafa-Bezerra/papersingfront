@@ -2,7 +2,7 @@ import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoC
 import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Solicitacao";
-const elemento_singular = "produto";
+// const elemento_singular = "produto";
 const elemento_plural = "produtos";
 
 export async function getAllCentrosDeCusto(): Promise<CentroDeCusto[]> {
@@ -40,16 +40,26 @@ export async function getAllProdutos(data: string): Promise<Produto[]> {
 export async function createElement(data: Carrinho): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/enviarsoap`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
+        const body = await res.text();
+        try {
+            const json = JSON.parse(body);
+            throw new Error(json.erro ?? body);
+        } catch {
+            throw new Error(body);
+        }
     }
 }
 
 export async function updateElement(idmov: number, data: Carrinho): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/${idmov}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+        const body = await res.text();
+        try {
+            const json = JSON.parse(body);
+            throw new Error(json.erro ?? body);
+        } catch {
+            throw new Error(body);
+        }
     }
 }
 
