@@ -80,6 +80,7 @@ export default function Page() {
     const [error, setError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
+    // Valores retornados pela API: 'EM ANDAMENTO' | 'APROVADO' | 'REPROVADO'
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [isFormDocumentoOpen, setIsFormDocumentoOpen] = useState(false)
@@ -197,14 +198,20 @@ export default function Page() {
 
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
-                const matchQuery = qNorm === "" || String(d.nome ?? '').includes(qNorm)
-                const matchSituacao = situacaoFiltrada === "" || d.situacao == situacaoFiltrada
+                const nomeNorm = stripDiacritics(String(d.nome ?? '').toLowerCase())
+                const situacaoNorm = stripDiacritics(String(d.situacao ?? '').toUpperCase().trim())
+                const filtroSituacaoNorm = stripDiacritics(String(situacaoFiltrada ?? '').toUpperCase().trim())
+
+                const matchQuery = qNorm === "" || nomeNorm.includes(qNorm) || String(d.id ?? '').includes(qNorm)
+                const matchSituacao = filtroSituacaoNorm === "" || situacaoNorm === filtroSituacaoNorm
                 const usuarioAprovador = d.aprovadores.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
-                const matchDateFrom = dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
-                const matchDateTo = dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
+                // Regra: pendências ("EM ANDAMENTO") sempre aparecem, independente do período.
+                const isPendente = situacaoNorm === "EM ANDAMENTO"
+                const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
+                const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
                 return matchQuery && matchSituacao && (usuarioAprovador || d.usuario_criacao == userCodusuario) && matchSolicitante && matchDateFrom && matchDateTo
             })
 
@@ -630,9 +637,27 @@ export default function Page() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => setSituacaoFiltrada("Em Andamento")}>Em Andamento</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Aprovados"} checked={situacaoFiltrada == "Aprovados"} onCheckedChange={() => setSituacaoFiltrada("Aprovados")}>Aprovados</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Reprovados"} checked={situacaoFiltrada == "Reprovados"} onCheckedChange={() => setSituacaoFiltrada("Reprovados")}>Reprovados</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                    key={"EM ANDAMENTO"}
+                                    checked={situacaoFiltrada == "EM ANDAMENTO"}
+                                    onCheckedChange={() => setSituacaoFiltrada("EM ANDAMENTO")}
+                                >
+                                    Em Andamento
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                    key={"APROVADO"}
+                                    checked={situacaoFiltrada == "APROVADO"}
+                                    onCheckedChange={() => setSituacaoFiltrada("APROVADO")}
+                                >
+                                    Aprovados
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                    key={"REPROVADO"}
+                                    checked={situacaoFiltrada == "REPROVADO"}
+                                    onCheckedChange={() => setSituacaoFiltrada("REPROVADO")}
+                                >
+                                    Reprovados
+                                </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>

@@ -259,8 +259,13 @@ export default function Page() {
                 const matchQuery = qNorm === "" || String(d.nome ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.situacao == situacaoFiltrada
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
-                const matchDateFrom = dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
-                const matchDateTo = dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
+
+                // Regra global: pendências ("Em Andamento") não limitam por período.
+                const situacaoNorm = stripDiacritics(String(d.situacao ?? '').toUpperCase().trim())
+                const isPendente = situacaoNorm === "EM ANDAMENTO"
+                const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
+                const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
+
                 return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo
             })
 

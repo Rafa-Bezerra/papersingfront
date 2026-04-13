@@ -171,13 +171,16 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
+            // Regra global: pendências ("Em Andamento") não limitam por período.
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
             // "Avaliado" aqui significa "reprovado com motivo (avaliação)".
             // Como nem sempre isso existe como status de movimento no backend,
             // buscamos "Todos" e filtramos localmente.
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
-            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const fromApi = isPendente ? "1900-01-01" : from
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -329,9 +332,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     async function handleAprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await aprovar(id, atendimento)
+            const resultado = await aprovar(id, atendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
-            toast.success("Aprovado! Lista atualizada.")
+            toast.success(resultado.message || "Aprovado! Lista atualizada.")
+            // Aviso se notificação por e-mail ao próximo aprovador falhou (aprovação já persistida no backend).
+            if (resultado.avisoNotificacao) {
+                toast.warning(resultado.avisoNotificacao, { duration: 12_000 })
+            }
             handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
