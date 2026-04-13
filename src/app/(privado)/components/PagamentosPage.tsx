@@ -104,8 +104,13 @@ export default function Page({ titulo, grupo }: Props) {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
+
+            // Regra global: pendências não limitam por período.
+            // Em Pagamentos CI, o pendente é "EM ABERTO".
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ABERTO"
+            const fromApi = isPendente ? "1900-01-01" : from
             const data: PagamentoGetAll = {
-                dateFrom: from,
+                dateFrom: fromApi,
                 dateTo: to,
                 grupo: grupo,
                 status: situacaoFiltrada,
