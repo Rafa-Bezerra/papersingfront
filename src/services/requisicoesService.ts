@@ -24,12 +24,21 @@ export async function getAll(dateFrom: string, dateTo: string, movimentos: strin
     return list;
 }
 
-export async function aprovar(id: number, atendimento: number): Promise<void> {
+/** Resposta de POST /api/Requisicoes/aprovar: sucesso sempre que a aprovação foi gravada; avisoNotificacao só se o e-mail ao próximo nível falhou. */
+export type AprovarRequisicaoResult = {
+    message: string;
+    avisoNotificacao?: string | null;
+    idMov?: number;
+};
+
+/** Aprova no servidor e devolve mensagens (incl. aviso amigável se notificação por e-mail falhar após persistir a aprovação). */
+export async function aprovar(id: number, atendimento: number): Promise<AprovarRequisicaoResult> {
     const res = await fetch(`${API_BASE}/api/${caminho}/aprovar/${id}/${atendimento}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao aprovar ${elemento_singular}: ${msg}`);
     }
+    return (await res.json()) as AprovarRequisicaoResult;
 }
 
 export async function reprovar(id: number, atendimento: number): Promise<void> {

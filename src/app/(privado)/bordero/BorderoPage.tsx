@@ -140,7 +140,10 @@ export default function Page() {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
-            const dados = await getAll(from, to)
+            // Regra global: pendências ("Em Andamento") não limitam por período.
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const fromApi = isPendente ? "1900-01-01" : from
+            const dados = await getAll(fromApi, to)
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.descricao ?? '').includes(qNorm)

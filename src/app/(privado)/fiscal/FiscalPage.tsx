@@ -158,8 +158,12 @@ export default function Page() {
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
 
+            // Regra global: pendências ("Em Andamento") não limitam por período.
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const fromApi = isPendente ? "1900-01-01" : from
+
             const data: FiscalGetAll = {
-                dateFrom: from,
+                dateFrom: fromApi,
                 dateTo: to,
                 status: situacaoFiltrada,
                 solicitante: solicitanteFiltrado,

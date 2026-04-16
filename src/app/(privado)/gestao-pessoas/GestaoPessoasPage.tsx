@@ -139,7 +139,8 @@ export default function Page() {
         }
 
 
-        const status = searchParams.get("status") ?? "";
+        // Compatibilidade: alguns cards antigos usam ?filtro=pendentes.
+        const status = searchParams.get("status") ?? searchParams.get("filtro") ?? "";
         switch (status) {
             case "em_andamento":
                 setSituacaoFiltrada("Em Andamento")
@@ -241,7 +242,11 @@ export default function Page() {
             fiveDaysAgo.setDate(today.getDate() - 5);
             const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10);
             const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10);
-            const dados = await getAllRequisicoes(from, to, [], situacaoFiltrada, "RESTRITO");
+            // Regra global: pendências não limitam por período (inclusive no dashboard "Pendentes").
+            const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const isPendenteDashboard = filtroDashboard === "Pendentes"
+            const fromApi = (isPendenteStatus || isPendenteDashboard) ? "1900-01-01" : from
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "RESTRITO");
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -267,7 +272,9 @@ export default function Page() {
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? "").includes(qNorm);
-                const matchSituacao = !situacaoFiltrada || d.requisicao.status_movimento === situacaoFiltrada;
+                const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
+                const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
+                const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
                 const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
@@ -410,9 +417,13 @@ export default function Page() {
     async function handleAprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await aprovar(id, atendimento)
+            const resultado = await aprovar(id, atendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
-            toast.success("Aprovado! Lista atualizada.")
+            toast.success(resultado.message || "Aprovado! Lista atualizada.")
+            // Aviso se notificação por e-mail ao próximo aprovador falhou (aprovação já persistida no backend).
+            if (resultado.avisoNotificacao) {
+                toast.warning(resultado.avisoNotificacao, { duration: 12_000 })
+            }
             handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
