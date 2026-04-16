@@ -113,6 +113,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [fornecedorFiltrado, setFornecedorFiltrado] = useState<string>("")
+    const [fornecedores, setFornecedores] = useState<string[]>([])
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
 
     function clearQuery() {
@@ -153,7 +155,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
 
     // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível.
     useEffect(() => {
@@ -162,7 +164,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             if (document.visibilityState === "visible") handleSearch(query)
         }, 60000)
         return () => clearInterval(timer)
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
 
     async function handleSearch(q: string) {
         setIsLoading(true)
@@ -189,6 +191,16 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
             setSolicitantes(solicitantesUnicos)
 
+            const fornecedoresUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.nome_fornecedor)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+
+            setFornecedores(fornecedoresUnicos)
+
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
@@ -200,6 +212,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                     d.requisicao.status_movimento == situacaoFiltrada
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
+                const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
                 const userNorm = stripDiacritics(userCodusuario.toLowerCase().trim())
                 const usuarioAprovador = (userAdmin || userAdministrativo)
                     ? true
@@ -218,10 +231,10 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const avaliadoComMotivo = d.requisicao.possui_avaliacoes == 1;
 
                 if (situacaoFiltrada === "Avaliado") {
-                    return matchQuery && matchTipos && matchSituacao && matchSolicitante && matchTipoMovimento && avaliadoComMotivo
+                    return matchQuery && matchTipos && matchSituacao && matchSolicitante && matchFornecedor && matchTipoMovimento && avaliadoComMotivo
                 }
 
-                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovouOuReprovou
+                return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && !usuarioAprovouOuReprovou
             })
             setResults(filtrados)
         } catch (err) {
@@ -819,6 +832,29 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                     </DropdownMenuCheckboxItem>
                                 ))}
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={solicitanteFiltrado == ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Fornecedores */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Filtrar por fornecedor">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Fornecedores</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Fornecedores</DropdownMenuLabel>
+                                {fornecedores.map((fornecedor) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={fornecedor}
+                                        checked={fornecedorFiltrado === fornecedor}
+                                        onCheckedChange={(checked) => { if (checked) setFornecedorFiltrado(fornecedor) }}
+                                    >
+                                        {fornecedor}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={fornecedorFiltrado == ""} onCheckedChange={(checked) => { if (checked) setFornecedorFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 

@@ -110,6 +110,8 @@ export default function Page() {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+    const [fornecedorFiltrado, setFornecedorFiltrado] = useState<string>("")
+    const [fornecedores, setFornecedores] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
     function clearQuery() {
@@ -125,10 +127,17 @@ export default function Page() {
 
     useEffect(() => {
         const today = new Date();
-        const fiveDaysAgo = new Date();
-        fiveDaysAgo.setDate(today.getDate() - 5);
+        const status = searchParams.get("status") ?? "";
 
-        setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
+        if (status === "pendentes") {
+            const broadFrom = new Date();
+            broadFrom.setFullYear(broadFrom.getFullYear() - 2);
+            setDateFrom(prev => prev || broadFrom.toISOString().substring(0, 10));
+        } else {
+            const fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(today.getDate() - 5);
+            setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
+        }
         setDateTo(prev => prev || today.toISOString().substring(0, 10));
 
         const storedUser = sessionStorage.getItem("userData");
@@ -140,8 +149,6 @@ export default function Page() {
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
         }
 
-
-        const status = searchParams.get("status") ?? "";
         switch (status) {
             case "em_andamento":
                 setSituacaoFiltrada("Em Andamento")
@@ -222,6 +229,7 @@ export default function Page() {
         userAdmin,
         userCodusuario,
         solicitanteFiltrado,
+        fornecedorFiltrado,
         tipoMovimentoFiltrado,
         entregaFiltrada
     ]);
@@ -235,7 +243,7 @@ export default function Page() {
             }
         }, interval);
         return () => clearInterval(timer);
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, tipoMovimentoFiltrado, entregaFiltrada]);
+    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada]);
 
     async function handleSearch(q: string) {
         setIsLoading(true);
@@ -258,6 +266,15 @@ export default function Page() {
             ).sort((a, b) => a.localeCompare(b))
             setSolicitantes(solicitantesUnicos)
 
+            const fornecedoresUnicos = Array.from(
+                new Set(
+                    dados
+                        .map(d => d.requisicao?.nome_fornecedor)
+                        .filter((s): s is string => !!s && s.trim() !== "")
+                )
+            ).sort((a, b) => a.localeCompare(b))
+            setFornecedores(fornecedoresUnicos)
+
             const tiposDeMovimentoUnicos = Array.from(
                 new Set(
                     dados
@@ -277,13 +294,14 @@ export default function Page() {
                 const usuarioAprovador = userAdmin || userAdministrativo || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
+                const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
                 let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
                     stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A' || ap.situacao === 'R')
                 );
                 if (userAdmin || userAdministrativo) {
                     usuarioAprovou = false;
                 }
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && !usuarioAprovou;
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && !usuarioAprovou;
             });
 
             const fitradosStatus = filtrados.filter(d => {
@@ -904,6 +922,29 @@ export default function Page() {
                                     </DropdownMenuCheckboxItem>
                                 ))}
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={solicitanteFiltrado == ""} onCheckedChange={(checked) => { if (checked) setSolicitanteFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Fornecedores */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Filtrar por fornecedor">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">Fornecedores</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64" align="end">
+                                <DropdownMenuLabel>Fornecedores</DropdownMenuLabel>
+                                {fornecedores.map((fornecedor) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={fornecedor}
+                                        checked={fornecedorFiltrado === fornecedor}
+                                        onCheckedChange={(checked) => { if (checked) setFornecedorFiltrado(fornecedor) }}
+                                    >
+                                        {fornecedor}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={fornecedorFiltrado == ""} onCheckedChange={(checked) => { if (checked) setFornecedorFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 

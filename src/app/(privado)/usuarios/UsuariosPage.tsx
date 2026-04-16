@@ -430,6 +430,7 @@ export default function PageUsuarios() {
                         <option key={'36.128.741'} value={'36.128.741'}>{'WAY 306'}</option>
                         <option key={'64.017.857'} value={'64.017.857'}>{'WAY 364'}</option>
                         <option key={'57.190.446'} value={'57.190.446'}>{'MIGRA BR'}</option>
+                        <option key={'57.582.342'} value={'57.582.342'}>{'WAY CSC'}</option>
                       </select>
                     </FormControl>
                     <FormMessage />
