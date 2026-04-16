@@ -118,7 +118,7 @@ export default function HomePage() {
             icon={PenLine}
             color="purple"
             description="Movimentos restritos"
-            href="/gestao-pessoas?filtro=pendentes"
+            href="/gestao-pessoas?status=pendentes"
           />)}
           {(userPagamentoRh || userAdmin) && (<DashboardCard
             title="Pag. RH"

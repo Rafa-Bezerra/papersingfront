@@ -88,7 +88,10 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAprovacoesRdv(situacaoFiltrada, dateFrom, dateTo)
+            // Regra global: pendências ("Em Andamento") não limitam por período.
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const fromApi = isPendente ? "1900-01-01" : dateFrom
+            const dados = await getAprovacoesRdv(situacaoFiltrada, fromApi, dateTo)
             setResults(dados.filter(r => r.idmov && r.idmov !== 0))
         } catch (err) {
             setError((err as Error).message)

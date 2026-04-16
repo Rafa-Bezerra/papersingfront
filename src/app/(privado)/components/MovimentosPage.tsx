@@ -117,6 +117,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [fornecedores, setFornecedores] = useState<string[]>([])
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
 
+    const normalizeUserCode = (value: string) =>
+        stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
+
     function clearQuery() {
         setQuery('')
     }
@@ -173,13 +176,16 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
+            // Regra global: pendências ("Em Andamento") não limitam por período.
             const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
             const to = dateTo ? dateTo : dateToIso(today)
             // "Avaliado" aqui significa "reprovado com motivo (avaliação)".
             // Como nem sempre isso existe como status de movimento no backend,
             // buscamos "Todos" e filtramos localmente.
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
-            const dados = await getAllRequisicoes(from, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
+            const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+            const fromApi = isPendente ? "1900-01-01" : from
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -213,15 +219,15 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
                 const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
-                const userNorm = stripDiacritics(userCodusuario.toLowerCase().trim())
+                const userNorm = normalizeUserCode(userCodusuario)
                 const usuarioAprovador = (userAdmin || userAdministrativo)
                     ? true
-                    : d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === userNorm);
+                    : d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === userNorm);
 
                 const usuarioAprovouOuReprovou = (userAdmin || userAdministrativo)
                     ? false
                     : d.requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === userNorm &&
+                        normalizeUserCode(ap.usuario) === userNorm &&
                         (ap.situacao === 'A' || ap.situacao === 'R')
                     );
 
@@ -261,11 +267,12 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     async function handleDocumento(requisicao: RequisicaoDto) {
         setIsLoading(true)
         setPodeAssinar(false);
+        const userNorm = normalizeUserCode(userCodusuario)
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
-            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+            ap => normalizeUserCode(ap.usuario) === userNorm
         );
         const nivelUsuario = requisicao.requisicao_aprovacoes.find(
-            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+            ap => normalizeUserCode(ap.usuario) === userNorm
         )?.nivel ?? 1;
 
         const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
@@ -342,9 +349,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     async function handleAprovar(id: number, atendimento: number) {
         setIsLoading(true)
         try {
-            await aprovar(id, atendimento)
+            const resultado = await aprovar(id, atendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
-            toast.success("Aprovado! Lista atualizada.")
+            toast.success(resultado.message || "Aprovado! Lista atualizada.")
+            // Aviso se notificação por e-mail ao próximo aprovador falhou (aprovação já persistida no backend).
+            if (resultado.avisoNotificacao) {
+                toast.warning(resultado.avisoNotificacao, { duration: 12_000 })
+            }
             handleSearch(query)
         } catch (err) {
             setError((err as Error).message)
@@ -527,21 +538,22 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 header: 'Ações',
                 cell: ({ row }) => {
                     const { requisicao, requisicao_aprovacoes } = row.original;
+                    const userNorm = normalizeUserCode(userCodusuario)
                     const usuarioAprovador = requisicao_aprovacoes.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => normalizeUserCode(ap.usuario) === userNorm
                     );
 
                     const nivelUsuario = row.original.requisicao_aprovacoes.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => normalizeUserCode(ap.usuario) === userNorm
                     )?.nivel ?? 1;
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
                     const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'A')
+                        normalizeUserCode(ap.usuario) === userNorm && (ap.situacao === 'A')
                     );
                     const usuarioReprovou = requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.situacao === 'R')
+                        normalizeUserCode(ap.usuario) === userNorm && (ap.situacao === 'R')
                     );
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
