@@ -173,6 +173,7 @@ export default function LoginPage() {
                             <SelectItem value="WAY 262">WAY 262</SelectItem>
                             <SelectItem value="WAY 306">WAY 306</SelectItem>
                             <SelectItem value="WAY 364">WAY 364</SelectItem>
+                            <SelectItem value="WAY CSC">WAY CSC</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
