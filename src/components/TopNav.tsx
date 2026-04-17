@@ -1,7 +1,7 @@
 // components/TopNav.tsx
 "use client";
 
-import { User, Menu } from "lucide-react";
+import { CircleHelp, Headset, Menu, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -23,6 +23,7 @@ interface TopNavProps {
 export default function TopNav({ onMenuClick }: TopNavProps) {
   const [userName, setUserName] = useState("");
   const [logo, setLogo] = useState("");
+  const [supportUrl, setSupportUrl] = useState<string | null>(null);
   const [lastClickTime, setLastClickTime] = useState(0);
   const router = useRouter();
 
@@ -34,21 +35,27 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       switch (user.unidade) {
         case "WAY 112":
           setLogo("/logos/way112.png");
+          setSupportUrl(null);
           break;
         case "WAY 153":
           setLogo("/logos/way153.png");
+          setSupportUrl(null);
           break;
         case "WAY 262":
           setLogo("/logos/way262.png");
+          setSupportUrl("http://servicedesk.way262.com.br/index.php?redirect=%2Ffront%2Fcentral.php&error=3");
           break;
         case "WAY 306":
           setLogo("/logos/way306.png");
+          setSupportUrl(null);
           break;
         case "WAY 364":
           setLogo("/logos/way364.png");
+          setSupportUrl(null);
           break;
         default:
           setLogo("/logos/way262.png");
+          setSupportUrl(null);
           break;
       }
     }
@@ -97,6 +104,40 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
 
       {/* Área de controles - sempre à direita */}
       <div className="ml-auto flex items-center space-x-2 sm:space-x-4">
+        {/* Suporte (por unidade) */}
+        {supportUrl ? (
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="hover:bg-muted"
+            aria-label="Suporte"
+            title="Suporte"
+          >
+            <a href={supportUrl} target="_blank" rel="noreferrer">
+              <Headset className="h-5 w-5 text-muted-foreground" />
+            </a>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hover:bg-muted"
+            aria-label="Suporte (em breve)"
+            title="Suporte (em breve)"
+            disabled
+          >
+            <Headset className="h-5 w-5 text-muted-foreground" />
+          </Button>
+        )}
+
+        {/* Help */}
+        <Button asChild variant="ghost" size="icon" className="hover:bg-muted" aria-label="Ajuda e treinamentos">
+          <Link href="/help">
+            <CircleHelp className="h-5 w-5 text-muted-foreground" />
+          </Link>
+        </Button>
+
         {/* Toggle de tema */}
         <ThemeToggle />
 

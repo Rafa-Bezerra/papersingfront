@@ -18,6 +18,12 @@
 /out/
 /papersign/
 
+# training videos (muito grandes para git)
+/public/trainings/*.mp4
+
+# local dev logs
+dev-*.log
+
 # production
 /build
 
