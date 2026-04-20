@@ -20,8 +20,11 @@ export async function updateElement(data: Rdv): Promise<void> {
     }
 }
 
-export async function getUltimosRdvs(): Promise<Rdv[]> {
+export async function getUltimosRdvs(params?: { dateFrom?: string; dateTo?: string; situacao?: string }): Promise<Rdv[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
+    if (params?.dateFrom) url.searchParams.set('dateFrom', params.dateFrom);
+    if (params?.dateTo) url.searchParams.set('dateTo', params.dateTo);
+    if (params?.situacao) url.searchParams.set('situacao', params.situacao);
 
     const res = await fetch(url.toString(), {
         method: 'GET',

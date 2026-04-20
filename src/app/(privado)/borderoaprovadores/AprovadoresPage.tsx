@@ -135,6 +135,7 @@ export default function Page() {
           (
             stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.usuario ?? '').toLowerCase()).includes(qNorm) ||
+            String(p.ativo ?? '').includes(qNorm) ||
             String(p.id ?? '').includes(qNorm)
           )
         )
@@ -223,7 +224,7 @@ export default function Page() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-2 md:flex-row">
-          <div className="relative flex-1">
+          <div className="relative flex-1 w-full">
             <Input
               placeholder="Pesquise por nome ou ID"
               value={query}

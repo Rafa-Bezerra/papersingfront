@@ -366,7 +366,7 @@ export default function Page() {
                 </CardHeader>
 
                 <CardContent className="flex flex-col gap-2 md:flex-row">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <Input
                             placeholder="Pesquise por Centro de custo ou ID"
                             value={query}

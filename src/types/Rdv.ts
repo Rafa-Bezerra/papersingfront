@@ -24,6 +24,7 @@ export type Rdv = {
     codigo_atendimento?: number;
     arquivo_assinado?: boolean;
     usuario_criacao?: string;
+    nome_solicitante?: string;
     itens: ItemRdv[];
     anexos: AnexoRdv[];
     aprovadores: AprovadoresRdv[];
