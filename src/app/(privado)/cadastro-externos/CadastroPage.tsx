@@ -210,13 +210,12 @@ export default function PageUsuarios() {
             } else {
                 await createUsuario(data)
             }
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
             toast.success(`Registro enviado`)
             form.reset()
-            await handleSearchClick()
             setIsModalOpen(false)
+            await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
 
