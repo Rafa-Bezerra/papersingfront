@@ -763,7 +763,7 @@ ${html}
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <Input
                             placeholder="Pesquise por nome ou ID"
                             value={query}
@@ -993,33 +993,31 @@ ${html}
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="flex flex-col gap-1">
-                                                <Label>Arquivo</Label>
-                                                <Input
-                                                    type="file"
-                                                    accept="application/pdf/*"
-                                                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                                />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                                <Label>Descrição do anexo</Label>
-                                                <Input
-                                                    type="text"
-                                                    value={fileName}
-                                                    onChange={(e) => setFileName(e.target.value)}
-                                                    aria-label='Descrição do anexo'
-                                                    placeholder='Descrição do anexo'
-                                                />
-                                            </div>
-                                            <Button
-                                                onClick={handleSubmitAnexos}
-                                                disabled={!file || isLoading || !fileName?.trim()}
-                                                className="flex items-center"
-                                            >
-                                                {isLoading ? "Enviando..." : "Anexar documento"}
-                                            </Button>
+                                        <div className="flex flex-col gap-1">
+                                            <Label>Arquivo</Label>
+                                            <Input
+                                                type="file"
+                                                accept="application/pdf/*"
+                                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                                            />
                                         </div>
+                                        <div className="flex flex-col gap-1">
+                                            <Label>Descrição do anexo</Label>
+                                            <Input
+                                                type="text"
+                                                value={fileName}
+                                                onChange={(e) => setFileName(e.target.value)}
+                                                aria-label='Descrição do anexo'
+                                                placeholder='Descrição do anexo'
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={handleSubmitAnexos}
+                                            disabled={!file || isLoading || !fileName?.trim()}
+                                            className="flex items-center"
+                                        >
+                                            {isLoading ? "Enviando..." : "Anexar documento"}
+                                        </Button>
 
                                         {anexosSubmit.map((item, i) => (
                                             <div key={i} className="flex justify-between items-center p-3 border rounded-lg">

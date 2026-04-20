@@ -136,6 +136,7 @@ export default function PageUsuarios() {
           (
             stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.codusuario ?? '').toLowerCase()).includes(qNorm) ||
+            stripDiacritics((p.empresa ?? '').toLowerCase()).includes(qNorm) ||
             String(p.sequencial ?? '').includes(qNorm)
           )
         )
@@ -330,7 +331,7 @@ export default function PageUsuarios() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-2 md:flex-row">
-          <div className="relative flex-1">
+          <div className="relative flex-1 w-full">
             <Input
               placeholder="Pesquise por nome ou ID"
               value={query}

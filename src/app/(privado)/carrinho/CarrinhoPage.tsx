@@ -16,7 +16,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, Check } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, Check, Filter, SearchIcon } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
 import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
 import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
@@ -44,6 +44,12 @@ import {
 import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function Page() {
     const titulo = 'Carrinho de Compras'
@@ -79,6 +85,13 @@ export default function Page() {
     const [selectedAprovadoresResult, setSelectedAprovadoresResult] = useState<Requisicao_aprovacao[]>([])
     const [carrinhoDocumento, setCarrinhoDocumento] = useState<string | null>(null)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+
+    const hoje = new Date().toISOString().split('T')[0]
+    const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const [dateFrom, setDateFrom] = useState(trintaDiasAtras)
+    const [dateTo, setDateTo] = useState(hoje)
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>('')
+    const situacoesCarrinho = ['Em Andamento', 'Aprovado', 'Reprovado', 'Cancelado']
 
     // Desbloqueia envio quando há pelo menos 1 produto disponível (novo) ou 1 item já adicionado (edição)
     useEffect(() => {
@@ -127,7 +140,7 @@ export default function Page() {
     // Carrega centros de custo e últimas requisições ao montar
     useEffect(() => {
         buscaCentrosDeCusto();
-        buscaUltimasRequisicoes();
+        buscaUltimasRequisicoes({ dateFrom: trintaDiasAtras, dateTo: hoje });
     }, [])
 
     /** Busca centros de custo da API */
@@ -148,11 +161,11 @@ export default function Page() {
     }
 
     /** Busca últimas requisições para exibir na tabela */
-    async function buscaUltimasRequisicoes() {
+    async function buscaUltimasRequisicoes(params?: { dateFrom?: string; dateTo?: string; situacao?: string }) {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getUltimasRequisicoes()
+            const dados = await getUltimasRequisicoes(params)
             setResults(dados)
         } catch (err) {
             setError((err as Error).message)
@@ -393,8 +406,43 @@ export default function Page() {
         <div className="p-6">
             {/* Título */}
             <Card className="mb-6">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">Últimas requisições</CardTitle>
+                    <div className="flex flex-wrap justify-start md:justify-end items-end gap-3 w-full md:w-auto">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground">Data de</label>
+                                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                                    className="border rounded px-2 py-1 text-sm min-w-[140px] max-w-[200px] h-9" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground">Data até</label>
+                                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                                    className="border rounded px-2 py-1 text-sm min-w-[140px] max-w-[200px] h-9" />
+                            </div>
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9">
+                                    <Filter className="mr-1 h-3 w-3" />
+                                    Situação {situacaoFiltrada ? `(${situacaoFiltrada})` : ''}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuCheckboxItem checked={!situacaoFiltrada} onCheckedChange={() => setSituacaoFiltrada('')}>
+                                    Todos
+                                </DropdownMenuCheckboxItem>
+                                {situacoesCarrinho.map(s => (
+                                    <DropdownMenuCheckboxItem key={s} checked={situacaoFiltrada === s} onCheckedChange={() => setSituacaoFiltrada(s === situacaoFiltrada ? '' : s)}>
+                                        {s}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button size="sm" className="h-9" onClick={() => buscaUltimasRequisicoes({ dateFrom, dateTo, situacao: situacaoFiltrada || undefined })}>
+                            <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={isLoading} />

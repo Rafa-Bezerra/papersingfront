@@ -21,8 +21,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Popover, PopoverTrigger } from '@/components/ui/popover'
-import * as PopoverPrimitive from '@radix-ui/react-popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
   CommandEmpty,
@@ -32,7 +31,6 @@ import {
   CommandList
 } from '@/components/ui/command'
 import { stripDiacritics } from '@/utils/functions'
-import { cn } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -49,25 +47,6 @@ import {
   getAll as getAllUsuarios
 } from '@/services/usuariosService'
 
-// Popover sem portal para evitar o overlay do Dialog bloquear clique/scroll.
-const PopoverContentNoPortal = React.forwardRef<
-  React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'start', sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Content
-    ref={ref}
-    side="bottom"
-    align={align}
-    sideOffset={sideOffset}
-    avoidCollisions={false}
-    className={cn(
-      "bg-popover text-popover-foreground z-50 w-72 rounded-md border p-4 shadow-md outline-hidden",
-      className
-    )}
-    {...props}
-  />
-))
-PopoverContentNoPortal.displayName = 'PopoverContentNoPortal'
 
 export default function Page() {
   const titulo = 'Centros de custos'
@@ -393,7 +372,7 @@ export default function Page() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-2 md:flex-row">
-          <div className="relative flex-1">
+          <div className="relative flex-1 w-full">
             <Input
               placeholder="Pesquise por Centro de custo ou ID"
               value={query}
@@ -487,7 +466,7 @@ export default function Page() {
                   <FormItem>
                     <FormLabel>Centro de custo</FormLabel>
                     <FormControl>
-                      <Popover open={openCentroSearch} onOpenChange={setOpenCentroSearch}>
+                      <Popover modal={true} open={openCentroSearch} onOpenChange={setOpenCentroSearch}>
                         <PopoverTrigger asChild>
                           <Button
                             type="button"
@@ -501,7 +480,7 @@ export default function Page() {
                             <ChevronsUpDown className="opacity-50 size-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContentNoPortal className="p-0 w-[600px] z-[60] pointer-events-auto">
+                        <PopoverContent className="p-0 w-[600px] z-[200] pointer-events-auto">
                           <Command
                             className="max-h-[320px] overflow-hidden"
                             filter={(value, search) => {
@@ -534,7 +513,7 @@ export default function Page() {
                               </CommandGroup>
                             </CommandList>
                           </Command>
-                        </PopoverContentNoPortal>
+                        </PopoverContent>
                       </Popover>
                     </FormControl>
                     <FormMessage />
@@ -551,7 +530,7 @@ export default function Page() {
                   <FormItem>
                     <FormLabel>Conta contábil</FormLabel>
                     <FormControl>
-                      <Popover open={openContaSearch} onOpenChange={setOpenContaSearch}>
+                      <Popover modal={true} open={openContaSearch} onOpenChange={setOpenContaSearch}>
                         <PopoverTrigger asChild>
                           <Button
                             type="button"
@@ -565,7 +544,7 @@ export default function Page() {
                             <ChevronsUpDown className="opacity-50 size-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContentNoPortal className="p-0 w-[600px] z-[60] pointer-events-auto">
+                        <PopoverContent className="p-0 w-[600px] z-[200] pointer-events-auto">
                           <Command
                             className="max-h-[320px] overflow-hidden"
                             filter={(value, search) => {
@@ -598,7 +577,7 @@ export default function Page() {
                               </CommandGroup>
                             </CommandList>
                           </Command>
-                        </PopoverContentNoPortal>
+                        </PopoverContent>
                       </Popover>
                     </FormControl>
                     <FormMessage />
@@ -750,7 +729,7 @@ export default function Page() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Popover open={openUsuarioSearch} onOpenChange={setOpenUsuarioSearch}>
+                      <Popover modal={true} open={openUsuarioSearch} onOpenChange={setOpenUsuarioSearch}>
                         <PopoverTrigger asChild>
                           <Button
                             type="button"
@@ -765,7 +744,7 @@ export default function Page() {
                             <ChevronsUpDown className="opacity-50 size-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContentNoPortal className="p-0 w-[600px] z-[60] pointer-events-auto">
+                        <PopoverContent className="p-0 w-[600px] z-[200] pointer-events-auto">
                           <Command
                             className="max-h-[320px] overflow-hidden"
                             filter={(value, search) => {
@@ -798,7 +777,7 @@ export default function Page() {
                               </CommandGroup>
                             </CommandList>
                           </Command>
-                        </PopoverContentNoPortal>
+                        </PopoverContent>
                       </Popover>
                     </FormControl>
                     <FormMessage />

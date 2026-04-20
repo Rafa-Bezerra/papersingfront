@@ -72,8 +72,11 @@ export async function getAnexos(idmov: number): Promise<AnexoCarrinho[]> {
     return res.json();
 }
 
-export async function getUltimasRequisicoes(): Promise<RequisicaoDto[]> {
+export async function getUltimasRequisicoes(params?: { dateFrom?: string; dateTo?: string; situacao?: string }): Promise<RequisicaoDto[]> {
     const url = new URL(`${API_BASE}/api/${caminho}/ultimasrequisicoes`);
+    if (params?.dateFrom) url.searchParams.set('dateFrom', params.dateFrom);
+    if (params?.dateTo) url.searchParams.set('dateTo', params.dateTo);
+    if (params?.situacao) url.searchParams.set('situacao', params.situacao);
 
     const res = await fetch(url.toString(), {
         method: 'GET',

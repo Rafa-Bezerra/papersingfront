@@ -14,7 +14,7 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { ChevronsUpDown, Eye, Loader2, Trash2, Check, AlertTriangle } from "lucide-react";
+import { ChevronsUpDown, Eye, Loader2, Trash2, Check, AlertTriangle, Filter, SearchIcon } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, Produto } from '@/services/carrinhoService';
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, createElement, getUltimosRdvs, getAllFornecedores, Fornecedor, updateElement, getAnexoById } from '@/services/rdvService';
@@ -42,6 +42,12 @@ import {
 import { safeDateLabel, safeDateLabelAprovacao, toBase64, toMoney } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Usuario } from '@/types/Usuario';
 import { getAll } from '@/services/usuariosService';
 import { PopoverPortal } from '@radix-ui/react-popover';
@@ -89,6 +95,13 @@ export default function Page() {
     const [rdvDocumentoSelecionada, setRdvDocumentoSelecionada] = useState<string | null>(null)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
 
+    const hoje = new Date().toISOString().split('T')[0]
+    const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const [dateFrom, setDateFrom] = useState(trintaDiasAtras)
+    const [dateTo, setDateTo] = useState(hoje)
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>('')
+    const situacoesRdv = ['Em andamento', 'Aprovado', 'Reprovado', 'Cancelado']
+
     useEffect(() => {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
@@ -99,7 +112,7 @@ export default function Page() {
         buscaCentrosDeCusto();
         buscaUsuarios();
         buscaFornecedores();
-        buscaUltimosRdvs();
+        buscaUltimosRdvs({ dateFrom: trintaDiasAtras, dateTo: hoje });
     }, [])
 
     useEffect(() => {
@@ -181,11 +194,11 @@ export default function Page() {
         }
     }
 
-    async function buscaUltimosRdvs() {
+    async function buscaUltimosRdvs(params?: { dateFrom?: string; dateTo?: string; situacao?: string }) {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getUltimosRdvs()
+            const dados = await getUltimosRdvs(params)
             setResults(dados)
         } catch (err) {
             setError((err as Error).message)
@@ -401,6 +414,7 @@ export default function Page() {
             { accessorKey: 'periodo_ate', header: 'Período até', accessorFn: (row) => row.periodo_ate ? safeDateLabel(row.periodo_ate) : '' },
             { accessorKey: 'origem', header: 'Origem' },
             { accessorKey: 'destino', header: 'Destino' },
+            { accessorKey: 'nome_solicitante', header: 'Solicitante' },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'actions',
@@ -433,7 +447,7 @@ export default function Page() {
                                 Aprovadores
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos
+                                Anexos {(row.original.anexos?.length ?? 0) > 0 ? `(${row.original.anexos.length})` : ''}
                             </Button>
                             {podeEditar && editar != row.original.id &&  (<Button size="sm" variant="destructive" onClick={() => handleEditar(row.original)}>
                                 Editar
@@ -494,8 +508,43 @@ export default function Page() {
         <div className="p-6">
             {/* Título */}
             <Card className="mb-6">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">Últimas requisições</CardTitle>
+                    <div className="flex flex-wrap justify-start md:justify-end items-end gap-3 w-full md:w-auto">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground">Data de</label>
+                                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                                    className="border rounded px-2 py-1 text-sm min-w-[140px] max-w-[200px] h-9" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground">Data até</label>
+                                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                                    className="border rounded px-2 py-1 text-sm min-w-[140px] max-w-[200px] h-9" />
+                            </div>
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9">
+                                    <Filter className="mr-1 h-3 w-3" />
+                                    Situação {situacaoFiltrada ? `(${situacaoFiltrada})` : ''}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuCheckboxItem checked={!situacaoFiltrada} onCheckedChange={() => setSituacaoFiltrada('')}>
+                                    Todos
+                                </DropdownMenuCheckboxItem>
+                                {situacoesRdv.map(s => (
+                                    <DropdownMenuCheckboxItem key={s} checked={situacaoFiltrada === s} onCheckedChange={() => setSituacaoFiltrada(s === situacaoFiltrada ? '' : s)}>
+                                        {s}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button size="sm" className="h-9" onClick={() => buscaUltimosRdvs({ dateFrom, dateTo, situacao: situacaoFiltrada || undefined })}>
+                            <SearchIcon className="mr-1 h-4 w-4" /> Buscar
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={isLoading} />

@@ -897,7 +897,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <Input
                             placeholder="Pesquise por nome ou ID"
                             value={query}

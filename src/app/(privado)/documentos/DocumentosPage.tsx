@@ -470,7 +470,7 @@ export default function Page() {
                             </Button>)}
 
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos
+                                Anexos {(row.original.anexos?.length ?? 0) > 0 ? `(${row.original.anexos.length})` : ''}
                             </Button>
 
                             <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
@@ -664,7 +664,7 @@ export default function Page() {
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <Input
                             placeholder="Pesquise por nome ou ID"
                             value={query}
