@@ -17,6 +17,8 @@ import Link from "next/link";
 import Image from "next/image";
 
 const GLPI_SUPPORT_URL = "http://servicedesk.way262.com.br/index.php?noAUTO=1";
+const GLPI_SUPPORT_URL_WAY306 =
+  "http://servicedesk.way306.com.br/index.php?redirect=%2Ffront%2Fticket.php%3Fis_deleted%3D0%26as_map%3D0%26browse%3D0%26criteria%255B0%255D%255Blink%255D%3DAND%26criteria%255B0%255D%255Bfield%255D%3D12%26criteria%255B0%255D%255Bsearchtype%255D%3Dequals%26criteria%255B0%255D%255Bvalue%255D%3Dnotold%26itemtype%3DTicket%26start%3D0%26_glpi_csrf_token%3D54abd661b04575216eac52db3191eb896cc47bb1e6fd7ca2375de7a96b70ea67%26sort%255B%255D%3D19%26order%255B%255D%3DDESC?error=3";
 
 interface TopNavProps {
   onMenuClick: () => void;
@@ -49,7 +51,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
           break;
         case "WAY 306":
           setLogo("/logos/way306.png");
-          setSupportUrl(GLPI_SUPPORT_URL);
+          setSupportUrl(GLPI_SUPPORT_URL_WAY306);
           break;
         case "WAY 364":
           setLogo("/logos/way364.png");
