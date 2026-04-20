@@ -30,7 +30,7 @@ const MODULES: TrainingModule[] = [
   { id: "pagamentos-ci", url: "/comunicados", title: "Pagamentos CI", description: "Cadastro e validações de pagamentos.", status: "Em breve" },
   { id: "bordero", url: "/bordero", title: "Borderô", description: "Envio, acompanhamento e aprovação.", status: "Em breve" },
   { id: "carrinho", url: "/carrinho", title: "Carrinho", description: "Montagem e envio de requisições.", status: "Em breve" },
-  { id: "rdv", url: "/rdv", title: "RDV", description: "Reembolso/Despesas de viagem: fluxo completo.", status: "Em breve" },
+  { id: "rdv", url: "/rdv", title: "RDV", description: "Reembolso/Despesas de viagem: fluxo completo.", status: "Disponível", videoUrl: "/trainings/RDV%20-%20TREINAMENTO%20.mp4" },
   { id: "aprovacao-rdv", url: "/aprovacaordv", title: "Aprovação RDV", description: "Aprovar, reprovar e notificar aprovadores.", status: "Em breve" },
   { id: "gestao-pessoas", url: "/gestao-pessoas", title: "Gestão de Pessoas", description: "Rotinas e consultas do módulo.", status: "Em breve" },
   { id: "pagamentos-gp", url: "/pagamentos-rh", title: "Pagamentos G. Pessoas", description: "Fluxos e validações de pagamento.", status: "Em breve" },
