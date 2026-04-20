@@ -186,7 +186,10 @@ export default function PdfViewerDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[95vw] sm:w-[60vw] h-[90dvh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0">
+            <DialogContent
+                scrollBody={false}
+                className="w-[95vw] sm:w-[60vw] h-[90dvh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0"
+            >
                 <DialogHeader className="p-4 shrink-0 sticky top-0 z-10 bg-background border-b">
                     <DialogTitle className="text-lg font-semibold text-center">
                         {title}
