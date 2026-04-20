@@ -1479,11 +1479,29 @@ function ItensFinanceirosSection({
 export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number, centrosDeCusto: CentroDeCusto[] = [], contasFinanceiras: ContaFinanceira[] = []): string {
 
     const aprovadores = data.aprovadores ?? [];
+    const normNome = (nome?: string) =>
+        stripDiacritics(String(nome ?? "").toUpperCase().trim()).replace(/\s+/g, " ");
 
-    const primeiroAprovador = aprovadores.length > 0 ? aprovadores[0] : null;
-    const demaisAprovadores = aprovadores.slice(1);
+    // Regras do Pagamentos C.I:
+    // - "De acordo" sempre será Felipe Antonio de Lellis Andrade e/ou Paulo Gomes / Paulo Lopes (quando estiverem na lista)
+    // - Demais aprovadores sempre entram como "Atenciosamente"
+    const isDeAcordo = (nome?: string) => {
+        const n = normNome(nome);
+        return n === "FELIPE ANTONIO DE LELLIS ANDRADE" || n === "PAULO GOMES" || n === "PAULO LOPES";
+    };
 
-    const gerarColunasAssinaturas = (lista: typeof demaisAprovadores) => {
+    const deAcordoAprovadoresRaw = aprovadores.filter((a) => isDeAcordo(a.nome));
+    const deAcordoKeys = new Set(
+        deAcordoAprovadoresRaw.map((a) => (a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`))
+    );
+    const deAcordoAprovadores = aprovadores.filter((a) =>
+        deAcordoKeys.has(a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`)
+    );
+    const atenciosamenteAprovadores = aprovadores.filter(
+        (a) => !deAcordoKeys.has(a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`)
+    );
+
+    const gerarColunasAssinaturas = (lista: ComunicadoAprovacao[]) => {
 
         let html = '<table class="table-sem-borda" style="margin-top:50px; text-align:center;"><tr>';
 
@@ -1617,34 +1635,21 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
         
         <!-- ATENCIOSAMENTE -->
 
-        ${demaisAprovadores.length > 0 ? `
+        ${atenciosamenteAprovadores.length > 0 ? `
         <div style="margin-top:40px;">
             Atenciosamente,
         </div>`
             : ""}
 
-        ${demaisAprovadores.length > 0 ? gerarColunasAssinaturas(demaisAprovadores) : ""}
+        ${atenciosamenteAprovadores.length > 0 ? gerarColunasAssinaturas(atenciosamenteAprovadores) : ""}
 
         <!-- DE ACORDO -->
 
-        ${primeiroAprovador ? `
-
-        <table class="table-sem-borda" style="width:100%; margin-top:60px;">
-            <tr>
-                <td style="text-align:right;">
-                    <div style="
-                        border-top:1px solid #000;
-                        width:250px;
-                        display:inline-block;
-                        padding-top:6px;
-                        font-size:12px;
-                        text-align:center;
-                    ">
-                    ${primeiroAprovador.nome}
-                    </div>
-                </td>
-            </tr>
-        </table>
+        ${deAcordoAprovadores.length > 0 ? `
+        <div style="margin-top:40px;">
+            De acordo,
+        </div>
+        ${gerarColunasAssinaturas(deAcordoAprovadores)}
         ` : ""}
     </div>
     `;
