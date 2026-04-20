@@ -1,24 +1,10 @@
 import { Suspense } from "react"
 import MovimentosPage from "../components/MovimentosPage";
 import LoadingFallback from "@/components/LoadingFallback";
+import { codTmvListaOrdensCompraApi } from "@/constants/ordensCompraTipos";
 
 const titulo = 'Ordens de compra'
-const tipos_movimento: string[] = [
-  "1.1.20",
-  "1.1.21",
-  "1.1.22",
-  "1.1.30",
-  "1.1.31",
-  "1.1.32",
-  "1.1.33",
-  "1.1.34",
-  "1.1.35",
-  "1.1.36",
-  "1.1.37",
-  "1.1.40",
-  "1.1.50",
-  "1.1.51",
-];
+const tipos_movimento: string[] = codTmvListaOrdensCompraApi()
 
 export default function Page() {
   // Loading padrão (spinner + texto).

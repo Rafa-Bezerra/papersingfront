@@ -595,7 +595,7 @@ export default function Page() {
 
       {/* Usuários */}
       <Dialog open={isModalUsuarioOpen} onOpenChange={setIsModalUsuarioOpen}>
-        <DialogContent className="flex flex-col">
+        <DialogContent scrollBody={false} className="flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Usuários CCUSTO: {ccustoSelecionado?.ccusto + " - " + ccustoSelecionado?.custo}</DialogTitle>
             <Button onClick={handleInsertUsuario} className="flex items-center">

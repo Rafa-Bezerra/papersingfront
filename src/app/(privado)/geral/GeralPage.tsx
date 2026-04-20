@@ -1106,6 +1106,7 @@ export default function Page() {
             <Dialog open={isLoading} onOpenChange={setIsLoading}>
                 <DialogContent
                     showCloseButton={false}
+                    scrollBody={false}
                     className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                 >
                     <DialogHeader>

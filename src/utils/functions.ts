@@ -277,6 +277,7 @@ export async function htmlToPdfBase64(html: string): Promise<string> {
 
 export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): string {
   if (!tipo_movimento) return "Desconhecida";
+  const t = tipo_movimento.trim().replace(/,/g, ".");
   const mapa: Record<string, string> = {
     '1.2.31': 'Aquisição de materiais',
     '1.2.32': 'Aquisição de materiais',
@@ -322,7 +323,10 @@ export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): 
     '1.2.65': 'Outras movimentações',
     '1.2.90': 'Outras movimentações',
   };
-  return mapa[tipo_movimento] ?? "Desconhecida";
+  if (mapa[t]) return mapa[t];
+  // RM: qualquer 1.1.x que não seja tipo de solicitação do PS conta como fluxo de ordens/compras.
+  if (/^1\.1\.(?!(?:01|02|04|05|10|11|12)$)\d{1,4}$/.test(t)) return "Ordens de compra";
+  return "Desconhecida";
 }
 
 export function imprimirPdfBase64(base64String: string) {
