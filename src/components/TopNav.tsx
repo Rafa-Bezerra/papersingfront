@@ -16,6 +16,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 import Image from "next/image";
 
+const GLPI_SUPPORT_URL = "http://servicedesk.way262.com.br/index.php?noAUTO=1";
+
 interface TopNavProps {
   onMenuClick: () => void;
 }
@@ -35,27 +37,27 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       switch (user.unidade) {
         case "WAY 112":
           setLogo("/logos/way112.png");
-          setSupportUrl(null);
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
         case "WAY 153":
           setLogo("/logos/way153.png");
-          setSupportUrl(null);
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
         case "WAY 262":
           setLogo("/logos/way262.png");
-          setSupportUrl("http://servicedesk.way262.com.br/index.php?redirect=%2Ffront%2Fcentral.php&error=3");
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
         case "WAY 306":
           setLogo("/logos/way306.png");
-          setSupportUrl(null);
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
         case "WAY 364":
           setLogo("/logos/way364.png");
-          setSupportUrl(null);
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
         default:
           setLogo("/logos/way262.png");
-          setSupportUrl(null);
+          setSupportUrl(GLPI_SUPPORT_URL);
           break;
       }
     }

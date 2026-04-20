@@ -404,6 +404,7 @@ export default function Page() {
             <Dialog open={isLoading} modal={false}>
                 <DialogContent
                     showCloseButton={false}
+                    scrollBody={false}
                     className="pointer-events-none flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                     aria-description='Carregando...'
                 >

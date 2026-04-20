@@ -832,6 +832,7 @@ ${html}
             <Dialog open={isLoading} onOpenChange={setIsLoading}>
                 <DialogContent
                     showCloseButton={false}
+                    scrollBody={false}
                     className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                 >
                     <DialogHeader>
@@ -993,7 +994,7 @@ ${html}
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3">
-                                        <div className="flex flex-col gap-3">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
                                             <div className="flex flex-col gap-1">
                                                 <Label>Arquivo</Label>
                                                 <Input
@@ -1015,7 +1016,7 @@ ${html}
                                             <Button
                                                 onClick={handleSubmitAnexos}
                                                 disabled={!file || isLoading || !fileName?.trim()}
-                                                className="flex items-center"
+                                                className="flex items-center sm:justify-center"
                                             >
                                                 {isLoading ? "Enviando..." : "Anexar documento"}
                                             </Button>

@@ -208,10 +208,12 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             setFornecedores(fornecedoresUnicos)
 
             const qNorm = stripDiacritics(q.toLowerCase().trim())
+            const normTipoMov = (t: string | null | undefined) =>
+                stripDiacritics((t ?? '').trim()).replace(/,/g, '.')
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
-                const matchTipos = tipos_movimento.includes(stripDiacritics((d.requisicao.tipo_movimento ?? '').trim()));
+                const matchTipos = tipos_movimento.some((tm) => normTipoMov(tm) === normTipoMov(d.requisicao.tipo_movimento))
                 const matchSituacao =
                     situacaoFiltrada === "" ||
                     situacaoFiltrada === "Avaliado" ||
@@ -938,7 +940,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Itens */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalItensOpen} onOpenChange={setIsModalItensOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogContent className="w-full max-w-[90vw] max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Itens movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -991,7 +993,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Aprovações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogContent className="w-full max-w-[90vw] max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1018,6 +1020,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             <Dialog open={isLoading} onOpenChange={setIsLoading}>
                 <DialogContent
                     showCloseButton={false}
+                    scrollBody={false}
                     className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                 >
                     <DialogHeader>
@@ -1033,7 +1036,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogContent className="w-full max-w-[90vw] max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1113,7 +1116,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Avaliações */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAvaliacoesOpen} onOpenChange={setIsModalAvaliacoesOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogContent className="w-full max-w-[90vw] max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
