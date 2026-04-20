@@ -647,7 +647,7 @@ ${html}
         }
     }
 
-    const colunasAprovacoes = useMemo<ColumnDef<ComunicadoAprovacao>[]>(
+    const colunasAprovacoes: ColumnDef<ComunicadoAprovacao>[] = useMemo(
         () => [
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'usuario_nome', header: 'Usuário' },
@@ -671,7 +671,7 @@ ${html}
         [handleNotificarAprovador]
     )
 
-    const colunasAnexos = useMemo<ColumnDef<ComunicadoAnexo>[]>(
+    const colunasAnexos: ColumnDef<ComunicadoAnexo>[] = useMemo(
         () => [
             { accessorKey: 'id', header: 'Id' },
             { accessorKey: 'nome', header: 'Usuário' },
@@ -994,15 +994,6 @@ ${html}
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3">
-<<<<<<< HEAD
-                                        <div className="flex flex-col gap-1">
-                                            <Label>Arquivo</Label>
-                                            <Input
-                                                type="file"
-                                                accept="application/pdf/*"
-                                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                            />
-=======
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
                                             <div className="flex flex-col gap-1">
                                                 <Label>Arquivo</Label>
@@ -1029,25 +1020,7 @@ ${html}
                                             >
                                                 {isLoading ? "Enviando..." : "Anexar documento"}
                                             </Button>
->>>>>>> ca70fa4c7c9d037c826462757152cbcf1683c784
                                         </div>
-                                        <div className="flex flex-col gap-1">
-                                            <Label>Descrição do anexo</Label>
-                                            <Input
-                                                type="text"
-                                                value={fileName}
-                                                onChange={(e) => setFileName(e.target.value)}
-                                                aria-label='Descrição do anexo'
-                                                placeholder='Descrição do anexo'
-                                            />
-                                        </div>
-                                        <Button
-                                            onClick={handleSubmitAnexos}
-                                            disabled={!file || isLoading || !fileName?.trim()}
-                                            className="flex items-center"
-                                        >
-                                            {isLoading ? "Enviando..." : "Anexar documento"}
-                                        </Button>
 
                                         {anexosSubmit.map((item, i) => (
                                             <div key={i} className="flex justify-between items-center p-3 border rounded-lg">
