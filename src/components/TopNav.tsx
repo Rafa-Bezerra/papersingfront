@@ -39,7 +39,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       switch (user.unidade) {
         case "WAY 112":
           setLogo("/logos/way112.png");
-          setSupportUrl(GLPI_SUPPORT_URL);
+          setSupportUrl(GLPI_SUPPORT_URL_WAY306);
           break;
         case "WAY 153":
           setLogo("/logos/way153.png");
