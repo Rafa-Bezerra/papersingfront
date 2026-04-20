@@ -29,7 +29,7 @@ const MODULES: TrainingModule[] = [
   { id: "documentos", url: "/documentos", title: "Documentos", description: "Consulta, assinatura e histórico.", status: "Disponível", videoUrl: "/trainings/documentos.mp4" },
   { id: "pagamentos-ci", url: "/comunicados", title: "Pagamentos CI", description: "Cadastro e validações de pagamentos.", status: "Disponível", videoUrl: "/trainings/CI-%20TREINAMENTO%20.mp4" },
   { id: "bordero", url: "/bordero", title: "Borderô", description: "Envio, acompanhamento e aprovação.", status: "Em breve" },
-  { id: "carrinho", url: "/carrinho", title: "Carrinho", description: "Montagem e envio de requisições.", status: "Em breve" },
+  { id: "carrinho", url: "/carrinho", title: "Carrinho", description: "Montagem e envio de requisições.", status: "Disponível", videoUrl: "/trainings/CARRINHO-TREINAMENTO.mp4" },
   { id: "rdv", url: "/rdv", title: "RDV", description: "Reembolso/Despesas de viagem: fluxo completo.", status: "Disponível", videoUrl: "/trainings/RDV%20-%20TREINAMENTO%20.mp4" },
   { id: "aprovacao-rdv", url: "/aprovacaordv", title: "Aprovação RDV", description: "Aprovar, reprovar e notificar aprovadores.", status: "Disponível", videoUrl: "/trainings/APROVACAO-RDV%20-%20TREINAMENTO%20.mp4" },
   { id: "gestao-pessoas", url: "/gestao-pessoas", title: "Gestão de Pessoas", description: "Rotinas e consultas do módulo.", status: "Em breve" },
