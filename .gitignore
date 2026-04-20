@@ -22,6 +22,8 @@
 /public/trainings/*.mp4
 !/public/trainings/documentos.mp4
 !/public/trainings/RDV - TREINAMENTO .mp4
+!/public/trainings/APROVACAO-RDV - TREINAMENTO .mp4
+!/public/trainings/CI- TREINAMENTO .mp4
 
 # local dev logs
 dev-*.log
