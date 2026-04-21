@@ -57,6 +57,10 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
           setLogo("/logos/way364.png");
           setSupportUrl(GLPI_SUPPORT_URL);
           break;
+        case "WAY CSC":
+          setLogo("/logos/wayCSC.png");
+          setSupportUrl(GLPI_SUPPORT_URL);
+          break;
         default:
           setLogo("/logos/way262.png");
           setSupportUrl(GLPI_SUPPORT_URL);
