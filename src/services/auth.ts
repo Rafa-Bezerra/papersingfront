@@ -1,4 +1,4 @@
-import { API_BASE } from "@/utils/constants";
+import { API_BASE, headers } from "@/utils/constants";
 
 
 export interface LoginPayload {
@@ -89,6 +89,46 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   return normalized;
 }
 
+
+export async function getUnidadesDisponiveis(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/api/Usuarios/unidades-disponiveis`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error('Erro ao buscar unidades disponíveis');
+  return res.json();
+}
+
+export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/api/Usuarios/trocar-unidade`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ unidade: novaUnidade }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || 'Erro ao trocar unidade');
+  const apiData = JSON.parse(text);
+  return {
+    sequencial: apiData.sequencial ?? apiData.SEQUENCIAL,
+    codusuario: apiData.codusuario ?? apiData.CODUSUARIO,
+    email: apiData.email ?? apiData.EMAIL,
+    unidade: apiData.unidade ?? apiData.UNIDADE,
+    nome: apiData.nome ?? apiData.NOME,
+    token: apiData.token ?? apiData.TOKEN,
+    admin: apiData.admin ?? apiData.ADMIN,
+    documentos: apiData.documentos ?? apiData.DOCUMENTOS,
+    rdv: apiData.rdv ?? apiData.RDV,
+    bordero: apiData.bordero ?? apiData.BORDERO,
+    comunicados: apiData.comunicados ?? apiData.COMUNICADOS,
+    administrativo: apiData.administrativo ?? apiData.ADMINISTRATIVO,
+    solicitante: apiData.solicitante ?? apiData.SOLICITANTE,
+    ccusto: apiData.ccusto ?? apiData.CCUSTO,
+    fiscal: apiData.fiscal ?? apiData.FISCAL,
+    restrito: apiData.restrito ?? apiData.RESTRITO,
+    externo: apiData.externo ?? apiData.EXTERNO,
+    pagamento_impostos: apiData.pagamento_impostos ?? apiData.PAGAMENTO_IMPOSTOS,
+    pagamento_rh: apiData.pagamento_rh ?? apiData.PAGAMENTO_RH,
+  };
+}
 
 export async function loginExterno(payload: LoginExternoPayload): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE}/api/Externos/login`, {

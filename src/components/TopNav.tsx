@@ -1,7 +1,7 @@
 // components/TopNav.tsx
 "use client";
 
-import { CircleHelp, Headset, Menu, User } from "lucide-react";
+import { ChevronDown, CircleHelp, Headset, Menu, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 import Image from "next/image";
+import { getUnidadesDisponiveis, trocarUnidade } from "@/services/auth";
 
 const GLPI_SUPPORT_URL = "http://servicedesk.way262.com.br/index.php?noAUTO=1";
 const GLPI_SUPPORT_URL_WAY306 =
@@ -29,6 +30,8 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const [logo, setLogo] = useState("");
   const [supportUrl, setSupportUrl] = useState<string | null>(null);
   const [lastClickTime, setLastClickTime] = useState(0);
+  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState<string[]>([]);
+  const [isTrocandoUnidade, setIsTrocandoUnidade] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -67,11 +70,28 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
           break;
       }
     }
+    getUnidadesDisponiveis()
+      .then((u) => setUnidadesDisponiveis([...u].sort((a, b) => a.localeCompare(b))))
+      .catch(() => {});
   }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem("userData");
     router.push("/login");
+  };
+
+  const handleTrocarUnidade = async (unidade: string) => {
+    setIsTrocandoUnidade(true);
+    try {
+      const novoUsuario = await trocarUnidade(unidade);
+      sessionStorage.setItem("authToken", novoUsuario.token);
+      sessionStorage.setItem("userData", JSON.stringify(novoUsuario));
+      window.location.href = "/home";
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao trocar unidade");
+    } finally {
+      setIsTrocandoUnidade(false);
+    }
   };
 
   const handleMenuClick = () => {
@@ -97,15 +117,49 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
         {/* Logo */}
         <div className="hidden sm:flex items-center h-full">
           {logo && (
-            <Image
-              src={logo}
-              alt="Logo PaperSign"
-              width={120}
-              height={40}
-              className="h-10 w-auto object-contain"
-              priority
-              unoptimized
-            />
+            unidadesDisponiveis.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex items-center gap-1 cursor-pointer hover:opacity-75 transition-opacity focus:outline-none"
+                    disabled={isTrocandoUnidade}
+                    title="Trocar unidade"
+                  >
+                    <Image
+                      src={logo}
+                      alt="Logo PaperSign"
+                      width={120}
+                      height={40}
+                      className="h-10 w-auto object-contain"
+                      priority
+                      unoptimized
+                    />
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {unidadesDisponiveis.map((u) => (
+                    <DropdownMenuItem
+                      key={u}
+                      onClick={() => handleTrocarUnidade(u)}
+                      className="cursor-pointer"
+                    >
+                      {u}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Image
+                src={logo}
+                alt="Logo PaperSign"
+                width={120}
+                height={40}
+                className="h-10 w-auto object-contain"
+                priority
+                unoptimized
+              />
+            )
           )}
         </div>
       </div>
