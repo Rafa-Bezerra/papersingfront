@@ -239,6 +239,22 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               </Link>
             </DropdownMenuItem>
 
+            {unidadesDisponiveis.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                {unidadesDisponiveis.map((u) => (
+                  <DropdownMenuItem
+                    key={u}
+                    onClick={() => handleTrocarUnidade(u)}
+                    className="cursor-pointer sm:hidden"
+                    disabled={isTrocandoUnidade}
+                  >
+                    {u}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
