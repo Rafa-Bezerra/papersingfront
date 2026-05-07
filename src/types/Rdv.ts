@@ -9,6 +9,7 @@ export type ItemRdv = {
     quantidade?: number;
     valor?: number;
     descricao?: string;
+    unidade?: string;
 };
 export type Rdv = {
     id?: number;

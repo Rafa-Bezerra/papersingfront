@@ -9,6 +9,7 @@ export type ItemCarrinho = {
     valor?: number;
     descricao?: string;
     nseqitmmov?: number;
+    unidade?: string;
 };
 
 export type Carrinho = {
@@ -37,6 +38,7 @@ export type ContaFinanceira = {
 export type Produto = {
     idprd: number;
     produto: string;
+    unidade?: string;
 };
 
 export type AnexoCarrinho = {

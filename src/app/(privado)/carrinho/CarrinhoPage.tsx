@@ -238,6 +238,7 @@ export default function Page() {
         const item: ItemCarrinho = formItem.getValues()
         const produto = produtos.find(p => p.idprd === item.idprd)
         item.produto = produto?.produto ?? "";
+        item.unidade = produto?.unidade ?? "UN";
         setProdutosSubmit(prev => [...prev, item])
         formItem.reset()
     }
@@ -682,6 +683,7 @@ export default function Page() {
                                                                         value={`${p.idprd} - ${p.produto}`}
                                                                         onSelect={() => {
                                                                             field.onChange(p.idprd)
+                                                                            formItem.setValue('unidade', p.unidade ?? 'UN')
                                                                             setOpenProdutoSearch(false)
                                                                         }}
                                                                     >
@@ -695,6 +697,19 @@ export default function Page() {
                                             </Popover>
                                         </FormControl>
                                         <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={formItem.control}
+                                name="unidade"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Unidade de Medida</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} disabled placeholder="Selecione um produto" />
+                                        </FormControl>
                                     </FormItem>
                                 )}
                             />
