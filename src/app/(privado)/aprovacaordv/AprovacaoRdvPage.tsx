@@ -12,8 +12,8 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Filter, Loader2, RefreshCwIcon } from "lucide-react";
-import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById } from '@/services/rdvService';
+import { Bell, Check, ChevronLeft, ChevronRight, Filter, Loader2, RefreshCwIcon } from "lucide-react";
+import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById, notificarAprovadorRdv } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics } from '@/utils/functions';
@@ -49,6 +49,7 @@ export default function Page() {
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     const [selectedAnexosResult, setSelectedAnexosResult] = useState<AnexoRdv[]>([])
     const [anexoSelecionado, setAnexoSelecionado] = useState<AnexoRdv | null>(null)
+    const [currentAnexoIndex, setCurrentAnexoIndex] = useState<number>(0)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
     const [documentoSelecionado, setDocumentoSelecionado] = useState<AnexoRdv | null>(null)
     const [isModalVisualizarDocumentoOpen, setIsModalVisualizarDocumentoOpen] = useState(false)
@@ -118,6 +119,16 @@ export default function Page() {
         setSelectedAprovadoresResult(result.aprovadores)
     }
 
+    async function handleNotificarAprovador(usuario: string) {
+        if (!selectedResult) return
+        try {
+            const msg = await notificarAprovadorRdv(selectedResult.id!, usuario)
+            toast.success(msg)
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     async function handleAprovar(result: Rdv, aprovacao: string) {
         setIsLoading(true)
         setError(null)
@@ -137,6 +148,8 @@ export default function Page() {
     async function handleVisualizarAnexo(anexo: AnexoRdv) {
         setIsLoading(true)
         try {
+            const idx = selectedAnexosResult.findIndex(a => a.id === anexo.id)
+            setCurrentAnexoIndex(idx >= 0 ? idx : 0)
             const data = await getAnexoById(anexo.id!)
             setAnexoSelecionado(data);
             setAnexoParaImpressao(data.anexo);
@@ -146,6 +159,12 @@ export default function Page() {
             setIsLoading(false)
             setIsModalVisualizarAnexoOpen(true)
         }
+    }
+
+    async function navegarAnexo(delta: number) {
+        const novoIdx = currentAnexoIndex + delta
+        if (novoIdx < 0 || novoIdx >= selectedAnexosResult.length) return
+        await handleVisualizarAnexo(selectedAnexosResult[novoIdx])
     }
 
     function handleImprimirAnexo() {
@@ -306,8 +325,22 @@ export default function Page() {
             { accessorKey: 'nome', header: 'Aprovador' },
             { accessorKey: 'aprovacao', header: 'Aprovação' },
             { accessorKey: 'data_aprovacao', header: 'Data aprovação', accessorFn: (row) => safeDateLabelAprovacao(row.data_aprovacao != null ? String(row.data_aprovacao) : null) },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => row.original.aprovacao !== 'A' ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        title="Notificar aprovador por e-mail"
+                        onClick={() => handleNotificarAprovador(row.original.usuario)}
+                    >
+                        <Bell className="w-4 h-4" />
+                    </Button>
+                ) : null
+            }
         ],
-        []
+        [handleNotificarAprovador]
     )
 
     const colunasAnexos = useMemo<ColumnDef<AnexoRdv>[]>(
@@ -464,10 +497,20 @@ export default function Page() {
             <PdfViewerDialog
                 open={isModalVisualizarAnexoOpen}
                 onOpenChange={setIsModalVisualizarAnexoOpen}
-                title={anexoSelecionado ? `Anexo ${anexoSelecionado.nome}` : ''}
+                title={anexoSelecionado ? `Anexo ${anexoSelecionado.nome} (${currentAnexoIndex + 1}/${selectedAnexosResult.length})` : ''}
                 pdfBase64={anexoSelecionado?.anexo ?? null}
                 onPrint={handleImprimirAnexo}
                 isLoading={isLoading}
+                extraControls={selectedAnexosResult.length > 1 ? (
+                    <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexo(-1)}>
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === selectedAnexosResult.length - 1} onClick={() => navegarAnexo(1)}>
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                ) : undefined}
             />
 
             {/* Visualizar documento */}

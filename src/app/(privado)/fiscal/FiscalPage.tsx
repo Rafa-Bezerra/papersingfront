@@ -27,10 +27,10 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Bell, Check, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
+import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, X, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label';
-import { createElement as createAnexo } from "@/services/anexoService";
+import { createElement as createAnexo, deleteElement as deleteAnexo } from "@/services/anexoService";
 
 function parseFiscalAnexoBase64(anexo: string): { base64: string; mime: string } {
     const t = anexo.trim();
@@ -90,6 +90,8 @@ export default function Page() {
     const [podeAssinar, setPodeAssinar] = useState(false)
     const [novoAnexoFile, setNovoAnexoFile] = useState<File | null>(null)
     const [novoAnexoNome, setNovoAnexoNome] = useState<string>("")
+    const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
+    const [currentAnexoIndex, setCurrentAnexoIndex] = useState<number>(0)
     function clearQuery() {
         setQuery('')
     }
@@ -250,14 +252,22 @@ export default function Page() {
         setPodeAssinar(false);
         setSelectedDocumentoTipo(tipo);
         try {
-            const arquivoBase64 = requisicao.anexo;
-            setSelectedDocumento(arquivoBase64);
+            const idx = resultAnexos.findIndex(a => a.id === requisicao.id)
+            setCurrentAnexoIndex(idx >= 0 ? idx : 0)
+            setSelectedDocumento(requisicao.anexo);
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsLoading(false)
             setIsModalDocumentosOpen(true)
         }
+    }
+
+    function navegarAnexoFiscal(delta: number) {
+        const novoIdx = currentAnexoIndex + delta
+        if (novoIdx < 0 || novoIdx >= resultAnexos.length) return
+        setCurrentAnexoIndex(novoIdx)
+        setSelectedDocumento(resultAnexos[novoIdx].anexo)
     }
 
     async function handleAssinar(data: FiscalAssinar) {
@@ -363,6 +373,21 @@ export default function Page() {
             setNovoAnexoFile(null)
             setNovoAnexoNome("")
             toast.success("Anexo incluído com sucesso!")
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleExcluirAnexo() {
+        if (!deleteAnexoId || !selectedResult) return
+        setIsLoading(true)
+        try {
+            await deleteAnexo(deleteAnexoId)
+            setResultAnexos(prev => prev.filter(a => a.id !== deleteAnexoId))
+            setDeleteAnexoId(null)
+            toast.success("Anexo excluído")
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -561,11 +586,20 @@ export default function Page() {
                                 Baixar
                             </Button>
                         )}
+                        {row.original.usuario_criacao === userCodusuario && (
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setDeleteAnexoId(row.original.id)}
+                            >
+                                Excluir
+                            </Button>
+                        )}
                     </div>
                 )
             }
         ],
-        [handleDownloadAnexoFiscal]
+        [handleDownloadAnexoFiscal, userCodusuario]
     )
 
     return (
@@ -857,6 +891,16 @@ export default function Page() {
                 canSign={selectedDocumentoTipo === "fiscal" && !!selectedResult && selectedResult.fiscal.documento_assinado == 0 && podeAssinar}
                 onSign={confirmarAssinatura}
                 isLoading={isLoading}
+                extraControls={selectedDocumentoTipo === "anexo" && resultAnexos.length > 1 ? (
+                    <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexoFiscal(-1)}>
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === resultAnexos.length - 1} onClick={() => navegarAnexoFiscal(1)}>
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                ) : undefined}
             />
 
             {/* Loading */}
@@ -895,6 +939,21 @@ export default function Page() {
                     Nenhum registro encontrado.
                 </p>
             )}
+
+            <Dialog open={deleteAnexoId !== null} onOpenChange={() => setDeleteAnexoId(null)}>
+                <DialogContent className="max-w-sm rounded-xl bg-background p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <DialogHeader>
+                        <DialogTitle>Excluir anexo</DialogTitle>
+                    </DialogHeader>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                        Tem certeza que deseja excluir o anexo #{deleteAnexoId}?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setDeleteAnexoId(null)}>Cancelar</Button>
+                        <Button variant="destructive" onClick={handleExcluirAnexo}>Excluir</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

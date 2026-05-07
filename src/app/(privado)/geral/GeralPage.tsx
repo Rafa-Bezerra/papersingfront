@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
+import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -102,6 +102,7 @@ export default function Page() {
     const [fileName, setFileName] = useState<string>("")
     const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
+    const [currentAnexoIndex, setCurrentAnexoIndex] = useState<number>(0)
     const [podeAssinar, setPodeAssinar] = useState(false)
 
     const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
@@ -531,9 +532,18 @@ export default function Page() {
 
     async function handleVisualizarAnexo(anexo: Anexo) {
         setIsLoading(true)
+        const idx = anexos.findIndex(a => a.id === anexo.id)
+        setCurrentAnexoIndex(idx >= 0 ? idx : 0)
         setAnexoSelecionado(anexo);
         setIsModalVisualizarAnexoOpen(true)
         setIsLoading(false)
+    }
+
+    function navegarAnexo(delta: number) {
+        const novoIdx = currentAnexoIndex + delta
+        if (novoIdx < 0 || novoIdx >= anexos.length) return
+        setCurrentAnexoIndex(novoIdx)
+        setAnexoSelecionado(anexos[novoIdx])
     }
 
     async function handleExcluirAnexo() {
@@ -1168,12 +1178,22 @@ export default function Page() {
             <PdfViewerDialog
                 open={isModalVisualizarAnexoOpen}
                 onOpenChange={setIsModalVisualizarAnexoOpen}
-                title={anexoSelecionado ? `Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome}` : ''}
+                title={anexoSelecionado ? `Anexo n° ${anexoSelecionado.id} - ${anexoSelecionado.nome} (${currentAnexoIndex + 1}/${anexos.length})` : ''}
                 pdfBase64={anexoSelecionado?.anexo || null}
                 canSign={anexoSelecionado?.documento_assinado == 0}
                 onSign={confirmarAssinaturaAnexo}
                 onPrint={handleImprimirAnexo}
                 isLoading={isLoading}
+                extraControls={anexos.length > 1 ? (
+                    <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexo(-1)}>
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={currentAnexoIndex === anexos.length - 1} onClick={() => navegarAnexo(1)}>
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                ) : undefined}
             />
 
             {/* Confirmação de exclusão usando Dialog */}

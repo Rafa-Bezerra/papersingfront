@@ -98,4 +98,15 @@ export async function getAnexoById(id: number): Promise<AnexoRdv> {
     return apiData;
 }
 
+export async function notificarAprovadorRdv(id: number, usuario: string): Promise<string> {
+    const url = new URL(`${API_BASE}/api/${caminho}/notificar/${id}/${encodeURIComponent(usuario)}`);
+    const res = await fetch(url.toString(), { method: 'POST', headers: headers() });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao notificar aprovador: ${msg}`);
+    }
+    const data = await res.json();
+    return data.message ?? "Notificação enviada.";
+}
+
 export type { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv, Fornecedor, AssinarRdv }

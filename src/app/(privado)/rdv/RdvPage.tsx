@@ -317,7 +317,7 @@ export default function Page() {
         const item: ItemRdv = formItem.getValues()
         const produto = produtos.find(p => p.idprd === item.idprd)
         item.produto = produto?.produto ?? "";
-        console.log(item);
+        item.unidade = produto?.unidade ?? "UN";
         setProdutosSubmit(prev => [...prev, item])
         formItem.reset()
     }
@@ -469,6 +469,7 @@ export default function Page() {
             { accessorKey: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.ccusto + ' - ' + (row.custo ?? '-') },
             { accessorKey: 'codconta', header: 'Conta financeira', accessorFn: (row) => row.codconta + ' - ' + (row.contabil ?? '-') },
             { accessorKey: 'idprd', header: 'Produto', accessorFn: (row) => row.idprd + ' - ' + (row.produto ?? '-') },
+            { accessorKey: 'unidade', header: 'Un.' },
             { accessorKey: 'quantidade', header: 'Qtd', accessorFn: (row) => String(row.quantidade ?? 1) },
             { accessorKey: 'valor', header: 'Valor unit.', accessorFn: (row) => (row.valor != null ? Number(row.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '') },
             { id: 'total', header: 'Total', accessorFn: (row) => ((row.quantidade ?? 1) * (row.valor ?? 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) },
@@ -894,6 +895,7 @@ export default function Page() {
                                                                             value={`${p.idprd} - ${p.produto}`}
                                                                             onSelect={() => {
                                                                                 field.onChange(p.idprd)
+                                                                                formItem.setValue('unidade', p.unidade ?? 'UN')
                                                                                 setOpenProdutoSearch(false)
                                                                             }}
                                                                         >
@@ -907,6 +909,20 @@ export default function Page() {
                                                 </Popover>
                                             </FormControl>
                                             <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/** unidade de medida (read-only, preenchida ao selecionar produto) */}
+                                <FormField
+                                    control={formItem.control}
+                                    name="unidade"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Unidade de Medida</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} disabled placeholder="Selecione um produto" />
+                                            </FormControl>
                                         </FormItem>
                                     )}
                                 />

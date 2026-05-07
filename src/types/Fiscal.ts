@@ -22,6 +22,7 @@ export interface FiscalDocumento {
     idmov: number,
     nome: string,
     anexo: string,
+    usuario_criacao?: string,
 }
 
 export interface FiscalResponseDto {
