@@ -52,4 +52,17 @@ export async function deleteElement(id: number): Promise<void> {
     }
 }
 
+export async function importarAnexosRM(idmov: number, codigoAtendimento: string | number): Promise<{ importados: number }> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/importar-rm`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ idmov, codigo_atendimento: String(codigoAtendimento) }),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao importar anexos do RM: ${msg}`);
+    }
+    return res.json();
+}
+
 export type { Anexo, AnexoAssinar, AnexoUpload }
