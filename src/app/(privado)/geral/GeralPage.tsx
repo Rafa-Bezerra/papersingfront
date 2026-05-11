@@ -54,7 +54,8 @@ import {
     getAll as getAllAnexos,
     createElement as createAnexo,
     updateElement as updateAnexo,
-    deleteElement as deleteAnexo
+    deleteElement as deleteAnexo,
+    importarAnexosRM
 } from '@/services/anexoService';
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -94,6 +95,7 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const loading = isPending
     const [anexos, setAnexos] = useState<Anexo[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
@@ -104,6 +106,7 @@ export default function Page() {
     const [anexoSelecionado, setAnexoSelecionado] = useState<Anexo | null>(null)
     const [currentAnexoIndex, setCurrentAnexoIndex] = useState<number>(0)
     const [podeAssinar, setPodeAssinar] = useState(false)
+    const [isImportingRM, setIsImportingRM] = useState(false)
 
     const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
     const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
@@ -521,6 +524,7 @@ export default function Page() {
             toast.success("Arquivo enviado com sucesso!")
             setFile(null)
             setFileName("")
+            if (fileInputRef.current) fileInputRef.current.value = ""
             const dados = await getAllAnexos(requisicaoSelecionada.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
@@ -595,6 +599,24 @@ export default function Page() {
         let base64 = anexoSelecionado.anexo.trim();
         if (base64.startsWith("data:")) base64 = base64.split(",")[1];
         imprimirPdfBase64(base64);
+    }
+
+    async function handleImportarAnexosRM() {
+        if (!requisicaoSelecionada) return
+        const cod = requisicaoSelecionada.requisicao.codigo_atendimento
+        if (!cod) return toast.error("Código de atendimento não encontrado.")
+        setIsImportingRM(true)
+        try {
+            const { importados } = await importarAnexosRM(requisicaoSelecionada.requisicao.idmov, cod)
+            if (importados === 0) toast.info("Nenhum arquivo encontrado no RM.")
+            else toast.success(`${importados} arquivo(s) importado(s) com sucesso!`)
+            const dados = await getAllAnexos(requisicaoSelecionada.requisicao.idmov)
+            setAnexos(dados)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsImportingRM(false)
+        }
     }
 
     const handleDownloadAll = async () => {
@@ -1132,7 +1154,7 @@ export default function Page() {
             {/* Anexos */}
             {requisicaoSelecionada && (
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
-                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogContent className="sm:max-w-[90vw] overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.requisicao.idmov}`}</DialogTitle>
                         </DialogHeader>
@@ -1140,35 +1162,56 @@ export default function Page() {
                             <DataTable columns={colunasAnexos} data={anexos} loading={loading} />
                         </div>
                         {/* Ações */}
-                        <div className="flex justify-center mt-2 mb-4 gap-4 shrink-0 sticky bottom-0 p-4 border-t">
-                            <Input
-                                type="file"
-                                accept="application/pdf/*"
-                                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                                className="w-40"
-                            />
-                            <Input
-                                type="text"
-                                onChange={(e) => setFileName(e.target.value)}
-                                className="w-40"
-                                aria-label='Descrição do anexo'
-                                placeholder='Descrição do anexo'
-                            />
-                            <Button
-                                onClick={handleAnexarDocumento}
-                                disabled={!file || isLoading || !fileName?.trim()}
-                                className="flex items-center"
-                            >
-                                {isLoading ? "Enviando..." : "Anexar documento"}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={handleDownloadAll}
-                                disabled={!anexos?.length}
-                                className="flex items-center gap-2"
-                            >
-                                Baixar todos
-                            </Button>
+                        <div className="flex flex-col gap-3 shrink-0 sticky bottom-0 p-4 border-t bg-background">
+                            <div className="flex flex-col sm:flex-row justify-center gap-3">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="application/pdf/*"
+                                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                                    className="hidden"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full sm:w-auto truncate max-w-[160px]"
+                                >
+                                    {file ? file.name : "Selecionar arquivo"}
+                                </Button>
+                                <Input
+                                    type="text"
+                                    onChange={(e) => setFileName(e.target.value)}
+                                    className="w-full sm:w-40"
+                                    aria-label='Descrição do anexo'
+                                    placeholder='Descrição do anexo'
+                                />
+                                <Button
+                                    onClick={handleAnexarDocumento}
+                                    disabled={!file || isLoading || !fileName?.trim()}
+                                    className="flex items-center w-full sm:w-auto"
+                                >
+                                    {isLoading ? "Enviando..." : "Anexar documento"}
+                                </Button>
+                            </div>
+                            <div className="flex justify-center gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleImportarAnexosRM}
+                                    disabled={isImportingRM || isLoading}
+                                    className="flex items-center gap-2"
+                                >
+                                    {isImportingRM ? "Importando..." : "Importar do RM"}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleDownloadAll}
+                                    disabled={!anexos?.length}
+                                    className="flex items-center gap-2"
+                                >
+                                    Baixar todos
+                                </Button>
+                            </div>
                         </div>
                     </DialogContent>
                 </Dialog>

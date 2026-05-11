@@ -1,5 +1,7 @@
 const isDev = process.env.NODE_ENV === 'development';
 
+export const GLPI_SUPPORT_URL = "http://servicedesk.grupowaybrasil.com.br/";
+
 export const API_BASE = isDev
   ? 'http://localhost:5170'
   : (process.env.NEXT_PUBLIC_API_URL ?? 'https://papersign.grupowaybrasil.com.br:5062');
