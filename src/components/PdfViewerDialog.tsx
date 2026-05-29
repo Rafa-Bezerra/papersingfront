@@ -119,7 +119,19 @@ export default function PdfViewerDialog({
 
     function postPdfToIframe() {
         if (!open || !pdfBase64) return
-        const clean = pdfBase64.replace(/^data:.*;base64,/, '').trim()
+        let raw = pdfBase64.trim()
+        if (raw.startsWith('"') && raw.endsWith('"')) {
+            try {
+                raw = JSON.parse(raw) as string
+            } catch {
+                raw = raw.slice(1, -1)
+            }
+        }
+        const clean = raw.replace(/^data:.*;base64,/, '').trim()
+        if (!clean.startsWith('JVBERi')) {
+            console.error('PDF inválido: conteúdo não começa com %PDF em base64')
+            return
+        }
         iframeRef.current?.contentWindow?.postMessage({ pdfBase64: clean }, '*')
     }
 

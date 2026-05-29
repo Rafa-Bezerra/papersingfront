@@ -54,9 +54,11 @@ export function DataTable<TData>({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: (row, columnId, filterValue) => {
-      if (!globalFilterAccessorKey) return false;
+      if (!globalFilterAccessorKey?.length) return true;
+      const q = String(filterValue ?? "").trim().toLowerCase();
+      if (!q) return true;
       return globalFilterAccessorKey.some((key) =>
-        String(row.original[key]).toLowerCase().includes(filterValue.toLowerCase())
+        String(row.original[key] ?? "").toLowerCase().includes(q)
       );
     },
   });
