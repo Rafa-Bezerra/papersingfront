@@ -44,4 +44,5 @@ export type DocumentoAnexoAssinar = {
     posY: number
     largura: number
     altura: number
+    dataHoraAssinatura: string
 }

@@ -49,6 +49,7 @@ export type ComunicadoAssinar = {
     posY: number
     largura: number
     altura: number
+    dataHoraAssinatura: string
 }
 
 export type ComunicadoAnexo = {

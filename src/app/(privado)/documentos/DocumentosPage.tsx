@@ -424,6 +424,7 @@ export default function Page() {
             posY,
             largura,
             altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinarAnexo(dadosAssinatura);
     }

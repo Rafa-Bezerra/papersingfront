@@ -325,6 +325,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             posY,
             largura,
             altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinar(dadosAssinatura);
     }
@@ -497,6 +498,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             posY,
             largura,
             altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinarAnexo(dadosAssinatura);
     }
