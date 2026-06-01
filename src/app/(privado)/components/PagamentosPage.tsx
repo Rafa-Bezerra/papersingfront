@@ -427,6 +427,7 @@ export default function Page({ titulo, grupo }: Props) {
                 posY: signData.posY,
                 largura: signData.largura,
                 altura: signData.altura,
+                dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
             };
             await assinarDocumento(dadosAssinatura);
             handleSearchClick()

@@ -421,6 +421,7 @@ export default function Page() {
             posY: signData.posY,
             largura: signData.largura,
             altura: signData.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinar(dadosAssinatura);
     }
@@ -590,6 +591,7 @@ export default function Page() {
             posY: signData.posY,
             largura: signData.largura,
             altura: signData.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinarAnexo(dadosAssinatura);
     }

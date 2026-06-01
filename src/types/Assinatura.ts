@@ -11,4 +11,5 @@ export type Assinar = {
     posY: number
     largura: number
     altura: number
+    dataHoraAssinatura: string
 }
