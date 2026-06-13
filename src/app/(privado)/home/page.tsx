@@ -166,7 +166,7 @@ export default function HomePage() {
             icon={PenLine}
             color="purple"
             description="Assinatura de Fiscal"
-            href="/fiscal"
+            href="/fiscal?filtro=pendentes"
           />)}
           {(userExterno || userAdmin) && (<DashboardCard
             title="RDV"

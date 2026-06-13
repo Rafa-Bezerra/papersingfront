@@ -1,5 +1,6 @@
 import { Rdv, ItemRdv, AnexoRdv, AprovadoresRdv, Fornecedor, AssinarRdv } from "@/types/Rdv";
 import { API_BASE, headers } from "@/utils/constants";
+import { extrairMensagemErroApi } from "@/utils/functions";
 const caminho = "Rdv";
 const elemento_singular = "rdv";
 const elemento_plural = "rdvs";
@@ -7,16 +8,16 @@ const elemento_plural = "rdvs";
 export async function createElement(data: Rdv): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
+        const body = await res.text();
+        throw new Error(extrairMensagemErroApi(body, `Não foi possível enviar o RDV (erro ${res.status}).`));
     }
 }
 
 export async function updateElement(data: Rdv): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
+        const body = await res.text();
+        throw new Error(extrairMensagemErroApi(body, `Não foi possível atualizar o RDV (erro ${res.status}).`));
     }
 }
 

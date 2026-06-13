@@ -42,6 +42,9 @@ export default function Page({ titulo, grupo }: Props) {
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("EM ABERTO")
     const [statusFiltrado, setStatusFiltrado] = useState<string>("")
+    // "Pendentes" = modo do botão da home (?filtro=pendentes): mostra só itens na vez do usuário,
+    // alinhado ao contador do dashboard. Sai do modo ao mudar os filtros manualmente.
+    const [filtroDashboard, setFiltroDashboard] = useState<string>("")
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Pagamento[]>([])
     const [selectedResult, setSelectedResult] = useState<Pagamento | null>(null)
@@ -52,6 +55,25 @@ export default function Page({ titulo, grupo }: Props) {
     const [documentoSelecionado, setDocumentoSelecionado] = useState<string>("")
     const [isModalDocumentoOpen, setIsModalDocumentoOpen] = useState(false)
     const [documentoParaImpressao, setDocumentoParaImpressao] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (searchParams.get("filtro") === "pendentes") {
+            setFiltroDashboard("Pendentes");
+            setSituacaoFiltrada("EM ABERTO");
+            setStatusFiltrado("PENDENTE");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    function selecionarSituacao(valor: string) {
+        setFiltroDashboard("");
+        setSituacaoFiltrada(valor);
+    }
+
+    function selecionarStatus(valor: string) {
+        setFiltroDashboard("");
+        setStatusFiltrado(valor);
+    }
 
     useEffect(() => {
         if (dateFrom === "" && dateTo === "") {
@@ -77,7 +99,7 @@ export default function Page({ titulo, grupo }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado])
+    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado, filtroDashboard])
 
     function clearQuery() {
         setQuery('')
@@ -125,7 +147,10 @@ export default function Page({ titulo, grupo }: Props) {
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.idlan ?? '').includes(qNorm)
                 const matchSituacao = situacaoFiltrada === "" || d.status_lancamento == situacaoFiltrada
                 const matchStatus = statusFiltrado === "" || d.status_aprovacao == statusFiltrado
-                return matchQuery && matchSituacao && matchStatus
+                // Modo "Pendentes" (botão da home): só itens na vez do usuário —
+                // pode_aprovar vem do backend com a mesma hierarquia de NIVEL do contador.
+                const matchMinhaVez = filtroDashboard !== "Pendentes" || !!d.pode_aprovar
+                return matchQuery && matchSituacao && matchStatus && matchMinhaVez
             })
             setResults(filtrados)
         } catch (err) {
@@ -586,11 +611,11 @@ export default function Page({ titulo, grupo }: Props) {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"EM ABERTO"} checked={situacaoFiltrada == "EM ABERTO"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("EM ABERTO") }}>EM ABERTO</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"BAIXADO"} checked={situacaoFiltrada == "BAIXADO"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("BAIXADO") }}>BAIXADO</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"BAIXADO PARCIALMENTE"} checked={situacaoFiltrada == "BAIXADO PARCIALMENTE"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("BAIXADO PARCIALMENTE") }}>BAIXADO PARCIALMENTE</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"CANCELADO"} checked={situacaoFiltrada == "CANCELADO"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("CANCELADO") }}>CANCELADO</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"EM ABERTO"} checked={situacaoFiltrada == "EM ABERTO"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("EM ABERTO") }}>EM ABERTO</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"BAIXADO"} checked={situacaoFiltrada == "BAIXADO"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("BAIXADO") }}>BAIXADO</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"BAIXADO PARCIALMENTE"} checked={situacaoFiltrada == "BAIXADO PARCIALMENTE"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("BAIXADO PARCIALMENTE") }}>BAIXADO PARCIALMENTE</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"CANCELADO"} checked={situacaoFiltrada == "CANCELADO"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("CANCELADO") }}>CANCELADO</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) selecionarSituacao("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
@@ -604,10 +629,10 @@ export default function Page({ titulo, grupo }: Props) {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Situação</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"PENDENTE"} checked={statusFiltrado == "PENDENTE"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("PENDENTE") }}>PENDENTE</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"APROVADA"} checked={statusFiltrado == "APROVADA"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("APROVADA") }}>APROVADA</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"RECUSADA"} checked={statusFiltrado == "RECUSADA"} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("RECUSADA") }}>RECUSADA</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={statusFiltrado == ""} onCheckedChange={(checked) => { if (checked) setStatusFiltrado("") }}>Todos</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"PENDENTE"} checked={statusFiltrado == "PENDENTE"} onCheckedChange={(checked) => { if (checked) selecionarStatus("PENDENTE") }}>PENDENTE</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"APROVADA"} checked={statusFiltrado == "APROVADA"} onCheckedChange={(checked) => { if (checked) selecionarStatus("APROVADA") }}>APROVADA</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"RECUSADA"} checked={statusFiltrado == "RECUSADA"} onCheckedChange={(checked) => { if (checked) selecionarStatus("RECUSADA") }}>RECUSADA</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={statusFiltrado == ""} onCheckedChange={(checked) => { if (checked) selecionarStatus("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
