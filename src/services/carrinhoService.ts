@@ -1,6 +1,7 @@
 import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho } from "@/types/Carrinho";
 import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
+import { extrairMensagemErroApi } from "@/utils/functions";
 const caminho = "Solicitacao";
 // const elemento_singular = "produto";
 const elemento_plural = "produtos";
@@ -41,12 +42,7 @@ export async function createElement(data: Carrinho): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/enviarsoap`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const body = await res.text();
-        try {
-            const json = JSON.parse(body);
-            throw new Error(json.erro ?? body);
-        } catch {
-            throw new Error(body);
-        }
+        throw new Error(extrairMensagemErroApi(body, `Erro ${res.status} ao enviar o carrinho.`));
     }
 }
 
@@ -54,12 +50,7 @@ export async function updateElement(idmov: number, data: Carrinho): Promise<void
     const res = await fetch(`${API_BASE}/api/${caminho}/${idmov}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const body = await res.text();
-        try {
-            const json = JSON.parse(body);
-            throw new Error(json.erro ?? body);
-        } catch {
-            throw new Error(body);
-        }
+        throw new Error(extrairMensagemErroApi(body, `Erro ${res.status} ao atualizar o carrinho.`));
     }
 }
 

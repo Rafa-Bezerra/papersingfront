@@ -296,6 +296,9 @@ export default function Page() {
 
             const qNorm = stripDiacritics(q.toLowerCase().trim());
             const usuarioLogado = normalizeUserCode(userCodusuario ?? "");
+            // Modo "Pendentes" (botão da home): alinhar com o contador do dashboard,
+            // que filtra por usuário incondicionalmente — sem bypass de admin.
+            const modoPendentesHome = filtroDashboard === "Pendentes";
 
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
@@ -303,27 +306,27 @@ export default function Page() {
                 const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
                 const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
                 const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
-                const usuarioAprovador = userAdmin || userAdministrativo || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
+                const usuarioAprovador = (!modoPendentesHome && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
                 const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
                 let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
                     normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario) && (ap.situacao === 'A' || ap.situacao === 'R')
                 );
-                if (userAdmin || userAdministrativo) {
+                if ((userAdmin || userAdministrativo) && !modoPendentesHome) {
                     usuarioAprovou = false;
                 }
                 return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && !usuarioAprovou;
             });
 
             const fitradosStatus = filtrados.filter(d => {
-                if (userAdmin == false) {
+                if (userAdmin == false || modoPendentesHome) {
                     const nivelUsuario = d.requisicao_aprovacoes.find(
                         ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
                     )?.nivel ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                     const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
-                    const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
+                    const usuarioAprovador = (!modoPendentesHome && userAdmin) || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                     switch (filtroDashboard) {

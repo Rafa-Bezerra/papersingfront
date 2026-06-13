@@ -10,6 +10,23 @@ export function stripDiacritics(s: string) {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 }
 
+/**
+ * Extrai uma mensagem de erro legível do body de uma resposta da API.
+ * O backend responde ora texto puro, ora string JSON-encoded (StatusCode(500, msg)),
+ * ora objeto { erro / message }. Erros do TOTVS vêm multi-linha — só a primeira
+ * linha interessa ao usuário.
+ */
+export function extrairMensagemErroApi(body: string, fallback: string): string {
+  let mensagem = (body ?? "").trim()
+  try {
+    const json = JSON.parse(mensagem)
+    if (typeof json === "string") mensagem = json
+    else mensagem = json?.erro ?? json?.message ?? json?.title ?? ""
+  } catch { /* body não é JSON — usa como está */ }
+  mensagem = (mensagem ?? "").split("\n")[0].trim()
+  return mensagem || fallback
+}
+
 export function maskCPF(cpf?: string) {
   if (!cpf) return '—'
   const d = cpf.replace(/\D/g, '')
