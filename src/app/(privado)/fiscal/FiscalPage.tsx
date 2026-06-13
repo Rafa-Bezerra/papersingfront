@@ -85,6 +85,9 @@ export default function Page() {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
+    // "Pendentes" = modo do botão da home (?filtro=pendentes): mostra só itens na vez do usuário,
+    // alinhado ao contador do dashboard. Sai do modo ao mudar o filtro de situação.
+    const [filtroDashboard, setFiltroDashboard] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposMovimento, setTiposMovimento] = useState<string[]>([])
     const [podeAssinar, setPodeAssinar] = useState(false)
@@ -101,6 +104,19 @@ export default function Page() {
             e.preventDefault()
             handleSearchClick()
         }
+    }
+
+    useEffect(() => {
+        if (searchParams.get("filtro") === "pendentes") {
+            setFiltroDashboard("Pendentes");
+            setSituacaoFiltrada("Em Andamento");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    function selecionarSituacao(valor: string) {
+        setFiltroDashboard("");
+        setSituacaoFiltrada(valor);
     }
 
     useEffect(() => {
@@ -128,7 +144,7 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard])
 
     useEffect(() => {
         if (!results.length || !dateFrom || !dateTo) return
@@ -193,6 +209,10 @@ export default function Page() {
             setTiposMovimento(tipos_movimento)
 
             const qNorm = stripDiacritics(q.toLowerCase().trim())
+            // Modo "Pendentes" (botão da home): alinhar com o contador do dashboard,
+            // que conta só os movimentos na vez do usuário — sem bypass de admin.
+            const modoPendentesHome = filtroDashboard === "Pendentes"
+            const usuarioNorm = stripDiacritics(userCodusuario.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.fiscal.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.fiscal.idmov ?? '').includes(qNorm)
@@ -201,11 +221,24 @@ export default function Page() {
                 const matchSolicitante = solicitanteFiltrado === "" || d.fiscal.nome_solicitante == solicitanteFiltrado
 
                 let usuarioAprovador = d.fiscal_aprovacoes.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioNorm
                 );
 
-                if (userAdmin) { usuarioAprovador = true; }
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento
+                if (userAdmin && !modoPendentesHome) { usuarioAprovador = true; }
+
+                let matchMinhaVez = true
+                if (modoPendentesHome) {
+                    const nivelUsuario = d.fiscal_aprovacoes.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioNorm
+                    )?.nivel ?? 1;
+                    const todasInferioresAprovadas = nivelUsuario == 1 || (d.fiscal_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
+                    const status_liberado = ['Em Andamento'].includes(d.fiscal.status);
+                    matchMinhaVez = d.fiscal_aprovacoes.some(ap =>
+                        stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioNorm && ap.situacao === 'P'
+                    ) && todasInferioresAprovadas && status_liberado;
+                }
+
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && matchMinhaVez
             })
             setResults(filtrados)
         } catch (err) {
@@ -296,6 +329,7 @@ export default function Page() {
             posY: data.posY,
             largura: data.largura,
             altura: data.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinar(dadosAssinatura);
     }
@@ -690,18 +724,18 @@ export default function Page() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Em Andamento") }}>Em Andamento</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído a responder") }}>Concluído a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído respondido") }}>Concluído respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído confirmado") }}>Concluído confirmado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Concluído automático(pelo sistema)") }}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Avaliado") }}>Avaliado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado a responder") }}>Agendado a responder</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Agendado respondido") }}>Agendado respondido</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Aguardando terceiros") }}>Aguardando terceiros</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Cancelado") }}>Cancelado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("Despertado") }}>Despertado</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Em Andamento") }}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído a responder"} checked={situacaoFiltrada == "Concluído a responder"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Concluído a responder") }}>Concluído a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído respondido"} checked={situacaoFiltrada == "Concluído respondido"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Concluído respondido") }}>Concluído respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído confirmado"} checked={situacaoFiltrada == "Concluído confirmado"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Concluído confirmado") }}>Concluído confirmado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Concluído automático(pelo sistema)"} checked={situacaoFiltrada == "Concluído automático(pelo sistema)"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Concluído automático(pelo sistema)") }}>Concluído automático(pelo sistema)</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Avaliado"} checked={situacaoFiltrada == "Avaliado"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Avaliado") }}>Avaliado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado a responder"} checked={situacaoFiltrada == "Agendado a responder"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Agendado a responder") }}>Agendado a responder</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Agendado respondido"} checked={situacaoFiltrada == "Agendado respondido"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Agendado respondido") }}>Agendado respondido</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aguardando terceiros"} checked={situacaoFiltrada == "Aguardando terceiros"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Aguardando terceiros") }}>Aguardando terceiros</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Cancelado"} checked={situacaoFiltrada == "Cancelado"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Cancelado") }}>Cancelado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Despertado"} checked={situacaoFiltrada == "Despertado"} onCheckedChange={(checked) => { if (checked) selecionarSituacao("Despertado") }}>Despertado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) selecionarSituacao("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>

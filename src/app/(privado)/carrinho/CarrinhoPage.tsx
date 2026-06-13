@@ -227,7 +227,8 @@ export default function Page() {
             toast.success('Carrinho enviado com sucesso!')
             window.location.reload()
         } catch (err) {
-            toast.error((err as Error).message)
+            // Falha de envio: toast mais longo + botão de fechar para o usuário conseguir ler
+            toast.error((err as Error).message, { duration: 10000, closeButton: true })
         } finally {
             setIsLoading(false)
         }
