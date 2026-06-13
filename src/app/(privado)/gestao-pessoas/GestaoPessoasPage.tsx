@@ -289,7 +289,8 @@ export default function Page() {
                 )?.nivel ?? 1;
                 const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                 const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
-                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                // No modo "Pendentes" (botão da home) não há bypass de admin — alinhado ao contador do dashboard.
+                const usuarioAprovador = (filtroDashboard !== "Pendentes" && userAdmin) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                 switch (filtroDashboard) {
@@ -388,6 +389,7 @@ export default function Page() {
             posY: signData.posY,
             largura: signData.largura,
             altura: signData.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinar(dadosAssinatura);
     }
@@ -545,6 +547,7 @@ export default function Page() {
             posY: signData.posY,
             largura: signData.largura,
             altura: signData.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
         await handleAssinarAnexo(dadosAssinatura);
     }

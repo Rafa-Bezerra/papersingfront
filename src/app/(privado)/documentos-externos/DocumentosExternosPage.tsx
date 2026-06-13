@@ -434,6 +434,7 @@ export default function Page() {
             posY: data.posY,
             largura: data.largura,
             altura: data.altura,
+            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
         };
 
         try {
