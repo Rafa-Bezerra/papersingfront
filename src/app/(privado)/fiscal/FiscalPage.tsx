@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
 import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
-import { base64ToBlob, dateToIso, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
+import { base64ToBlob, dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
@@ -64,10 +64,12 @@ export default function Page() {
     const searchParams = useSearchParams()
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [isLoading, setIsLoading] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
     const [userAdmin, setUserAdmin] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
+    const [datasManuais, setDatasManuais] = useState(false);
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<FiscalResponseDto[]>([])
     const [selectedResult, setSelectedResult] = useState<FiscalResponseDto | null>(null)
@@ -85,6 +87,8 @@ export default function Page() {
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
+    // Filtro independente dos demais: quando ligado, mostra apenas documentos já assinados pelo usuário.
+    const [apenasAssinados, setApenasAssinados] = useState<boolean>(false)
     // "Pendentes" = modo do botão da home (?filtro=pendentes): mostra só itens na vez do usuário,
     // alinhado ao contador do dashboard. Sai do modo ao mudar o filtro de situação.
     const [filtroDashboard, setFiltroDashboard] = useState<string>("")
@@ -144,7 +148,7 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard, apenasAssinados])
 
     useEffect(() => {
         if (!results.length || !dateFrom || !dateTo) return
@@ -178,7 +182,7 @@ export default function Page() {
 
             // Regra global: pendências ("Em Andamento") não limitam por período.
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
-            const fromApi = isPendente ? "1900-01-01" : from
+            const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
 
             const data: FiscalGetAll = {
                 dateFrom: fromApi,
@@ -219,6 +223,7 @@ export default function Page() {
                 const matchSituacao = situacaoFiltrada === "" || d.fiscal.status == situacaoFiltrada
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.fiscal.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.fiscal.nome_solicitante == solicitanteFiltrado
+                const matchAssinado = !apenasAssinados || d.fiscal.documento_assinado == 1
 
                 let usuarioAprovador = d.fiscal_aprovacoes.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioNorm
@@ -238,7 +243,7 @@ export default function Page() {
                     ) && todasInferioresAprovadas && status_liberado;
                 }
 
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && matchMinhaVez
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && matchMinhaVez && matchAssinado
             })
             setResults(filtrados)
         } catch (err) {
@@ -250,7 +255,7 @@ export default function Page() {
     }
 
     async function handleDocumento(requisicao: FiscalResponseDto, tipo: string) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setPodeAssinar(false);
         setSelectedDocumentoTipo(tipo);
         const usuarioAprovador = requisicao.fiscal_aprovacoes.some(
@@ -275,13 +280,13 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalDocumentosOpen(true)
         }
     }
 
     async function handleAnexo(requisicao: FiscalDocumento, tipo: string) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setPodeAssinar(false);
         setSelectedDocumentoTipo(tipo);
         try {
@@ -291,7 +296,7 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalDocumentosOpen(true)
         }
     }
@@ -303,8 +308,13 @@ export default function Page() {
         setSelectedDocumento(resultAnexos[novoIdx].anexo)
     }
 
+    function handleImprimir() {
+        if (!selectedDocumento) return;
+        imprimirPdfBase64(selectedDocumento);
+    }
+
     async function handleAssinar(data: FiscalAssinar) {
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             data.arquivo = selectedDocumento;
             await assinar(data)
@@ -314,7 +324,7 @@ export default function Page() {
             toast.error((err as Error).message)
         } finally {
             setIsModalDocumentosOpen(false)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -335,7 +345,7 @@ export default function Page() {
     }
 
     async function handleAprovar(requisicao: FiscalResponseDto, aprovar: boolean) {
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             const data: FiscalAprovarDocumento = {
                 idmov: requisicao.fiscal.idmov,
@@ -349,29 +359,29 @@ export default function Page() {
         } catch (err) {
             setError((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
     async function handleItens(requisicao: FiscalResponseDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalItensOpen(true)
         setSelectedResult(requisicao)
         setResultItens(requisicao.movimento_itens)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAprovacoes(requisicao: FiscalResponseDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalAprovacoesOpen(true)
         setSelectedResult(requisicao)
         setResultAprovacoes(requisicao.fiscal_aprovacoes)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAnexos(requisicao: FiscalResponseDto) {
         setSelectedResult(requisicao)
-        setIsLoading(true)
+        setIsProcessing(true)
         setError(null)
         try {
             const dados = await getAllAnexos(requisicao.movimento.idmov)
@@ -380,7 +390,7 @@ export default function Page() {
             setError((err as Error).message)
             setResults([])
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             setNovoAnexoFile(null)
             setNovoAnexoNome("")
             setIsModalAnexosOpen(true)
@@ -391,7 +401,7 @@ export default function Page() {
         if (!selectedResult) return;
         if (!novoAnexoFile) return toast.error("Selecione um arquivo para anexar.");
 
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             const base64 = await toBase64(novoAnexoFile)
             const nome = (novoAnexoNome || novoAnexoFile.name || "anexo").trim()
@@ -410,13 +420,13 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
     async function handleExcluirAnexo() {
         if (!deleteAnexoId || !selectedResult) return
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             await deleteAnexo(deleteAnexoId)
             setResultAnexos(prev => prev.filter(a => a.id !== deleteAnexoId))
@@ -425,7 +435,7 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -651,7 +661,7 @@ export default function Page() {
                                 id="dateFrom"
                                 type="date"
                                 value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
+                                onChange={(e) => { setDateFrom(e.target.value); setDatasManuais(true) }}
                                 className="w-40"
                             />
                         </div>
@@ -663,7 +673,7 @@ export default function Page() {
                                 id="dateTo"
                                 type="date"
                                 value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
+                                onChange={(e) => { setDateTo(e.target.value); setDatasManuais(true) }}
                                 className="w-40"
                             />
                         </div>
@@ -738,6 +748,17 @@ export default function Page() {
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) selecionarSituacao("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        {/* Filtro independente: somente documentos já assinados */}
+                        <Button
+                            variant={apenasAssinados ? "default" : "outline"}
+                            onClick={() => setApenasAssinados(v => !v)}
+                            aria-pressed={apenasAssinados}
+                            title="Mostrar apenas documentos já assinados"
+                        >
+                            <Filter className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Somente assinados</span>
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
@@ -877,9 +898,9 @@ export default function Page() {
                                         <Button
                                             type="button"
                                             onClick={handleAnexarNovoAnexo}
-                                            disabled={isLoading || !novoAnexoFile}
+                                            disabled={isProcessing || !novoAnexoFile}
                                         >
-                                            {isLoading ? "Anexando..." : "Anexar"}
+                                            {isProcessing ? "Anexando..." : "Anexar"}
                                         </Button>
                                     </div>
                                 </div>
@@ -924,7 +945,8 @@ export default function Page() {
                 pdfBase64={selectedDocumento || null}
                 canSign={selectedDocumentoTipo === "fiscal" && !!selectedResult && selectedResult.fiscal.documento_assinado == 0 && podeAssinar}
                 onSign={confirmarAssinatura}
-                isLoading={isLoading}
+                onPrint={handleImprimir}
+                isLoading={isProcessing}
                 extraControls={selectedDocumentoTipo === "anexo" && resultAnexos.length > 1 ? (
                     <div className="flex items-center gap-1">
                         <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexoFiscal(-1)}>
@@ -938,7 +960,7 @@ export default function Page() {
             />
 
             {/* Loading */}
-            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+            <Dialog open={isProcessing} onOpenChange={setIsProcessing}>
                 <DialogContent
                     showCloseButton={false}
                     scrollBody={false}

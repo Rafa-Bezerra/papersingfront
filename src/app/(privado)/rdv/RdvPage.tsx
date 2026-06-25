@@ -416,6 +416,8 @@ export default function Page() {
             { accessorKey: 'origem', header: 'Origem' },
             { accessorKey: 'destino', header: 'Destino' },
             { accessorKey: 'nome_solicitante', header: 'Solicitante' },
+            { accessorKey: 'nome_fornecedor', header: 'Fornecedor', accessorFn: (row) => row.nome_fornecedor?.trim() || row.codcfo || '—' },
+            { id: 'valor', header: 'Valor', accessorFn: (row) => (row.itens ?? []).reduce((s, it) => s + (it.quantidade ?? 1) * (it.valor ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'actions',

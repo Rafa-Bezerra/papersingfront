@@ -23,6 +23,8 @@ export type Usuario = {
     pagamento_rh: boolean,
     fiscal: boolean,
     gestao_pessoas: boolean,
+    financeiro: boolean,
+    docusign: boolean,
 }
 
 export interface LoginPayload {

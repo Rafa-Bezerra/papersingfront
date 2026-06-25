@@ -77,9 +77,16 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const parsedUser = JSON.parse(userData);
             const isAdmin = Boolean(parsedUser?.admin);
             const canCentrosCustos = Boolean(parsedUser?.centros_custos);
+            const isFinanceiro = Boolean(parsedUser?.financeiro);
+            const canDocusign = Boolean(parsedUser?.docusign);
 
             // Bloqueia acesso direto a centros de custos sem permissão.
             if (normalizedPath === "/centros-custos" && !isAdmin && !canCentrosCustos) {
+              setIsAuthorized(false);
+            }
+
+            // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
+            if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
               setIsAuthorized(false);
             }
           } catch (parseError) {
