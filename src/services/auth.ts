@@ -32,6 +32,9 @@ export interface LoginResponse {
   pagamento_rh: boolean;
   pagamento_impostos: boolean;
   externo: boolean;
+  gestao_pessoas: boolean;
+  financeiro: boolean;
+  docusign: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -73,6 +76,10 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     fiscal: apiData.fiscal,
     restrito: apiData.restrito,
     externo: apiData.externo,
+
+    gestao_pessoas: apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false,
+    financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
+    docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
 
     // 👇 aqui está o conserto
     pagamento_impostos:
@@ -127,6 +134,9 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     externo: apiData.externo ?? apiData.EXTERNO,
     pagamento_impostos: apiData.pagamento_impostos ?? apiData.PAGAMENTO_IMPOSTOS,
     pagamento_rh: apiData.pagamento_rh ?? apiData.PAGAMENTO_RH,
+    gestao_pessoas: apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false,
+    financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
+    docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
   };
 }
 

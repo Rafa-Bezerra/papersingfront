@@ -66,7 +66,10 @@ export async function getElementById(id: number): Promise<Usuario> {
       gestao_pessoas:
         apiData.gestao_pessoas ??
         apiData.GESTAO_PESSOAS ??
-        apiData.gestaO_PESSOAS
+        apiData.gestaO_PESSOAS,
+
+      financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
+      docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
     }
   
     return normalized
@@ -105,7 +108,9 @@ export async function updateElement(data: Usuario): Promise<void> {
 
         PAGAMENTO_IMPOSTOS: data.pagamento_impostos,
         PAGAMENTO_RH: data.pagamento_rh,
-        GESTAO_PESSOAS: data.gestao_pessoas
+        GESTAO_PESSOAS: data.gestao_pessoas,
+        FINANCEIRO: data.financeiro,
+        DOCUSIGN: data.docusign
     }
 
     const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.sequencial}`, { method: "POST", headers: headers(), body: JSON.stringify(payload) });

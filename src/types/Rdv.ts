@@ -19,6 +19,7 @@ export type Rdv = {
     origem?: string;
     destino?: string;
     codcfo?: string;
+    nome_fornecedor?: string;
     situacao: string;
     arquivo?: string;
     idmov?: number;

@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { useForm, UseFormReturn } from 'react-hook-form';
@@ -266,6 +266,11 @@ export default function Page() {
         } finally {
             setIsLoading(false)
         }
+    }
+
+    function handleImprimir() {
+        if (!selectedResultDocumento) return;
+        imprimirPdfBase64(selectedResultDocumento);
     }
 
     async function handleAprovar(id: number, aprovado: number) {
@@ -711,6 +716,7 @@ export default function Page() {
                 pdfBase64={selectedResultDocumento}
                 canSign={selectedResult?.pode_assinar}
                 onSign={confirmarAssinatura}
+                onPrint={handleImprimir}
                 isLoading={isLoading}
             />
 

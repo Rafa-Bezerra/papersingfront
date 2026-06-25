@@ -78,12 +78,14 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
     const [userAdministrativo, setUserAdministrativo] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
+    const [datasManuais, setDatasManuais] = useState(false);
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<RequisicaoDto[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
@@ -120,6 +122,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     const [fornecedorFiltrado, setFornecedorFiltrado] = useState<string>("")
     const [fornecedores, setFornecedores] = useState<string[]>([])
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
+    // Filtro independente: somente movimentos com nota fiscal anexada (anexo com NOME contendo "NF").
+    const [apenasComNF, setApenasComNF] = useState<boolean>(false)
 
     const normalizeUserCode = (value: string) =>
         stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
@@ -162,7 +166,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
+    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada, apenasComNF])
 
     // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível.
     useEffect(() => {
@@ -188,8 +192,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             // buscamos "Todos" e filtramos localmente.
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
-            const fromApi = isPendente ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada)
+            const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -271,7 +275,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setPodeAssinar(false);
         const userNorm = normalizeUserCode(userCodusuario)
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
@@ -293,13 +297,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalDocumentosOpen(true)
         }
     }
 
     async function handleAssinar(data: Assinar) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setSearched(false)
         try {
             data.arquivo = requisicaoDocumentoSelecionada;
@@ -311,7 +315,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -338,23 +342,23 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAprovar(id: number, atendimento: number) {
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             const resultado = await aprovar(id, atendimento)
             setResults(prev => prev.filter(r => r.requisicao.idmov !== id))
@@ -367,7 +371,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } catch (err) {
             setError((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -396,7 +400,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
     async function handleAnexos(requisicao: RequisicaoDto) {
         setRequisicaoSelecionada(requisicao)
-        setIsLoading(true)
+        setIsProcessing(true)
         setError(null)
         try {
             const dados = await getAllAnexos(requisicao.requisicao.idmov)
@@ -406,15 +410,15 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             setResults([])
         } finally {
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalAnexosOpen(true)
         }
     }
 
     async function handleAnexarDocumento() {
-        setIsLoading(true)
         if (!requisicaoSelecionada) return toast.error("Selecione um arquivo primeiro!")
         if (!file) return toast.error("Selecione um arquivo primeiro!")
+        setIsProcessing(true)
         const base64 = await toBase64(file)
         const anexo: AnexoUpload = {
             anexo: base64,
@@ -433,12 +437,12 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } catch (err) {
             setError((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
     async function handleVisualizarAnexo(anexo: Anexo) {
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             const idx = anexos.findIndex(a => a.id === anexo.id)
             setCurrentAnexoIndex(idx >= 0 ? idx : 0)
@@ -447,7 +451,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             toast.error((err as Error).message)
         } finally {
             setIsModalVisualizarAnexoOpen(true)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -459,8 +463,8 @@ export default function Page({ titulo, tipos_movimento }: Props) {
     }
 
     async function handleExcluirAnexo() {
-        setIsLoading(true)
         if (!deleteAnexoId) return
+        setIsProcessing(true)
         try {
             await deleteAnexo(deleteAnexoId)
             handleAnexos(requisicaoSelecionada!)
@@ -468,13 +472,13 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             toast.success(`Anexo excluído`)
         }
     }
 
     async function handleAssinarAnexo(data: AnexoAssinar) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setSearched(false)
         try {
             await updateAnexo(data)
@@ -485,7 +489,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
         } finally {
             setIsModalVisualizarAnexoOpen(false)
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -728,7 +732,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {
         setRequisicaoSelecionada(requisicao)
-        setIsLoading(true)
+        setIsProcessing(true)
         setError(null)
         try {
             const dados = await getAllAvaliacoes(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento)
@@ -738,7 +742,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             setAvaliacoes([])
         } finally {
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalAvaliacoesOpen(true)
         }
     }
@@ -803,7 +807,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                     id="dateFrom"
                                     type="date"
                                     value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    onChange={(e) => { setDateFrom(e.target.value); setDatasManuais(true) }}
                                     className="w-full min-w-[140px] max-w-[200px] sm:w-40"
                                 />
                             </div>
@@ -814,7 +818,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                     id="dateTo"
                                     type="date"
                                     value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
+                                    onChange={(e) => { setDateTo(e.target.value); setDatasManuais(true) }}
                                     className="w-full min-w-[140px] max-w-[200px] sm:w-40"
                                 />
                             </div>
@@ -930,6 +934,17 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={(checked) => { if (checked) setSituacaoFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        {/* Filtro independente: somente com NF anexada */}
+                        <Button
+                            variant={apenasComNF ? "default" : "outline"}
+                            onClick={() => setApenasComNF(v => !v)}
+                            aria-pressed={apenasComNF}
+                            title="Mostrar apenas movimentos com nota fiscal (NF) anexada"
+                        >
+                            <Filter className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Com NF anexada</span>
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
@@ -967,7 +982,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={loading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading || loading} />
                 </CardContent>
             </Card>
 
@@ -1047,11 +1062,11 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 canSign={requisicaoSelecionada?.requisicao.documento_assinado == 0 && podeAssinar}
                 onSign={confirmarAssinatura}
                 onPrint={handleImprimir}
-                isLoading={isLoading}
+                isLoading={isProcessing}
             />
 
             {/* Loading */}
-            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+            <Dialog open={isProcessing} onOpenChange={setIsProcessing}>
                 <DialogContent
                     showCloseButton={false}
                     scrollBody={false}
@@ -1104,17 +1119,17 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 />
                                 <Button
                                     onClick={handleAnexarDocumento}
-                                    disabled={!file || isLoading || !fileName?.trim()}
+                                    disabled={!file || isProcessing || !fileName?.trim()}
                                     className="flex items-center w-full sm:w-auto"
                                 >
-                                    {isLoading ? "Enviando..." : "Anexar documento"}
+                                    {isProcessing ? "Enviando..." : "Anexar documento"}
                                 </Button>
                             </div>
                             <div className="flex justify-center gap-3">
                                 <Button
                                     variant="outline"
                                     onClick={handleImportarAnexosRM}
-                                    disabled={isImportingRM || isLoading}
+                                    disabled={isImportingRM || isProcessing}
                                     className="flex items-center gap-2"
                                 >
                                     {isImportingRM ? "Importando..." : "Importar do RM"}
@@ -1142,7 +1157,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                 canSign={anexoSelecionado?.documento_assinado == 0}
                 onSign={confirmarAssinaturaAnexo}
                 onPrint={handleImprimirAnexo}
-                isLoading={isLoading}
+                isLoading={isProcessing}
                 extraControls={anexos.length > 1 ? (
                     <div className="flex items-center gap-1">
                         <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexo(-1)}>

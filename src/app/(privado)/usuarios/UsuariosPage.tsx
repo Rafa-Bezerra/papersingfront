@@ -91,6 +91,8 @@ export default function PageUsuarios() {
       pagamento_rh: false,
       fiscal: false,
       gestao_pessoas: false,
+      financeiro: false,
+      docusign: false,
     }
   })
 
@@ -219,6 +221,8 @@ export default function PageUsuarios() {
         pagamento_rh: response.pagamento_rh,
         fiscal: response.fiscal,
         gestao_pessoas: response.gestao_pessoas,
+        financeiro: response.financeiro,
+        docusign: response.docusign,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -251,6 +255,8 @@ export default function PageUsuarios() {
       pagamento_rh: false,
       fiscal: false,
       gestao_pessoas: false,
+      financeiro: false,
+      docusign: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -649,6 +655,38 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Administrativo</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="financeiro"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Financeiro</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="docusign"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Docusign</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

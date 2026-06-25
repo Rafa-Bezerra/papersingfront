@@ -57,6 +57,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
   const [userRestrito, setUserRestrito] = useState(false)
   const [userRdv, setUserRdv] = useState(false)
+  const [userFinanceiro, setUserFinanceiro] = useState(false)
+  const [userDocusign, setUserDocusign] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -85,6 +87,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setPagamentoRh(user.pagamento_rh);
         setPagamentoImpostos(user.pagamento_impostos);
         setUserRdv(user.rdv);
+        setUserFinanceiro(user.financeiro);
+        setUserDocusign(user.docusign);
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -134,6 +138,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Aquisição de serviços': <Briefcase className="w-5 h-5" />,
     'Outras movimentações': <MoreHorizontal className="w-5 h-5" />,
     'Documentos': <FileText className="w-5 h-5" />,
+    'Docusign': <FileText className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -248,7 +253,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
-                      if (!userAdmin) {
+                      // Financeiro tem acesso a todas as rotinas, exceto as configurações
+                      // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
+                      if (!userAdmin && !userFinanceiro) {
                         if (item.url === "/documentos" && !userDocumentos) return null;
                         if (item.url === "/comunicados" && !userComunicados) return null;
                         if (item.url === "/bordero" && !userBordero) return null;
@@ -258,6 +265,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
                         if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
                         if (item.url === "/fiscal" && !userFiscal) return null;
+                        if (item.url === "/docusign" && !userDocusign) return null;
                         if ([
                             "/alcadas", 
                             "/usuarios", 

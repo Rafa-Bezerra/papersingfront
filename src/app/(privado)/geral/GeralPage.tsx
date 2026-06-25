@@ -74,6 +74,7 @@ export default function Page() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
     const [userAdministrativo, setUserAdministrativo] = useState(false);
@@ -81,6 +82,7 @@ export default function Page() {
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
+    const [datasManuais, setDatasManuais] = useState(false);
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<RequisicaoDto[]>([])
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoDto>()
@@ -118,6 +120,8 @@ export default function Page() {
     const [fornecedores, setFornecedores] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
+    // Filtro independente: somente movimentos com nota fiscal anexada (anexo com NOME contendo "NF").
+    const [apenasComNF, setApenasComNF] = useState<boolean>(false)
     const normalizeUserCode = (value: string) =>
         stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
     function clearQuery() {
@@ -237,7 +241,8 @@ export default function Page() {
         solicitanteFiltrado,
         fornecedorFiltrado,
         tipoMovimentoFiltrado,
-        entregaFiltrada
+        entregaFiltrada,
+        apenasComNF
     ]);
 
     useEffect(() => {
@@ -264,8 +269,8 @@ export default function Page() {
             // Regra global: pendências não limitam por período (inclusive no dashboard "Pendentes").
             const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const isPendenteDashboard = filtroDashboard === "Pendentes"
-            const fromApi = (isPendenteStatus || isPendenteDashboard) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada);
+            const fromApi = ((isPendenteStatus || isPendenteDashboard) && !datasManuais) ? "1900-01-01" : from
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF);
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -372,7 +377,7 @@ export default function Page() {
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setPodeAssinar(false);
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
             ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
@@ -392,13 +397,13 @@ export default function Page() {
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalDocumentosOpen(true)
         }
     }
 
     async function handleAssinar(data: Assinar) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setSearched(false)
         try {
             data.arquivo = requisicaoDocumentoSelecionada;
@@ -410,7 +415,7 @@ export default function Page() {
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -437,23 +442,23 @@ export default function Page() {
     }
 
     async function handleItens(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoItensSelecionada(requisicao.requisicao_itens)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.requisicao_aprovacoes)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     async function handleAprovar(id: number, atendimento: number) {
-        setIsLoading(true)
+        setIsProcessing(true)
         try {
             const resultado = await aprovar(id, atendimento)
             // Atualização otimista: remove o item da lista imediatamente (fica mais dinâmico).
@@ -468,7 +473,7 @@ export default function Page() {
         } catch (err) {
             setError((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -497,7 +502,7 @@ export default function Page() {
 
     async function handleAnexos(requisicao: RequisicaoDto) {
         setRequisicaoSelecionada(requisicao)
-        setIsLoading(true)
+        setIsProcessing(true)
         setError(null)
         try {
             const dados = await getAllAnexos(requisicao.requisicao.idmov)
@@ -507,15 +512,15 @@ export default function Page() {
             setResults([])
         } finally {
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalAnexosOpen(true)
         }
     }
 
     async function handleAnexarDocumento() {
-        setIsLoading(true)
         if (!requisicaoSelecionada) return toast.error("Selecione um arquivo primeiro!")
         if (!file) return toast.error("Selecione um arquivo primeiro!")
+        setIsProcessing(true)
         const base64 = await toBase64(file)
         const anexo: AnexoUpload = {
             anexo: base64,
@@ -534,17 +539,17 @@ export default function Page() {
         } catch (err) {
             setError((err as Error).message)
         } finally {
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
     async function handleVisualizarAnexo(anexo: Anexo) {
-        setIsLoading(true)
+        setIsProcessing(true)
         const idx = anexos.findIndex(a => a.id === anexo.id)
         setCurrentAnexoIndex(idx >= 0 ? idx : 0)
         setAnexoSelecionado(anexo);
         setIsModalVisualizarAnexoOpen(true)
-        setIsLoading(false)
+        setIsProcessing(false)
     }
 
     function navegarAnexo(delta: number) {
@@ -555,8 +560,8 @@ export default function Page() {
     }
 
     async function handleExcluirAnexo() {
-        setIsLoading(true)
         if (!deleteAnexoId) return
+        setIsProcessing(true)
         try {
             await deleteAnexo(deleteAnexoId)
             handleAnexos(requisicaoSelecionada!)
@@ -565,12 +570,12 @@ export default function Page() {
             toast.error((err as Error).message)
         } finally {
             toast.success(`Anexo excluído`)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
     async function handleAssinarAnexo(data: AnexoAssinar) {
-        setIsLoading(true)
+        setIsProcessing(true)
         setSearched(false)
         try {
             await updateAnexo(data)
@@ -581,7 +586,7 @@ export default function Page() {
         } finally {
             setIsModalVisualizarAnexoOpen(false)
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
         }
     }
 
@@ -820,7 +825,7 @@ export default function Page() {
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {
         setRequisicaoSelecionada(requisicao)
-        setIsLoading(true)
+        setIsProcessing(true)
         setError(null)
         try {
             const dados = await getAllAvaliacoes(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento)
@@ -830,7 +835,7 @@ export default function Page() {
             setAvaliacoes([])
         } finally {
             setSearched(true)
-            setIsLoading(false)
+            setIsProcessing(false)
             setIsModalAvaliacoesOpen(true)
         }
     }
@@ -892,7 +897,7 @@ export default function Page() {
                                 id="dateFrom"
                                 type="date"
                                 value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
+                                onChange={(e) => { setDateFrom(e.target.value); setDatasManuais(true) }}
                                 className="w-40"
                             />
                         </div>
@@ -904,7 +909,7 @@ export default function Page() {
                                 id="dateTo"
                                 type="date"
                                 value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
+                                onChange={(e) => { setDateTo(e.target.value); setDatasManuais(true) }}
                                 className="w-40"
                             />
                         </div>
@@ -1019,6 +1024,17 @@ export default function Page() {
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => { setSituacaoFiltrada(""); setFiltroDashboard("todos"); }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        {/* Filtro independente: somente com NF anexada */}
+                        <Button
+                            variant={apenasComNF ? "default" : "outline"}
+                            onClick={() => setApenasComNF(v => !v)}
+                            aria-pressed={apenasComNF}
+                            title="Mostrar apenas movimentos com nota fiscal (NF) anexada"
+                        >
+                            <Filter className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Com NF anexada</span>
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
@@ -1056,7 +1072,7 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={loading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading || loading} />
                 </CardContent>
             </Card>
 
@@ -1136,11 +1152,11 @@ export default function Page() {
                 canSign={requisicaoSelecionada?.requisicao.documento_assinado == 0 && podeAssinar}
                 onSign={confirmarAssinatura}
                 onPrint={handleImprimir}
-                isLoading={isLoading}
+                isLoading={isProcessing}
             />
 
             {/* Loading */}
-            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+            <Dialog open={isProcessing} onOpenChange={setIsProcessing}>
                 <DialogContent
                     showCloseButton={false}
                     scrollBody={false}
@@ -1193,17 +1209,17 @@ export default function Page() {
                                 />
                                 <Button
                                     onClick={handleAnexarDocumento}
-                                    disabled={!file || isLoading || !fileName?.trim()}
+                                    disabled={!file || isProcessing || !fileName?.trim()}
                                     className="flex items-center w-full sm:w-auto"
                                 >
-                                    {isLoading ? "Enviando..." : "Anexar documento"}
+                                    {isProcessing ? "Enviando..." : "Anexar documento"}
                                 </Button>
                             </div>
                             <div className="flex justify-center gap-3">
                                 <Button
                                     variant="outline"
                                     onClick={handleImportarAnexosRM}
-                                    disabled={isImportingRM || isLoading}
+                                    disabled={isImportingRM || isProcessing}
                                     className="flex items-center gap-2"
                                 >
                                     {isImportingRM ? "Importando..." : "Importar do RM"}
@@ -1231,7 +1247,7 @@ export default function Page() {
                 canSign={anexoSelecionado?.documento_assinado == 0}
                 onSign={confirmarAssinaturaAnexo}
                 onPrint={handleImprimirAnexo}
-                isLoading={isLoading}
+                isLoading={isProcessing}
                 extraControls={anexos.length > 1 ? (
                     <div className="flex items-center gap-1">
                         <Button size="sm" variant="outline" disabled={currentAnexoIndex === 0} onClick={() => navegarAnexo(-1)}>
