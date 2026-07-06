@@ -63,10 +63,16 @@ export default function Page() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    // Cancela a busca anterior quando uma nova é disparada (troca de filtro/auto-refresh),
+    // garantindo que a resposta mais recente seja a que prevalece (evita registros "piscando").
+    const abortRef = useRef<AbortController | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
     const [userAdmin, setUserAdmin] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
+    // Só liberamos a primeira busca depois de ler o usuário do sessionStorage; caso
+    // contrário o filtro por aprovador roda com usuário vazio e esconde os registros.
+    const [userCarregado, setUserCarregado] = useState(false);
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [datasManuais, setDatasManuais] = useState(false);
@@ -115,6 +121,20 @@ export default function Page() {
             setFiltroDashboard("Pendentes");
             setSituacaoFiltrada("Em Andamento");
         }
+
+        const today = new Date();
+        const fiveDaysAgo = new Date();
+        fiveDaysAgo.setDate(today.getDate() - 5);
+        setDateFrom(dateToIso(fiveDaysAgo));
+        setDateTo(dateToIso(today));
+
+        const storedUser = sessionStorage.getItem("userData");
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            setUserAdmin(user.admin);
+            setCodusuario((user.codusuario ?? "").toUpperCase());
+        }
+        setUserCarregado(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -124,21 +144,9 @@ export default function Page() {
     }
 
     useEffect(() => {
-        if (dateFrom === "" && dateTo === "") {
-            const today = new Date();
-            const fiveDaysAgo = new Date();
-            fiveDaysAgo.setDate(today.getDate() - 5);
-
-            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
-            setDateTo(today.toISOString().substring(0, 10));
-        }
-
-        const storedUser = sessionStorage.getItem("userData");
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);
-            setCodusuario(user.codusuario.toUpperCase());
-        }
+        // Espera o usuário e as datas estarem carregados antes da 1ª busca (senão o
+        // filtro por aprovador roda com usuário vazio e a lista vem vazia).
+        if (!userCarregado || !dateFrom || !dateTo) return
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => {
@@ -148,7 +156,8 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard, apenasAssinados])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userCarregado, userAdmin, userCodusuario, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard, apenasAssinados])
 
     useEffect(() => {
         if (!results.length || !dateFrom || !dateTo) return
@@ -171,6 +180,10 @@ export default function Page() {
     }
 
     async function handleSearch(q: string) {
+        // cancela a busca anterior; a mais recente é a que vale
+        abortRef.current?.abort()
+        const controller = new AbortController()
+        abortRef.current = controller
         setIsLoading(true)
         setError(null)
         try {
@@ -192,7 +205,7 @@ export default function Page() {
                 tipo_movimento: tipoMovimentoFiltrado,
             };
 
-            const dados = await getAll(data)
+            const dados = await getAll(data, controller.signal)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -220,7 +233,7 @@ export default function Page() {
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.fiscal.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.fiscal.idmov ?? '').includes(qNorm)
-                const matchSituacao = situacaoFiltrada === "" || d.fiscal.status == situacaoFiltrada
+                const matchSituacao = situacaoFiltrada === "" || stripDiacritics((d.fiscal.status ?? "").toLowerCase().trim()) === stripDiacritics(situacaoFiltrada.toLowerCase().trim())
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.fiscal.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.fiscal.nome_solicitante == solicitanteFiltrado
                 const matchAssinado = !apenasAssinados || d.fiscal.documento_assinado == 1
@@ -247,10 +260,13 @@ export default function Page() {
             })
             setResults(filtrados)
         } catch (err) {
+            // resposta abortada por uma busca mais recente: ignora (a nova cuida do estado)
+            if ((err as Error).name === "AbortError") return
             setError((err as Error).message)
             setResults([])
         } finally {
-            setIsLoading(false)
+            // só a requisição vigente controla o loading; a abortada não mexe
+            if (!controller.signal.aborted) setIsLoading(false)
         }
     }
 
@@ -273,7 +289,9 @@ export default function Page() {
         try {
             const data: FiscalGetDocumento = {
                 idmov: requisicao.fiscal.idmov,
-                tipo: tipo
+                tipo: tipo,
+                atendimento: requisicao.movimento.codigo_atendimento,
+                movimento_op: requisicao.movimento.idmov,
             };
             const responseData = await getDocumento(data);
             setSelectedDocumento(responseData);
@@ -387,8 +405,8 @@ export default function Page() {
             const dados = await getAllAnexos(requisicao.movimento.idmov)
             setResultAnexos(dados)
         } catch (err) {
+            // erro ao carregar anexos não deve esvaziar a lista principal
             setError((err as Error).message)
-            setResults([])
         } finally {
             setIsProcessing(false)
             setNovoAnexoFile(null)

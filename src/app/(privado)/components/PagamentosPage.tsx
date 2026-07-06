@@ -36,10 +36,15 @@ interface Props {
 export default function Page({ titulo, grupo }: Props) {
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
+    // Loading da LISTAGEM: mostrado só na tabela (sem modal bloqueante), para que
+    // trocar filtro rapidamente ou o auto-refresh não travem a tela.
+    const [isSearching, setIsSearching] = useState(false)
     const [userName, setUserName] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    // Cancela a busca anterior ao disparar uma nova (a resposta mais recente vence).
+    const abortRef = useRef<AbortController | null>(null)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("EM ABERTO")
     const [statusFiltrado, setStatusFiltrado] = useState<string>("")
     // "Pendentes" = modo do botão da home (?filtro=pendentes): mostra só itens na vez do usuário,
@@ -113,12 +118,16 @@ export default function Page({ titulo, grupo }: Props) {
     }
 
     async function handleSearchClick() {
-        setIsLoading(true)
+        setIsSearching(true)
         await handleSearch(query)
     }
 
     async function handleSearch(q: string) {
-        setIsLoading(true)
+        // cancela a busca anterior; a mais recente prevalece
+        abortRef.current?.abort()
+        const controller = new AbortController()
+        abortRef.current = controller
+        setIsSearching(true)
         setError(null)
         try {
             const today = new Date();
@@ -138,15 +147,15 @@ export default function Page({ titulo, grupo }: Props) {
                 status: situacaoFiltrada,
                 situacao: statusFiltrado,
             };
-            const dados = await getAll(data)
+            const dados = await getAll(data, controller.signal)
 
             const qNorm = stripDiacritics(q.toLowerCase().trim())
 
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.tipo_documento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.idlan ?? '').includes(qNorm)
-                const matchSituacao = situacaoFiltrada === "" || d.status_lancamento == situacaoFiltrada
-                const matchStatus = statusFiltrado === "" || d.status_aprovacao == statusFiltrado
+                const matchSituacao = situacaoFiltrada === "" || stripDiacritics((d.status_lancamento ?? "").toUpperCase().trim()) === stripDiacritics(situacaoFiltrada.toUpperCase().trim())
+                const matchStatus = statusFiltrado === "" || stripDiacritics((d.status_aprovacao ?? "").toUpperCase().trim()) === stripDiacritics(statusFiltrado.toUpperCase().trim())
                 // Modo "Pendentes" (botão da home): só itens na vez do usuário —
                 // pode_aprovar vem do backend com a mesma hierarquia de NIVEL do contador.
                 const matchMinhaVez = filtroDashboard !== "Pendentes" || !!d.pode_aprovar
@@ -154,10 +163,13 @@ export default function Page({ titulo, grupo }: Props) {
             })
             setResults(filtrados)
         } catch (err) {
+            // busca abortada por outra mais recente: ignora
+            if ((err as Error).name === "AbortError") return
             setError((err as Error).message)
             setResults([])
         } finally {
-            setIsLoading(false)
+            // só a requisição vigente controla o loading; a abortada não mexe
+            if (!controller.signal.aborted) setIsSearching(false)
         }
     }
 
@@ -667,7 +679,7 @@ export default function Page({ titulo, grupo }: Props) {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable columns={colunas} data={results} loading={isSearching} />
                 </CardContent>
             </Card>
 
