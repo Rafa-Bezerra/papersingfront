@@ -71,10 +71,18 @@ export default function Page() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
+    // Loading da LISTAGEM (busca/atualização): mostrado só na tabela, sem modal
+    // bloqueante — assim trocar filtro ou o auto-refresh não travam a tela.
+    const [isSearching, setIsSearching] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
     const [filtroDashboard, setFiltroDashboard] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
+    // Libera a 1ª busca só após ler o usuário do sessionStorage (senão o filtro
+    // por aprovador roda com usuário vazio e esconde os registros).
+    const [userCarregado, setUserCarregado] = useState(false);
+    // Cancela a busca anterior ao disparar uma nova (a resposta mais recente vence).
+    const abortRef = useRef<AbortController | null>(null)
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -91,7 +99,7 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
-    const loading = isPending
+    const loading = isSearching || isPending
     const [anexos, setAnexos] = useState<Anexo[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
@@ -196,10 +204,14 @@ export default function Page() {
                 setFiltroDashboard(status);
                 break;
         }
+
+        setUserCarregado(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
-        if (!dateFrom || !dateTo) return;
+        // aguarda usuário e datas carregados antes da 1ª busca
+        if (!userCarregado || !dateFrom || !dateTo) return;
 
         if (debounceRef.current) {
             clearTimeout(debounceRef.current);
@@ -214,7 +226,9 @@ export default function Page() {
                 clearTimeout(debounceRef.current);
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
+        userCarregado,
         dateFrom,
         dateTo,
         situacaoFiltrada,
@@ -234,7 +248,11 @@ export default function Page() {
     }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, tipoMovimentoFiltrado])
 
     async function handleSearch(q: string) {
-        setIsLoading(true);
+        // cancela a busca anterior; a mais recente prevalece
+        abortRef.current?.abort()
+        const controller = new AbortController()
+        abortRef.current = controller
+        setIsSearching(true);
         setError(null);
 
         try {
@@ -247,7 +265,7 @@ export default function Page() {
             const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const isPendenteDashboard = filtroDashboard === "Pendentes"
             const fromApi = (isPendenteStatus || isPendenteDashboard) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "RESTRITO");
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "RESTRITO", "", false, controller.signal);
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -309,6 +327,8 @@ export default function Page() {
 
             setResults(fitradosStatus);
         } catch (err) {
+            // busca abortada por outra mais recente: ignora (a nova cuida do estado)
+            if ((err as Error).name === "AbortError") return;
             const msg = (err as Error).message;
             const mensagemAmigavel = msg === 'Failed to fetch'
                 ? 'Não foi possível conectar ao servidor'
@@ -316,13 +336,16 @@ export default function Page() {
             setError(mensagemAmigavel);
             setResults([]);
         } finally {
-            setSearched(true);
-            setIsLoading(false);
+            // só a requisição vigente controla o loading; a abortada não mexe
+            if (!controller.signal.aborted) {
+                setSearched(true);
+                setIsSearching(false);
+            }
         }
     }
 
     async function handleSearchClick() {
-        setIsLoading(true)
+        setIsSearching(true)
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (query) sp.set('q', query)
@@ -330,7 +353,6 @@ export default function Page() {
             router.replace(`?${sp.toString()}`)
         })
         await handleSearch(query)
-        setIsLoading(false)
     }
 
     async function handleDocumento(requisicao: RequisicaoDto) {
@@ -928,7 +950,7 @@ export default function Page() {
                             <SearchIcon className="mr-1 h-4 w-4" /> Buscar
                         </Button>
                         <Button variant="outline" onClick={() => handleSearch(query)} className="flex items-center" title="Atualizar lista">
-                            <RefreshCw className={`mr-1 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Atualizar
+                            <RefreshCw className={`mr-1 h-4 w-4 ${isSearching ? 'animate-spin' : ''}`} /> Atualizar
                         </Button>
                     </div>
                 </CardContent>

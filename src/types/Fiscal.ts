@@ -9,6 +9,8 @@ export interface FiscalGetAll {
 export interface FiscalGetDocumento {
     idmov: number,
     tipo: string,
+    atendimento: number,
+    movimento_op: number,
 }
 
 export interface FiscalAprovarDocumento {

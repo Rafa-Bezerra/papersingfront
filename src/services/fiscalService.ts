@@ -1,17 +1,16 @@
 import { FiscalAprovarDocumento, FiscalAssinar, FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto } from "@/types/Fiscal";
-import { API_BASE, headers } from "@/utils/constants";
+import { API_BASE, fetchJson, headers } from "@/utils/constants";
 const caminho = "Fiscal";
 const elemento_singular = "pagamento";
 const elemento_plural = "pagamento";
 
-export async function getAll(data: FiscalGetAll): Promise<FiscalResponseDto[]> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
-    }
-    const list: FiscalResponseDto[] = await res.json();
-    return list;
+export async function getAll(data: FiscalGetAll, signal?: AbortSignal): Promise<FiscalResponseDto[]> {
+    const list = await fetchJson<FiscalResponseDto[]>(
+        `${API_BASE}/api/${caminho}`,
+        { method: "POST", body: JSON.stringify(data), signal },
+        `Erro ao buscar ${elemento_plural}`
+    );
+    return list ?? [];
 }
 
 export async function getDocumento(data: FiscalGetDocumento): Promise<string> {
@@ -19,10 +18,8 @@ export async function getDocumento(data: FiscalGetDocumento): Promise<string> {
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
-    }    
+    }
     const list: string = await res.text();
-    console.log(list);
-    
     return list;
 }
 
