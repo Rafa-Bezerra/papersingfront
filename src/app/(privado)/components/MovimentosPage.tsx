@@ -3,6 +3,9 @@
 interface Props {
     titulo: string;
     tipos_movimento: string[];
+    // Recebimento de materiais: consulta a view VW_MOVIMENTACOES_MATERIAIS_<unidade>
+    // e considera apenas aprovadores de nível 0 a 2.
+    materiais?: boolean;
 }
 
 import React, {
@@ -74,7 +77,7 @@ import {
     FormMessage
 } from '@/components/ui/form'
 
-export default function Page({ titulo, tipos_movimento }: Props) {
+export default function Page({ titulo, tipos_movimento, materiais = false }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -193,7 +196,7 @@ export default function Page({ titulo, tipos_movimento }: Props) {
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF)
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -860,6 +863,9 @@ export default function Page({ titulo, tipos_movimento }: Props) {
                                 <DropdownMenuCheckboxItem checked={entregaFiltrada === "Pendente"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Pendente") }}>Pendente</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem checked={entregaFiltrada === "Parc. Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Parc. Recebido") }}>Parc. Recebido</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem checked={entregaFiltrada === "Recebido"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Recebido") }}>Recebido</DropdownMenuCheckboxItem>
+                                {materiais && (
+                                    <DropdownMenuCheckboxItem checked={entregaFiltrada === "Quitado"} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("Quitado") }}>Quitado</DropdownMenuCheckboxItem>
+                                )}
                                 <DropdownMenuCheckboxItem checked={entregaFiltrada === ""} onCheckedChange={(checked) => { if (checked) setEntregaFiltrada("") }}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>

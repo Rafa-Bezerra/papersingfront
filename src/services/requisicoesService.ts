@@ -4,8 +4,8 @@ const caminho = "Requisicoes";
 const elemento_singular = "requisição";
 const elemento_plural = "requisições";
 
-export async function getAll(dateFrom: string, dateTo: string, movimentos: string[], situacao: string, restrito: string, situacaoEntrega: string = "", apenasComNF: boolean = false, signal?: AbortSignal): Promise<RequisicaoDto[]> {
-    const body = { dateFrom, dateTo, movimentos, situacao, restrito, situacao_entrega: situacaoEntrega, apenasComNF };
+export async function getAll(dateFrom: string, dateTo: string, movimentos: string[], situacao: string, restrito: string, situacaoEntrega: string = "", apenasComNF: boolean = false, materiais: boolean = false, signal?: AbortSignal): Promise<RequisicaoDto[]> {
+    const body = { dateFrom, dateTo, movimentos, situacao, restrito, situacao_entrega: situacaoEntrega, apenasComNF, materiais };
 
     const list = await fetchJson<RequisicaoDto[]>(
         `${API_BASE}/api/${caminho}`,
