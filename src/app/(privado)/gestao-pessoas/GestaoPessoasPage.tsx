@@ -265,7 +265,7 @@ export default function Page() {
             const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const isPendenteDashboard = filtroDashboard === "Pendentes"
             const fromApi = (isPendenteStatus || isPendenteDashboard) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "RESTRITO", "", false, controller.signal);
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "RESTRITO", "", false, false, controller.signal);
 
             const solicitantesUnicos = Array.from(
                 new Set(

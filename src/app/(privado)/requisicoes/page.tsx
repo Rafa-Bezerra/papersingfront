@@ -3,13 +3,10 @@ import MovimentosPage from "../components/MovimentosPage";
 import LoadingFallback from "@/components/LoadingFallback"
 
 const titulo = 'Recebimento de materiais'
+// Mesmos tipos filtrados pela view VW_MOVIMENTACOES_MATERIAIS_<unidade>.
 const tipos_movimento: string[] = [
-  '1.2.40',
   '1.2.41',
-  '1.2.45',
-  '1.2.46',
-  '1.2.49',
-  '1.2.70',
+  '1.2.42',
 ];
 
 export default function Page() {
@@ -19,6 +16,7 @@ export default function Page() {
       <MovimentosPage
         titulo={titulo}
         tipos_movimento={tipos_movimento}
+        materiais
       />
     </Suspense>
   )
