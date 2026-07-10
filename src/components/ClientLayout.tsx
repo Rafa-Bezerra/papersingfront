@@ -79,6 +79,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const canCentrosCustos = Boolean(parsedUser?.centros_custos);
             const isFinanceiro = Boolean(parsedUser?.financeiro);
             const canDocusign = Boolean(parsedUser?.docusign);
+            const canProjetos = Boolean(parsedUser?.projetos);
 
             // Bloqueia acesso direto a centros de custos sem permissão.
             if (normalizedPath === "/centros-custos" && !isAdmin && !canCentrosCustos) {
@@ -87,6 +88,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
             // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
             if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
+              setIsAuthorized(false);
+            }
+
+            // Bloqueia acesso direto a Projetos sem permissão (admin/financeiro/projetos).
+            if (normalizedPath === "/projetos" && !isAdmin && !isFinanceiro && !canProjetos) {
               setIsAuthorized(false);
             }
           } catch (parseError) {

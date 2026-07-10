@@ -23,6 +23,7 @@ export const data = {
         { title: "Outras movimentações", url: "/outras" },
         { title: "Documentos", url: "/documentos" },
         { title: "Docusign", url: "/docusign" },
+        { title: "Projetos", url: "/projetos" },
         { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },

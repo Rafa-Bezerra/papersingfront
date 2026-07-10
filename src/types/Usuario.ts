@@ -25,6 +25,7 @@ export type Usuario = {
     gestao_pessoas: boolean,
     financeiro: boolean,
     docusign: boolean,
+    projetos: boolean,
 }
 
 export interface LoginPayload {

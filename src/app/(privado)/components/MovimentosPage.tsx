@@ -279,6 +279,8 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
 
     async function handleDocumento(requisicao: RequisicaoDto) {
         setIsProcessing(true)
+        // Limpa o documento anterior para nunca exibir (nem assinar) o arquivo de outra requisição em caso de erro.
+        setRequisicaoDocumentoSelecionada("")
         setPodeAssinar(false);
         const userNorm = normalizeUserCode(userCodusuario)
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
@@ -297,11 +299,11 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const data = await getAnexoByIdmov(requisicao.requisicao.idmov, requisicao.requisicao.codigo_atendimento);
             const arquivoBase64 = data.arquivo;
             setRequisicaoDocumentoSelecionada(arquivoBase64);
+            setIsModalDocumentosOpen(true)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsProcessing(false)
-            setIsModalDocumentosOpen(true)
         }
     }
 

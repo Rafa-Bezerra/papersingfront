@@ -59,6 +59,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userRdv, setUserRdv] = useState(false)
   const [userFinanceiro, setUserFinanceiro] = useState(false)
   const [userDocusign, setUserDocusign] = useState(false)
+  const [userProjetos, setUserProjetos] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -89,6 +90,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserRdv(user.rdv);
         setUserFinanceiro(user.financeiro);
         setUserDocusign(user.docusign);
+        setUserProjetos(user.projetos);
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -139,6 +141,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Outras movimentações': <MoreHorizontal className="w-5 h-5" />,
     'Documentos': <FileText className="w-5 h-5" />,
     'Docusign': <FileText className="w-5 h-5" />,
+    'Projetos': <FileText className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -266,6 +269,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
                         if (item.url === "/fiscal" && !userFiscal) return null;
                         if (item.url === "/docusign" && !userDocusign) return null;
+                        if (item.url === "/projetos" && !userProjetos) return null;
                         if ([
                             "/alcadas", 
                             "/usuarios", 
