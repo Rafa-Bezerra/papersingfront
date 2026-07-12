@@ -70,6 +70,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           ? pathname.slice(0, -1) 
           : pathname;
 
+        const isLoginRoute = normalizedPath === "/login" || normalizedPath === "/login-externo";
+
         if (token && userData) {
           setIsAuthenticated(true);
           setIsAuthorized(true);
@@ -102,18 +104,24 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           setIsAuthenticated(false);
           setIsAuthorized(false);
           // Redireciona para login se não estiver autenticado
-          if (normalizedPath !== "/login" && normalizedPath !== "/login-externo") {
+          if (!isLoginRoute) {
             if (!sessionExpiredNotifiedRef.current) {
               sessionExpiredNotifiedRef.current = true;
               toast.info("Sua sessão expirou. Faça login novamente.");
             }
-            router.push("/login");
+            router.replace("/login/");
           }
         }
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error);
         setIsAuthenticated(false);
-        router.push("/login");
+        const normalizedPath = pathname.endsWith('/') && pathname !== '/'
+          ? pathname.slice(0, -1)
+          : pathname;
+        const isLoginRoute = normalizedPath === "/login" || normalizedPath === "/login-externo";
+        if (!isLoginRoute) {
+          router.replace("/login/");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -129,7 +137,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       setIsAuthenticated(false);
       // Logout por inatividade: mensagem amigável antes do redirect.
       toast.info("Sua sessão expirou por inatividade. Faça login novamente.");
-      router.push("/login");
+      router.replace("/login/");
     };
 
     const resetInactivityTimer = () => {
@@ -186,7 +194,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             Você precisa fazer login para acessar esta página.
           </p>
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => router.replace("/login/")}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Ir para Login

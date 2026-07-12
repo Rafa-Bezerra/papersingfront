@@ -63,7 +63,7 @@ export default function LoginPage() {
       
       sessionStorage.setItem('authToken', usuario.token)
       sessionStorage.setItem('userData', JSON.stringify(usuario))
-      router.push('/home')
+      router.push('/home/')
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Falha na autenticação'

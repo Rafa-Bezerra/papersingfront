@@ -66,7 +66,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
 
   const handleLogout = () => {
     sessionStorage.removeItem("userData");
-    router.push("/login");
+    router.replace("/login/");
   };
 
   const handleTrocarUnidade = async (unidade: string) => {

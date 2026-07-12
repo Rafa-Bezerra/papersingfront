@@ -708,15 +708,13 @@ export default function Page() {
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex flex-wrap justify-end items-end gap-3">
-                        {certStatus?.plugsignAtivo && (
-                            <Button
-                                type="button"
-                                variant={certStatus.cadastrado ? "outline" : "default"}
-                                onClick={() => setIsCertDialogOpen(true)}
-                            >
-                                {certStatus.cadastrado ? "Certificado A1 OK" : "Certificado digital A1"}
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant={certStatus?.cadastrado ? "outline" : "default"}
+                            onClick={() => setIsCertDialogOpen(true)}
+                        >
+                            {certStatus?.cadastrado ? "Certificado A1 OK" : "Certificado digital A1"}
+                        </Button>
                         {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="docDateFrom">Data de</Label>
@@ -1176,9 +1174,13 @@ export default function Page() {
                             )}
                         </div>
 
-                        {certStatus?.temCertificadoA1 ? (
+                        {!certStatus?.plugsignAtivo ? (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                                {certStatus?.motivo ?? "Integração PlugSign indisponível. Solicite ao administrador a configuração do token da empresa."}
+                            </div>
+                        ) : certStatus?.temCertificadoA1 ? (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-                                Certificado A1 ativo. Suas assinaturas usarão validade ICP-Brasil.
+                                Certificado A1 ativo. Suas assinaturas no Docusign usarão validade ICP-Brasil (PlugSign).
                             </div>
                         ) : (
                             <div className="grid gap-3">
@@ -1212,7 +1214,7 @@ export default function Page() {
                         <Button type="button" variant="outline" onClick={() => setIsCertDialogOpen(false)}>
                             Fechar
                         </Button>
-                        {!certStatus?.temCertificadoA1 && (
+                        {!certStatus?.temCertificadoA1 && certStatus?.plugsignAtivo && (
                             <Button type="button" onClick={handleEnviarCertificado} disabled={isLoading || certVinculando}>
                                 {isLoading ? "Enviando…" : "Cadastrar certificado"}
                             </Button>

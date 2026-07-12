@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, Eye, Filter, SearchIcon, ShieldCheck, SquarePlus, Trash2, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, Eye, Filter, Loader2, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,9 @@ import { DataTable } from '@/components/ui/data-table'
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -32,12 +30,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
-import { Loader2 } from "lucide-react";
 import {
     adicionarAprovador,
     aprovar,
     assinar,
-    CertificadoA1Status,
     createElement,
     deleteElement,
     Documento,
@@ -46,9 +42,6 @@ import {
     getAnexo,
     base64PdfEhValido,
     normalizarPdfDataUrl,
-    getCertificadoStatus,
-    postCertificado,
-    vincularCertificadoPlugSign,
 } from '@/services/documentoService';
 import { notificarAprovador } from '@/services/requisicoesService';
 import { useForm, UseFormReturn } from 'react-hook-form';
@@ -96,11 +89,6 @@ export default function Page() {
     const [requisicaoAprovacoesSelecionada, setRequisicaoAprovacoesSelecionada] = useState<DocumentoAprovacao[]>([])
     const [searched, setSearched] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [certStatus, setCertStatus] = useState<CertificadoA1Status | null>(null)
-    const [isCertDialogOpen, setIsCertDialogOpen] = useState(false)
-    const [certSenha, setCertSenha] = useState("")
-    const [certVinculando, setCertVinculando] = useState(false)
-    const certFileRef = useRef<HTMLInputElement>(null)
     const [isPending, startTransition] = useTransition()
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     // Valores retornados pela API: 'EM ANDAMENTO' | 'APROVADO' | 'REPROVADO'
@@ -157,64 +145,7 @@ export default function Page() {
     useEffect(() => {
         if (carregou.current) return;
         buscaUsuarios();
-        carregarCertificadoStatus();
     }, [])
-
-    async function carregarCertificadoStatus() {
-        try {
-            const status = await getCertificadoStatus();
-            setCertStatus(status);
-        } catch {
-            setCertStatus(null);
-        }
-    }
-
-    async function sincronizarContaPlugSign() {
-        setCertVinculando(true);
-        try {
-            const status = await vincularCertificadoPlugSign();
-            setCertStatus(status);
-        } catch (err) {
-            toast.error((err as Error).message);
-        } finally {
-            setCertVinculando(false);
-        }
-    }
-
-    useEffect(() => {
-        if (!isCertDialogOpen) return;
-        void (async () => {
-            await carregarCertificadoStatus();
-            await sincronizarContaPlugSign();
-        })();
-    }, [isCertDialogOpen]);
-
-    async function handleEnviarCertificado() {
-        const file = certFileRef.current?.files?.[0];
-        if (!file) {
-            toast.error("Selecione o arquivo .pfx do certificado A1.");
-            return;
-        }
-        if (!certSenha.trim()) {
-            toast.error("Informe a senha do certificado.");
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const base64 = await toBase64(file);
-            await postCertificado(base64, certSenha);
-            toast.success("Certificado A1 cadastrado na PlugSign. Não é necessário enviar de novo a cada acesso.");
-            setIsCertDialogOpen(false);
-            setCertSenha("");
-            if (certFileRef.current) certFileRef.current.value = "";
-            await carregarCertificadoStatus();
-            setCertStatus((prev) => prev ? { ...prev, cadastrado: true, temCertificadoA1: true, vinculadoPlugSign: true } : prev);
-        } catch (err) {
-            toast.error((err as Error).message);
-        } finally {
-            setIsLoading(false);
-        }
-    }
 
     async function buscaUsuarios() {
         setIsLoading(true)
@@ -516,11 +447,7 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo({ page, posX, posY, largura, altura }: PdfSignData) {
-        if (!certStatus?.plugsignAtivo) {
-            toast.message("Integração PlugSign inativa: o documento seguirá o padrão PaperSign.");
-        } else if (!certStatus.cadastrado) {
-            toast.message("Sem certificado A1: o documento seguirá o padrão.");
-        }
+        toast.message("Será gerado comprovante PlugSign (assinatura eletrônica avançada, sem certificado A1).");
         const pdfBase64 = anexoPdfBase64ParaAssinatura;
         if (!pdfBase64 || !base64PdfEhValido(pdfBase64)) {
             toast.error("Documento não carregado ou PDF inválido. Feche e abra o anexo novamente antes de assinar.");
@@ -708,15 +635,6 @@ export default function Page() {
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex flex-wrap justify-end items-end gap-3">
-                        {certStatus?.plugsignAtivo && (
-                            <Button
-                                type="button"
-                                variant={certStatus.cadastrado ? "outline" : "default"}
-                                onClick={() => setIsCertDialogOpen(true)}
-                            >
-                                {certStatus.cadastrado ? "Certificado A1 OK" : "Certificado digital A1"}
-                            </Button>
-                        )}
                         {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="docDateFrom">Data de</Label>
@@ -1118,108 +1036,6 @@ export default function Page() {
                     </div>
                 </div>
             )}
-
-            {/* Certificado A1 — vínculo automático PlugSign pelo e-mail do cadastro */}
-            <Dialog open={isCertDialogOpen} onOpenChange={setIsCertDialogOpen}>
-                <DialogContent className="max-w-lg gap-0 p-0 overflow-hidden">
-                    <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
-                        <div className="flex items-start gap-3">
-                            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                <ShieldCheck className="h-5 w-5" />
-                            </div>
-                            <div className="space-y-1 text-left">
-                                <DialogTitle>Certificado digital A1</DialogTitle>
-                                <DialogDescription className="text-sm">
-                                    Assinatura ICP-Brasil integrada ao PaperSign. Você não precisa acessar outro portal.
-                                </DialogDescription>
-                            </div>
-                        </div>
-                    </DialogHeader>
-
-                    <div className="px-6 py-4 space-y-4">
-                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">Sua conta PaperSign</span>
-                                {certVinculando ? (
-                                    <Badge variant="secondary" className="gap-1">
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                        Verificando…
-                                    </Badge>
-                                ) : certStatus?.vinculadoPlugSign ? (
-                                    <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600">
-                                        Vinculada à assinatura digital
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline">Aguardando vínculo</Badge>
-                                )}
-                            </div>
-                            {certStatus?.nome && (
-                                <p className="text-sm text-foreground">{certStatus.nome}</p>
-                            )}
-                            {certStatus?.usuario && (
-                                <p className="text-xs text-muted-foreground">
-                                    Usuário: <span className="font-medium text-foreground">{certStatus.usuario}</span>
-                                </p>
-                            )}
-                            {certStatus?.emailMascarado && (
-                                <p className="text-xs text-muted-foreground">
-                                    Identificação no cadastro: {certStatus.emailMascarado}
-                                </p>
-                            )}
-                            {certStatus?.motivo && !certStatus.vinculadoPlugSign && (
-                                <p className="text-xs text-amber-700 dark:text-amber-400">{certStatus.motivo}</p>
-                            )}
-                            {!certVinculando && certStatus?.vinculadoPlugSign && !certStatus.temCertificadoA1 && (
-                                <p className="text-xs text-muted-foreground">
-                                    Conta encontrada na PlugSign pelo e-mail do seu cadastro. Envie o arquivo <b>.pfx</b> abaixo para concluir.
-                                </p>
-                            )}
-                        </div>
-
-                        {certStatus?.temCertificadoA1 ? (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-                                Certificado A1 ativo. Suas assinaturas usarão validade ICP-Brasil.
-                            </div>
-                        ) : (
-                            <div className="grid gap-3">
-                                <div>
-                                    <Label htmlFor="certFile">Arquivo do certificado (.pfx ou .p12)</Label>
-                                    <Input
-                                        id="certFile"
-                                        type="file"
-                                        accept=".pfx,.p12"
-                                        ref={certFileRef}
-                                        className="mt-1.5"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="certSenha">Senha do certificado</Label>
-                                    <Input
-                                        id="certSenha"
-                                        type="password"
-                                        value={certSenha}
-                                        onChange={(e) => setCertSenha(e.target.value)}
-                                        placeholder="Senha definida ao exportar o .pfx"
-                                        className="mt-1.5"
-                                        autoComplete="off"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t bg-muted/20">
-                        <Button type="button" variant="outline" onClick={() => setIsCertDialogOpen(false)}>
-                            Fechar
-                        </Button>
-                        {!certStatus?.temCertificadoA1 && (
-                            <Button type="button" onClick={handleEnviarCertificado} disabled={isLoading || certVinculando}>
-                                {isLoading ? "Enviando…" : "Cadastrar certificado"}
-                            </Button>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
 
             {/* Visualizar anexo */}
             {anexoSelecionado && (
