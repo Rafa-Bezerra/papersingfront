@@ -392,11 +392,19 @@ export default function Page() {
             } else {
                 arquivo = normalizarPdfDataUrl(anexo.anexo);
             }
-            if (!base64PdfEhValido(arquivo)) {
-                throw new Error(
-                    "O arquivo não é um PDF válido. Se já tentou assinar antes, exclua o anexo e envie o PDF de novo."
-                );
+
+            const isPdf = arquivo.startsWith('data:application/pdf') || base64PdfEhValido(arquivo);
+            if (!isPdf) {
+                const link = document.createElement('a');
+                link.href = arquivo;
+                link.download = anexo.nome || 'anexo';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                toast.success(`Download iniciado: ${anexo.nome || 'anexo'}`);
+                return;
             }
+
             setAnexoSelecionado(anexo);
             setAnexoPdfBase64ParaAssinatura(arquivo);
             setIsModalVisualizarAnexoOpen(true)
