@@ -87,52 +87,6 @@ export async function assinar(data: DocumentoAnexoAssinar): Promise<string> {
     return msg;
 }
 
-export type CertificadoA1Status = {
-    plugsignAtivo: boolean;
-    cadastrado: boolean;
-    vinculadoPlugSign?: boolean;
-    temCertificadoA1?: boolean;
-    motivo?: string;
-    usuario?: string;
-    nome?: string;
-    emailMascarado?: string;
-    plugsignUserId?: number;
-};
-
-export async function getCertificadoStatus(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, { headers: headers() });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao consultar certificado: ${msg}`);
-    }
-    return await res.json();
-}
-
-export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado/vincular`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao vincular conta`);
-    }
-    return await res.json();
-}
-
-export async function postCertificado(certificadoBase64: string, senha: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
-    }
-}
-
 /** Normaliza resposta da API (JSON string ou data URL) para data URL de PDF. */
 export function normalizarPdfDataUrl(valor: string): string {
     let s = valor.trim();
