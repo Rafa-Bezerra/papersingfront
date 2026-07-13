@@ -87,8 +87,8 @@ export async function assinar(data: DocumentoAnexoAssinar): Promise<string> {
     return msg;
 }
 
-/** Normaliza resposta da API (JSON string ou data URL) para data URL de PDF. */
-export function normalizarPdfDataUrl(valor: string): string {
+/** Normaliza resposta da API (JSON string ou data URL) preservando o MIME quando informado. */
+export function normalizarDataUrl(valor: string): string {
     let s = valor.trim();
     if (s.startsWith('"') && s.endsWith('"')) {
         try {
@@ -97,10 +97,18 @@ export function normalizarPdfDataUrl(valor: string): string {
             s = s.slice(1, -1);
         }
     }
-    if (!s.startsWith("data:")) {
-        s = `data:application/pdf;base64,${s.replace(/^data:.*;base64,/, "")}`;
+    if (s.startsWith("data:")) return s;
+    return `data:application/octet-stream;base64,${s.replace(/^data:.*;base64,/, "")}`;
+}
+
+/** @deprecated Use normalizarDataUrl — mantido para PDFs na visualização/assinatura. */
+export function normalizarPdfDataUrl(valor: string): string {
+    const dataUrl = normalizarDataUrl(valor);
+    if (dataUrl.startsWith("data:application/pdf")) return dataUrl;
+    if (!dataUrl.startsWith("data:")) {
+        return `data:application/pdf;base64,${dataUrl.replace(/^data:.*;base64,/, "")}`;
     }
-    return s;
+    return dataUrl;
 }
 
 export function base64PdfEhValido(dataUrlOuBase64: string): boolean {
@@ -126,8 +134,8 @@ export async function getAnexo(caminho_anexo: string): Promise<string> {
     const raw = contentType.includes("application/json")
       ? (await res.json() as string)
       : await res.text();
-    const dataUrl = normalizarPdfDataUrl(raw);
-    if (!base64PdfEhValido(dataUrl)) {
+    const dataUrl = normalizarDataUrl(raw);
+    if (dataUrl.startsWith("data:application/pdf") && !base64PdfEhValido(dataUrl)) {
         throw new Error(
             "O arquivo no servidor não é um PDF válido. Exclua o anexo e envie o documento novamente."
         );
