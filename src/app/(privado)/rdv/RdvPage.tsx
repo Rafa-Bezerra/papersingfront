@@ -357,9 +357,18 @@ export default function Page() {
         setSelectedAprovadoresResult(result.aprovadores)
     }
 
+    // Anexos vão como base64 dentro do JSON (+33% de tamanho) e o servidor aceita até 50 MB por requisição
+    const MAX_ANEXO_MB = 10
+    const MAX_ANEXOS_TOTAL_MB = 32
+
     async function handleSubmitAnexos() {
-        setIsLoading(true)
         if (!file) return toast.error("Selecione um arquivo primeiro!")
+        if (file.size > MAX_ANEXO_MB * 1024 * 1024)
+            return toast.error(`O arquivo excede o limite de ${MAX_ANEXO_MB} MB por anexo.`)
+        const totalAtual = anexosSubmit.reduce((soma, a) => soma + (a.anexo?.length ?? 0) * 0.75, 0)
+        if (totalAtual + file.size > MAX_ANEXOS_TOTAL_MB * 1024 * 1024)
+            return toast.error(`Os anexos somados excedem o limite de ${MAX_ANEXOS_TOTAL_MB} MB. Remova algum anexo ou reduza o tamanho dos arquivos.`)
+        setIsLoading(true)
         const base64 = await toBase64(file)
         const anexo: AnexoRdv = {
             anexo: base64,

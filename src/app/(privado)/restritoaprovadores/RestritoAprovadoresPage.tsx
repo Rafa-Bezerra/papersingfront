@@ -66,6 +66,7 @@ export default function Page() {
   const carregou = useRef(false)
   const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null)
   const [updateMode, setUpdateMode] = useState(false)
+  const [comboAberto, setComboAberto] = useState(false)
 
   const form = useForm<AprovadoresRestritos>({
     defaultValues: {
@@ -135,6 +136,7 @@ export default function Page() {
           p =>
           (
             stripDiacritics((p.usuario ?? '').toLowerCase()).includes(qNorm) ||
+            stripDiacritics((usuarios.find(u => u.codusuario === p.usuario)?.nome ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.cargo ?? '').toLowerCase()).includes(qNorm) ||
             String(p.nivel ?? '').includes(qNorm) ||
             String(p.valor_inicial ?? '').includes(qNorm) ||
@@ -222,7 +224,10 @@ export default function Page() {
   const colunas = useMemo<ColumnDef<AprovadoresRestritos>[]>(
     () => [
       { accessorKey: 'id', header: 'Id' },
-      { accessorKey: 'usuario', header: 'Usuário' },
+      {
+        accessorKey: 'usuario', header: 'Usuário',
+        accessorFn: (row) => usuarios.find(u => u.codusuario === row.usuario)?.nome ?? row.usuario
+      },
       { accessorKey: 'cargo', header: 'Cargo' },
       { accessorKey: 'valor_inicial', header: 'Valor inicial', accessorFn: (row) => toMoney(row.valor_inicial) },
       { accessorKey: 'valor_final', header: 'Valor final', accessorFn: (row) => toMoney(row.valor_final) },
@@ -250,7 +255,7 @@ export default function Page() {
         )
       }
     ],
-    []
+    [usuarios]
   )
 
   return (
@@ -317,7 +322,7 @@ export default function Page() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Popover>
+                      <Popover modal={true} open={comboAberto} onOpenChange={setComboAberto}>
                         <PopoverTrigger asChild>
                           <Button
                             type="button"
@@ -333,7 +338,7 @@ export default function Page() {
                         </PopoverTrigger>
                         <PopoverPortal>
                           <PopoverContent
-                            className="p-0 w-[250px] pointer-events-auto overflow-visible z-[9999]"
+                            className="p-0 w-(--radix-popover-trigger-width) pointer-events-auto overflow-visible z-[9999]"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Command>
@@ -348,6 +353,7 @@ export default function Page() {
                                       value={`${u.codusuario} - ${u.nome}`}
                                       onSelect={() => {
                                         field.onChange(u.codusuario)
+                                        setComboAberto(false)
                                       }}
                                     >
                                       {`${u.codusuario} - ${u.nome}`}

@@ -29,13 +29,17 @@ import {
     updateElement as updateAlcada,
     deleteElement as deleteAlcada
 } from '@/services/alcadasService'
-import { 
-    Aprovadores, 
+import {
+    Aprovadores,
     getAll as getAprovadores,
     createElement as createAprovador,
     updateElement as updateAprovador,
     deleteElement as deleteAprovador
 } from '@/services/aprovadoresService'
+import {
+    Usuario,
+    getAll as getAllUsuarios
+} from '@/services/usuariosService'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -71,6 +75,8 @@ export default function Page() {
     const [updateAprovadoresMode, setUpdateAprovadoresMode] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null)
+    const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const carregouUsuarios = useRef(false)
 
     const form = useForm<Alcada>({
         defaultValues: { 
@@ -108,7 +114,19 @@ export default function Page() {
 
     useEffect(() => {
         handleSearch(searchParams.get('q') ?? '')
+        if (carregouUsuarios.current) return
+        buscaUsuarios()
     }, [])
+
+    async function buscaUsuarios() {
+        try {
+            const dados = await getAllUsuarios()
+            setUsuarios(dados)
+            carregouUsuarios.current = true
+        } catch {
+            setUsuarios([])
+        }
+    }
 
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -327,7 +345,10 @@ export default function Page() {
     const colunasAprovadores = useMemo<ColumnDef<Aprovadores>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
-            { accessorKey: 'usuario', header: 'Usuário' },
+            {
+                accessorKey: 'usuario', header: 'Usuário',
+                accessorFn: (row) => usuarios.find(u => u.codusuario === row.usuario)?.nome ?? row.usuario
+            },
             { accessorKey: 'cargo', header: 'Cargo' },
             { accessorKey: 'valor_inicial', header: 'Valor inicial' },
             { accessorKey: 'valor_final', header: 'Valor final' },
@@ -355,7 +376,7 @@ export default function Page() {
                 )
             }
         ],
-        [handleEditarAprovador]
+        [handleEditarAprovador, usuarios]
     )
 
     return (

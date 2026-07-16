@@ -88,6 +88,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               setIsAuthorized(false);
             }
 
+            // Bloqueia acesso direto a fornecedores restritos (só admin).
+            if (normalizedPath === "/fornecedores-restritos" && !isAdmin) {
+              setIsAuthorized(false);
+            }
+
             // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
             if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
               setIsAuthorized(false);

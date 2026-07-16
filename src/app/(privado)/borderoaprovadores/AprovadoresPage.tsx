@@ -68,6 +68,7 @@ export default function Page() {
   const loading = isPending
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const carregou = useRef(false)
+  const [comboAberto, setComboAberto] = useState(false)
 
   const form = useForm<BorderoAprovacao>({
     defaultValues: {
@@ -135,6 +136,7 @@ export default function Page() {
           (
             stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.usuario ?? '').toLowerCase()).includes(qNorm) ||
+            stripDiacritics((usuarios.find(u => u.codusuario === p.usuario)?.nome ?? '').toLowerCase()).includes(qNorm) ||
             String(p.ativo ?? '').includes(qNorm) ||
             String(p.id ?? '').includes(qNorm)
           )
@@ -196,7 +198,10 @@ export default function Page() {
   const colunas = useMemo<ColumnDef<BorderoAprovacao>[]>(
     () => [
       { accessorKey: 'id', header: 'Id' },
-      { accessorKey: 'usuario', header: 'Usuário' },
+      {
+        accessorKey: 'usuario', header: 'Usuário',
+        accessorFn: (row) => usuarios.find(u => u.codusuario === row.usuario)?.nome ?? row.usuario
+      },
       // { accessorKey: 'nome', header: 'Nome' },
       {
         accessorKey: 'ativo', header: 'Ativo',
@@ -213,7 +218,7 @@ export default function Page() {
         )
       }
     ],
-    []
+    [usuarios]
   )
 
   return (
@@ -280,7 +285,7 @@ export default function Page() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Popover>
+                      <Popover modal={true} open={comboAberto} onOpenChange={setComboAberto}>
                         <PopoverTrigger asChild>
                           <Button
                             type="button"
@@ -296,7 +301,7 @@ export default function Page() {
                         </PopoverTrigger>
                         <PopoverPortal>
                           <PopoverContent
-                            className="p-0 w-[250px] pointer-events-auto overflow-visible z-[9999]"
+                            className="p-0 w-(--radix-popover-trigger-width) pointer-events-auto overflow-visible z-[9999]"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Command>
@@ -311,6 +316,7 @@ export default function Page() {
                                       value={`${u.codusuario} ${u.nome}`}
                                       onSelect={() => {
                                         field.onChange(u.codusuario)
+                                        setComboAberto(false)
                                       }}
                                     >
                                       {`${u.codusuario} ${u.nome}`}
