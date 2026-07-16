@@ -40,41 +40,35 @@ import {
 } from '@/components/ui/form'
 
 import { stripDiacritics } from '@/utils/functions'
-import {
-  BorderoAprovacao,
-  getAllAprovadores,
-  adicionarAprovador,
-  toggleAprovador
-} from '@/services/borderoService'
 import { PopoverPortal } from '@radix-ui/react-popover'
-import {
-  Usuario,
-  getAll as getAllUsuarios
-} from '@/services/usuariosService'
+import { Fornecedor } from '@/types/Rdv'
+import { FornecedoresRestritos, getAllFornecedores, createElement, deleteElement, getAll } from '@/services/fornecedoresRestritosService'
 
 export default function Page() {
-  const titulo = 'Aprovadores de Borderô'
-  const tituloInsert = 'Novo usuário'
+  const titulo = 'Fornecedores Restritos'
+  const tituloInsert = 'Novo fornecedor restrito'
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
-  const [results, setResults] = useState<BorderoAprovacao[]>([])
+  const [results, setResults] = useState<FornecedoresRestritos[]>([])
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const loading = isPending
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const carregou = useRef(false)
+  const [deleteFornecedorId, setDeleteFornecedorId] = useState<number | null>(null)
   const [comboAberto, setComboAberto] = useState(false)
+  // codcfo já restritos, para ocultar do combobox
+  const restritosRef = useRef<Set<string>>(new Set())
 
-  const form = useForm<BorderoAprovacao>({
+  const form = useForm<Omit<FornecedoresRestritos, 'id'>>({
     defaultValues: {
-      id: 0,
-      usuario: '',
-      ativo: 1,
+      codcfo: '',
+      nome: '',
     }
   })
 
@@ -92,18 +86,18 @@ export default function Page() {
     // on mount: run an initial search
     handleSearch(searchParams.get('q') ?? '')
     if (carregou.current) return;
-    buscaUsuarios();
+    buscaFornecedores();
   }, [])
 
-  async function buscaUsuarios() {
+  async function buscaFornecedores() {
     setError(null)
     try {
-      const dados = await getAllUsuarios()
-      setUsuarios(dados)
+      const dados = await getAllFornecedores()
+      setFornecedores(dados)
       carregou.current = true;
     } catch (err) {
       setError((err as Error).message)
-      setUsuarios([])
+      setFornecedores([])
     } finally {
       setSearched(true)
     }
@@ -128,16 +122,15 @@ export default function Page() {
   async function handleSearch(q: string) {
     setError(null)
     try {
-      const dados = await getAllAprovadores(0)
+      const dados = await getAll()
+      restritosRef.current = new Set(dados.map(d => d.codcfo))
       const qNorm = stripDiacritics(q.toLowerCase().trim())
       const filtrados = qNorm
         ? dados.filter(
           p =>
           (
+            stripDiacritics((p.codcfo ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
-            stripDiacritics((p.usuario ?? '').toLowerCase()).includes(qNorm) ||
-            stripDiacritics((usuarios.find(u => u.codusuario === p.usuario)?.nome ?? '').toLowerCase()).includes(qNorm) ||
-            String(p.ativo ?? '').includes(qNorm) ||
             String(p.id ?? '').includes(qNorm)
           )
         )
@@ -163,62 +156,59 @@ export default function Page() {
 
   function handleInsert() {
     form.reset({
-      id: 0,
-      usuario: '',
-      ativo: 1,
+      codcfo: '',
+      nome: '',
     })
     setIsModalOpen(true)
   }
 
-  async function handleToggle(id:number, ativo:number) {
-    try {
-      await toggleAprovador(id, ativo ? 0 : 1)
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      toast.success(`Usuário atualizado`)
-      await handleSearchClick()
-    }
-  }
-
-  async function onSubmit(data: BorderoAprovacao) {
+  async function onSubmit(data: Omit<FornecedoresRestritos, 'id'>) {
     setError(null)
     try {
-      await adicionarAprovador(data)
+      await createElement(data);
+      toast.success(`Registro enviado`)
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
-      toast.success(`Registro enviado`)
       form.reset()
       await handleSearchClick()
       setIsModalOpen(false)
     }
   }
 
-  const colunas = useMemo<ColumnDef<BorderoAprovacao>[]>(
+  async function handleExcluir() {
+    if (!deleteFornecedorId) return
+    try {
+      await deleteElement(deleteFornecedorId)
+      toast.success(`Fornecedor restrito excluído`)
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setDeleteFornecedorId(null)
+      await handleSearchClick()
+    }
+  }
+
+  const colunas = useMemo<ColumnDef<FornecedoresRestritos>[]>(
     () => [
-      { accessorKey: 'id', header: 'Id' },
+      { accessorKey: 'codcfo', header: 'Código' },
+      { accessorKey: 'nome', header: 'Nome' },
       {
-        accessorKey: 'usuario', header: 'Usuário',
-        accessorFn: (row) => usuarios.find(u => u.codusuario === row.usuario)?.nome ?? row.usuario
-      },
-      // { accessorKey: 'nome', header: 'Nome' },
-      {
-        accessorKey: 'ativo', header: 'Ativo',
+        accessorKey: 'acoes', header: 'Ações',
         cell: ({ row }) => (
           <div className="flex gap-2">
             <Button
               size="sm"
-              variant={row.original.ativo ? 'default' : 'destructive'}
-              onClick={() => handleToggle(row.original.id!, row.original.ativo)}
+              variant="destructive"
+              onClick={() => { setDeleteFornecedorId(row.original.id); setIsModalOpen(false) }}
             >
-              {row.original.ativo ? 'Sim' : 'Não'}
+              Excluir
             </Button>
           </div>
         )
       }
     ],
-    [usuarios]
+    []
   )
 
   return (
@@ -231,7 +221,7 @@ export default function Page() {
         <CardContent className="flex flex-col gap-2 md:flex-row">
           <div className="relative flex-1 w-full">
             <Input
-              placeholder="Pesquise por nome ou ID"
+              placeholder="Pesquise por nome ou código"
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -267,7 +257,7 @@ export default function Page() {
         </CardContent>
       </Card>
 
-      {/* Modal */}
+      {/* Form */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-md overflow-x-auto overflow-y-auto max-h-[90dvh]">
           <DialogHeader>
@@ -280,8 +270,8 @@ export default function Page() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               <FormField
                 control={form.control}
-                name={`usuario`}
-                rules={{ required: "Usuário obrigatório" }}
+                name={`codcfo`}
+                rules={{ required: "Fornecedor obrigatório" }}
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
@@ -293,8 +283,8 @@ export default function Page() {
                             className="w-full justify-between"
                           >
                             {
-                              usuarios.find(u => u.codusuario === field.value)?.nome ??
-                              "Selecione o usuário"
+                              fornecedores.find(f => f.codcfo === field.value)?.nome ??
+                              "Selecione o fornecedor"
                             }
                             <ChevronsUpDown className="opacity-50 size-4" />
                           </Button>
@@ -305,23 +295,26 @@ export default function Page() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Command>
-                              <CommandInput placeholder="Buscar usuário..." />
+                              <CommandInput placeholder="Buscar fornecedor..." />
                               <CommandList>
-                                <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                                <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
 
                                 <CommandGroup>
-                                  {usuarios.map((u) => (
-                                    <CommandItem
-                                      key={u.codusuario}
-                                      value={`${u.codusuario} ${u.nome}`}
-                                      onSelect={() => {
-                                        field.onChange(u.codusuario)
-                                        setComboAberto(false)
-                                      }}
-                                    >
-                                      {`${u.codusuario} ${u.nome}`}
-                                    </CommandItem>
-                                  ))}
+                                  {fornecedores
+                                    .filter(f => !restritosRef.current.has(f.codcfo))
+                                    .map((f) => (
+                                      <CommandItem
+                                        key={f.codcfo}
+                                        value={`${f.codcfo} - ${f.nome}`}
+                                        onSelect={() => {
+                                          field.onChange(f.codcfo)
+                                          form.setValue('nome', f.nome)
+                                          setComboAberto(false)
+                                        }}
+                                      >
+                                        {`${f.codcfo} - ${f.nome}`}
+                                      </CommandItem>
+                                    ))}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
@@ -353,6 +346,28 @@ export default function Page() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
           ))}
+        </div>
+      )}
+
+      {/* Confirmação de exclusão (simples) */}
+      {deleteFornecedorId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+            <h3 className="mb-2 text-base font-semibold">
+              Excluir fornecedor restrito
+            </h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Tem certeza que deseja excluir o fornecedor restrito #{deleteFornecedorId}?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteFornecedorId(null)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleExcluir}>
+                Excluir
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

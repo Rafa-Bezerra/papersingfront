@@ -5,8 +5,22 @@ const caminho = "Rdv";
 const elemento_singular = "rdv";
 const elemento_plural = "rdvs";
 
+// "Failed to fetch" = o navegador não recebeu resposta (queda de conexão ou requisição
+// derrubada pelo servidor, ex.: payload acima do limite) — traduz para algo acionável.
+function erroConexao(err: unknown): Error {
+    if (err instanceof TypeError) {
+        return new Error("Não foi possível conectar ao servidor. Se o RDV tem anexos grandes, reduza o tamanho dos arquivos e tente novamente.");
+    }
+    return err as Error;
+}
+
 export async function createElement(data: Rdv): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    let res: Response;
+    try {
+        res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    } catch (err) {
+        throw erroConexao(err);
+    }
     if (!res.ok) {
         const body = await res.text();
         throw new Error(extrairMensagemErroApi(body, `Não foi possível enviar o RDV (erro ${res.status}).`));
@@ -14,7 +28,12 @@ export async function createElement(data: Rdv): Promise<void> {
 }
 
 export async function updateElement(data: Rdv): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    let res: Response;
+    try {
+        res = await fetch(`${API_BASE}/api/${caminho}/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    } catch (err) {
+        throw erroConexao(err);
+    }
     if (!res.ok) {
         const body = await res.text();
         throw new Error(extrairMensagemErroApi(body, `Não foi possível atualizar o RDV (erro ${res.status}).`));
