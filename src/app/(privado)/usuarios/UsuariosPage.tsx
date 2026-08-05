@@ -94,6 +94,7 @@ export default function PageUsuarios() {
       financeiro: false,
       docusign: false,
       projetos: false,
+      replicar_todas_unidades: false,
     }
   })
 
@@ -260,6 +261,7 @@ export default function PageUsuarios() {
       financeiro: false,
       docusign: false,
       projetos: false,
+      replicar_todas_unidades: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -270,23 +272,41 @@ export default function PageUsuarios() {
     try {
       if (data.sequencial && data.sequencial !== 0) {
         await updateUsuario(data)
+        toast.success('Registro enviado')
       } else {
-        const duplicado = results.some(
-          u =>
-            u.codusuario.trim().toLowerCase() === data.codusuario.trim().toLowerCase() &&
-            u.nome.trim().toLowerCase() === data.nome.trim().toLowerCase() &&
-            u.empresa.trim().toLowerCase() === data.empresa.trim().toLowerCase()
-        )
-        if (duplicado) {
-          toast.error('Já existe um usuário com essa matrícula, nome e unidade.')
-          return
+        if (!data.replicar_todas_unidades) {
+          const duplicado = results.some(
+            u =>
+              u.codusuario.trim().toLowerCase() === data.codusuario.trim().toLowerCase() &&
+              u.nome.trim().toLowerCase() === data.nome.trim().toLowerCase() &&
+              u.empresa.trim().toLowerCase() === data.empresa.trim().toLowerCase()
+          )
+          if (duplicado) {
+            toast.error('Já existe um usuário com essa matrícula, nome e unidade.')
+            return
+          }
         }
-        await createUsuario(data)
+
+        const resultado = await createUsuario(data)
+        if (data.replicar_todas_unidades && resultado?.resultados) {
+          const criados = resultado.resultados.filter(r => r.status === 'criado')
+          const existentes = resultado.resultados.filter(r => r.status === 'ja_existe')
+          const erros = resultado.resultados.filter(r => r.status === 'erro')
+          let msg = `Criado em ${criados.length}/${resultado.resultados.length} unidades`
+          if (existentes.length) msg += ` — já existia em ${existentes.map(r => r.unidade).join(', ')}`
+          if (erros.length) msg += ` — falhou em ${erros.map(r => r.unidade).join(', ')}`
+          if (erros.length) {
+            toast.warning(msg)
+          } else {
+            toast.success(msg)
+          }
+        } else {
+          toast.success('Registro enviado')
+        }
       }
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
-      toast.success(`Registro enviado`)
       form.reset()
       await handleSearchClick()
       setIsModalOpen(false)
@@ -432,6 +452,7 @@ export default function PageUsuarios() {
                              focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={field.value ?? ''}
                         onChange={e => field.onChange(e.target.value)}
+                        disabled={!updateMode && form.watch('replicar_todas_unidades')}
                       >
                         <option value={0}>Selecione…</option>
                         <option key={'48.851.242'} value={'48.851.242'}>{'WAY 112'}</option>
@@ -447,6 +468,26 @@ export default function PageUsuarios() {
                   </FormItem>
                 )}
               />
+
+              {!updateMode && (
+                <FormField
+                  control={form.control}
+                  name="replicar_todas_unidades"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className="!mt-0">
+                        Replicar criação para todas as unidades (WAY 112, 153, 262, 306, 364)
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

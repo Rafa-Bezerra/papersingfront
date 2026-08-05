@@ -67,7 +67,7 @@ import {
 } from '@/components/ui/form'
 
 export default function Page() {
-    const titulo = 'Movimentações para aprovação - Gestão de Pessoas'
+    const titulo = 'Movimentações para aprovação - Restritos'
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -133,10 +133,12 @@ export default function Page() {
 
     useEffect(() => {
         const today = new Date();
-        const fiveDaysAgo = new Date();
-        fiveDaysAgo.setDate(today.getDate() - 5);
 
-        setDateFrom(prev => prev || fiveDaysAgo.toISOString().substring(0, 10));
+        // Tela de revisão de movimentos restritos: o período não deve começar
+        // limitado aos últimos dias (diferente das telas de listagem do dia a dia),
+        // senão movimentos restritos mais antigos ficam escondidos até o usuário
+        // ampliar manualmente o filtro de data.
+        setDateFrom(prev => prev || "1900-01-01");
         setDateTo(prev => prev || today.toISOString().substring(0, 10));
 
         const storedUser = sessionStorage.getItem("userData");

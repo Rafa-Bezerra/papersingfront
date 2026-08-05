@@ -26,6 +26,19 @@ export type Usuario = {
     financeiro: boolean,
     docusign: boolean,
     projetos: boolean,
+    replicar_todas_unidades?: boolean,
+}
+
+export type UnidadeResultado = {
+    unidade: string,
+    status: 'criado' | 'ja_existe' | 'erro',
+    sequencial?: number,
+    mensagem?: string,
+}
+
+export type CreateUsuarioResultado = {
+    replicado: boolean,
+    resultados: UnidadeResultado[],
 }
 
 export interface LoginPayload {

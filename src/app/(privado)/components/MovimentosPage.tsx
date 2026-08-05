@@ -474,11 +474,11 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             await deleteAnexo(deleteAnexoId)
             handleAnexos(requisicaoSelecionada!)
             setDeleteAnexoId(null)
+            toast.success(`Anexo excluído`)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
             setIsProcessing(false)
-            toast.success(`Anexo excluído`)
         }
     }
 
