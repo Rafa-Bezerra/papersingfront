@@ -104,7 +104,7 @@ export default function Page() {
     const [isPending, startTransition] = useTransition()
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     // Valores retornados pela API: 'EM ANDAMENTO' | 'APROVADO' | 'REPROVADO'
-    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
+    const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("EM ANDAMENTO")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [isFormDocumentoOpen, setIsFormDocumentoOpen] = useState(false)
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
@@ -287,12 +287,14 @@ export default function Page() {
                 const usuarioAprovador = d.aprovadores.some(
                     ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                 );
+                const isCriador = stripDiacritics(String(d.usuario_criacao ?? '').toLowerCase().trim())
+                    === stripDiacritics(userCodusuario.toLowerCase().trim())
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
                 // Regra: pendências ("EM ANDAMENTO") sempre aparecem, independente do período.
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                return matchQuery && matchSituacao && (usuarioAprovador || d.usuario_criacao == userCodusuario) && matchSolicitante && matchDateFrom && matchDateTo
+                return matchQuery && matchSituacao && (usuarioAprovador || isCriador) && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)
@@ -373,7 +375,7 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            if (!data.aprovadores.some(a => a.usuario === userCodusuario)) {
+            if (!data.aprovadores.some(a => stripDiacritics(a.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()))) {
                 data.aprovadores = [
                     { usuario: userCodusuario, ordem: 1 },
                     ...data.aprovadores

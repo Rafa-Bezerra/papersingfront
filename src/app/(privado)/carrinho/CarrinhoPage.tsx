@@ -22,6 +22,7 @@ import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement,
 import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useForm } from "react-hook-form"
 import {
@@ -110,9 +111,17 @@ export default function Page() {
             origem: "",
             destino: "",
             itens: [],
-            anexos: []
+            anexos: [],
+            gerar_contrato: false,
+            codtcn: ""
         }
     })
+
+    // Preview do valor do contrato (soma dos itens já adicionados) — o backend recalcula na hora de gravar.
+    const valorContratoPreview = useMemo(
+        () => produtosSubmit.reduce((soma, item) => soma + (item.quantidade ?? 0) * (item.valor ?? 0), 0),
+        [produtosSubmit]
+    )
 
     // Form de cada item a adicionar (produto, quantidade, valor)
     const formItem = useForm<ItemCarrinho>({
@@ -216,6 +225,8 @@ export default function Page() {
         carrinho.destino = form.getValues("destino")
         carrinho.periodo_de = form.getValues("periodo_de")
         carrinho.periodo_ate = form.getValues("periodo_ate")
+        carrinho.gerar_contrato = form.getValues("gerar_contrato")
+        carrinho.codtcn = form.getValues("codtcn")
         carrinho.itens = produtosSubmit
         carrinho.anexos = anexosSubmit
         try {
@@ -541,6 +552,89 @@ export default function Page() {
                                 </FormItem>
                             )}
                         />
+
+                        <FormField
+                            control={form.control}
+                            name="gerar_contrato"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                                    <FormControl>
+                                        <Checkbox
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                    <FormLabel className="!mt-0">Gerar contrato ao aprovar</FormLabel>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {form.watch("gerar_contrato") && (
+                            <div className="grid gap-4 sm:grid-cols-2 border rounded-md p-4">
+                                <FormField
+                                    control={form.control}
+                                    name="periodo_de"
+                                    rules={{ required: "Início da vigência obrigatório" }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Vigência - Início</FormLabel>
+                                            <FormControl>
+                                                <input
+                                                    type="date"
+                                                    className="border rounded-md h-9 px-3 w-full text-sm"
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="periodo_ate"
+                                    rules={{ required: "Fim da vigência obrigatório" }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Vigência - Fim</FormLabel>
+                                            <FormControl>
+                                                <input
+                                                    type="date"
+                                                    className="border rounded-md h-9 px-3 w-full text-sm"
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="codtcn"
+                                    rules={{ required: "Tipo de contrato obrigatório" }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Tipo de contrato</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <div>
+                                    <FormLabel>Valor do contrato</FormLabel>
+                                    <p className="h-9 flex items-center text-sm">
+                                        {valorContratoPreview.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </Form>
 
                     <Form {...formItem}>

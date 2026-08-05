@@ -29,7 +29,7 @@ export const data = {
         { title: "Carrinho", url: "/carrinho" },
         { title: "RDV", url: "/rdv" },
         { title: "Aprovação RDV", url: "/aprovacaordv" },
-        { title: "Gestão de Pessoas", url: "/gestao-pessoas" },
+        { title: "Restritos", url: "/gestao-pessoas" },
         { title: "Pagamentos G. Pessoas", url: "/pagamentos-rh" },
         { title: "Pagamentos Impostos", url: "/pagamentos-impostos" },
         { title: "Documentos Externos", url: "/documentos-externos" },
