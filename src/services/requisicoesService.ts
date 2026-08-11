@@ -32,6 +32,41 @@ export async function aprovar(id: number, atendimento: number): Promise<AprovarR
     return (await res.json()) as AprovarRequisicaoResult;
 }
 
+export type CriarContratoPayload = {
+    codtcn: string;
+    periodo_de?: string;
+    periodo_ate?: string;
+    descricao?: string;
+    valor_contrato?: number;
+};
+
+export type CriarContratoResult = {
+    sucesso: boolean;
+    message?: string;
+    erro?: string;
+    numeroContrato?: string;
+};
+
+/** Cria manualmente o contrato no TOTVS para uma solicitação já totalmente aprovada. */
+export async function criarContrato(idmov: number, payload: CriarContratoPayload): Promise<CriarContratoResult> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/criarcontrato/${idmov}`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+            Codtcn: payload.codtcn,
+            PeriodoDe: payload.periodo_de,
+            PeriodoAte: payload.periodo_ate,
+            Descricao: payload.descricao,
+            ValorContrato: payload.valor_contrato,
+        }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw new Error(data?.erro || `Erro ${res.status} ao criar contrato.`);
+    }
+    return data as CriarContratoResult;
+}
+
 export async function reprovar(id: number, atendimento: number): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/reprovar/${id}/${atendimento}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
     if (!res.ok) {

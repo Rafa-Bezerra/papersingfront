@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronsUpDown, Eye, Loader2, Trash2, Check, Filter, SearchIcon } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
-import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAllTiposContrato, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto, TipoContrato } from '@/services/carrinhoService';
 import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,13 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 export default function Page() {
     const titulo = 'Carrinho de Compras'
@@ -64,6 +71,7 @@ export default function Page() {
     const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [produtos, setProdutos] = useState<Produto[]>([])
+    const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([])
     // Dados do formulário e itens a enviar
     const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [], anexos: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemCarrinho[]>([])
@@ -150,6 +158,7 @@ export default function Page() {
     useEffect(() => {
         buscaCentrosDeCusto();
         buscaUltimasRequisicoes({ dateFrom: trintaDiasAtras, dateTo: hoje });
+        getAllTiposContrato().then(setTiposContrato).catch((err) => setError((err as Error).message))
     }, [])
 
     /** Busca centros de custo da API */
@@ -620,7 +629,18 @@ export default function Page() {
                                         <FormItem>
                                             <FormLabel>Tipo de contrato</FormLabel>
                                             <FormControl>
-                                                <Input {...field} />
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Selecione" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {tiposContrato.map(t => (
+                                                            <SelectItem key={t.codtcn} value={t.codtcn}>
+                                                                {t.codtcn} - {t.descricao}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
