@@ -37,6 +37,11 @@ export type ContaFinanceira = {
     contabil: string;
 };
 
+export type TipoContrato = {
+    codtcn: string;
+    descricao: string;
+};
+
 export type Produto = {
     idprd: number;
     produto: string;

@@ -1,4 +1,4 @@
-import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho } from "@/types/Carrinho";
+import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho, TipoContrato } from "@/types/Carrinho";
 import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 import { extrairMensagemErroApi } from "@/utils/functions";
@@ -15,6 +15,18 @@ export async function getAllCentrosDeCusto(): Promise<CentroDeCusto[]> {
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
     }
     const list: CentroDeCusto[] = await res.json();
+    return list;
+}
+
+export async function getAllTiposContrato(): Promise<TipoContrato[]> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/tipocontrato`, {
+        headers: headers(),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar tipos de contrato: ${msg}`);
+    }
+    const list: TipoContrato[] = await res.json();
     return list;
 }
 
@@ -83,4 +95,4 @@ export async function getUltimasRequisicoes(params?: { dateFrom?: string; dateTo
     return list;
 }
 
-export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto, AnexoCarrinho }
+export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto, AnexoCarrinho, TipoContrato }
