@@ -100,4 +100,60 @@ export async function getAnexo(caminho_anexo: string): Promise<string> {
     return data;
 }
 
+export type CriarFinanceiroPayload = {
+    codcfo: string;
+    cod_tipo_documento: string;
+    data_vencimento: string;
+    data_emissao?: string;
+    numero_documento?: string;
+    codigos_natureza_financeira: string[];
+};
+
+export type CriarFinanceiroResult = {
+    sucesso: boolean;
+    message?: string;
+    erro?: string;
+    numeroFinanceiro?: string;
+    idlanTotvs?: number;
+};
+
+export type TipoDocumento = {
+    codtdo: string;
+    descricao: string;
+};
+
+/** Lista os tipos de documento (CODTDO/FTDO) cadastrados no TOTVS da unidade do usuário logado. */
+export async function getAllTiposDocumento(): Promise<TipoDocumento[]> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/tiposdocumento`, {
+        headers: headers(),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar tipos de documento: ${msg}`);
+    }
+    const list: TipoDocumento[] = await res.json();
+    return list;
+}
+
+/** Cria manualmente o lançamento financeiro (FLAN) no TOTVS para um comunicado já totalmente aprovado. */
+export async function criarFinanceiro(id: number, payload: CriarFinanceiroPayload): Promise<CriarFinanceiroResult> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/criarfinanceiro/${id}`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+            Codcfo: payload.codcfo,
+            CodTipoDocumento: payload.cod_tipo_documento,
+            DataVencimento: payload.data_vencimento,
+            DataEmissao: payload.data_emissao,
+            NumeroDocumento: payload.numero_documento,
+            CodigosNaturezaFinanceira: payload.codigos_natureza_financeira,
+        }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw new Error(data?.erro || `Erro ${res.status} ao criar financeiro.`);
+    }
+    return data as CriarFinanceiroResult;
+}
+
 export type { Comunicado, ComunicadoAssinar, ComunicadoAprovacao }

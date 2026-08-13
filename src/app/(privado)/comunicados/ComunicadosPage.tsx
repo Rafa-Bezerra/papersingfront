@@ -32,8 +32,10 @@ import { imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64 } from '@/u
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
-import { adicionarAprovador, aprovar, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo, getDocumento, createElement } from '@/services/comunicadoService';
+import { adicionarAprovador, aprovar, deleteElement, Comunicado, ComunicadoAprovacao, ComunicadoAssinar, getAll, updateElement, getAnexo, getDocumento, createElement, criarFinanceiro, CriarFinanceiroPayload, getAllTiposDocumento, TipoDocumento } from '@/services/comunicadoService';
 import { notificarAprovador } from '@/services/requisicoesService';
+import { getAllFornecedores } from '@/services/fornecedoresRestritosService';
+import { Fornecedor } from '@/types/Rdv';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
     Form,
@@ -113,6 +115,26 @@ export default function Page() {
     const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
+
+    const [userFinanceiroTotvs, setUserFinanceiroTotvs] = useState(false)
+    const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+    const [openFornecedor, setOpenFornecedor] = useState(false)
+    const [tiposDocumento, setTiposDocumento] = useState<TipoDocumento[]>([])
+    const [openTipoDocumento, setOpenTipoDocumento] = useState(false)
+    const [financeiroComunicado, setFinanceiroComunicado] = useState<Comunicado | null>(null)
+    const [isCriandoFinanceiro, setIsCriandoFinanceiro] = useState(false)
+    const [naturezasFinanceirasSelecionadas, setNaturezasFinanceirasSelecionadas] = useState<string[]>([])
+
+    const formFinanceiro = useForm<CriarFinanceiroPayload>({
+        defaultValues: {
+            codcfo: '',
+            cod_tipo_documento: '',
+            data_vencimento: '',
+            data_emissao: '',
+            numero_documento: '',
+            codigos_natureza_financeira: [],
+        }
+    })
 
     const form = useForm<Comunicado>({
         defaultValues: {
@@ -201,6 +223,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
+            setUserFinanceiroTotvs(Boolean(user.financeiro_totvs));
             switch (user.unidade) {
                 case "WAY 112":
                     setLogo("/logos/way112.png");
@@ -257,11 +280,11 @@ export default function Page() {
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.nome ?? '').includes(qNorm)
-                const matchSituacao = situacaoFiltrada === "" || d.situacao == situacaoFiltrada
+                const situacaoNorm = stripDiacritics(String(d.situacao ?? '').toUpperCase().trim())
+                const matchSituacao = situacaoFiltrada === "" || situacaoNorm === situacaoFiltrada
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
 
                 // Regra global: pendências ("Em Andamento") não limitam por período.
-                const situacaoNorm = stripDiacritics(String(d.situacao ?? '').toUpperCase().trim())
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
@@ -358,6 +381,48 @@ export default function Page() {
             setError((err as Error).message)
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    function handleAbrirFinanceiro(comunicado: Comunicado) {
+        const hoje = new Date().toISOString().substring(0, 10)
+        formFinanceiro.reset({
+            codcfo: '',
+            cod_tipo_documento: '',
+            data_vencimento: '',
+            data_emissao: hoje,
+            numero_documento: `CI${comunicado.id}`,
+        })
+        setNaturezasFinanceirasSelecionadas((comunicado.itensFinanceiros ?? []).map(() => ''))
+        setFinanceiroComunicado(comunicado)
+        if (fornecedores.length === 0) {
+            getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
+        }
+        if (tiposDocumento.length === 0) {
+            getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
+        }
+    }
+
+    async function handleCriarFinanceiro(data: CriarFinanceiroPayload) {
+        if (!financeiroComunicado) return
+        if (naturezasFinanceirasSelecionadas.some(n => !n)) {
+            toast.error("Selecione a Natureza Financeira de todos os itens.")
+            return
+        }
+        const id = financeiroComunicado.id
+        setIsCriandoFinanceiro(true)
+        try {
+            const resultado = await criarFinanceiro(id, { ...data, codigos_natureza_financeira: naturezasFinanceirasSelecionadas })
+            toast.success(resultado.message || "Financeiro criado com sucesso.")
+            setResults(prev => prev.map(r => r.id === id
+                ? { ...r, financeiro_gerado: true, numero_financeiro: resultado.numeroFinanceiro, idlan_financeiro_totvs: resultado.idlanTotvs }
+                : r
+            ))
+            setFinanceiroComunicado(null)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsCriandoFinanceiro(false)
         }
     }
 
@@ -561,6 +626,11 @@ ${html}
             { id: 'codconta', header: 'Conta', accessorFn: (row) => row.itensFinanceiros?.[0]?.codconta ?? '' },
             { accessorKey: 'situacao', header: 'Situação' },
             {
+                id: 'financeiro',
+                header: 'Nº Lançamento Financeiro',
+                accessorFn: (row) => row.idlan_financeiro_totvs ?? row.numero_financeiro ?? '',
+            },
+            {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
@@ -600,6 +670,18 @@ ${html}
                                 Aprovações
                             </Button>
 
+                            {row.original.situacao === 'APROVADO' && !row.original.financeiro_gerado && userFinanceiroTotvs && (
+                                <Button size="sm" variant="outline" onClick={() => handleAbrirFinanceiro(row.original)}>
+                                    Criar Financeiro
+                                </Button>
+                            )}
+
+                            {row.original.financeiro_gerado && (
+                                <Button size="sm" variant="outline" disabled title={row.original.numero_financeiro ?? undefined}>
+                                    Financeiro {row.original.idlan_financeiro_totvs ? `(IDLAN ${row.original.idlan_financeiro_totvs})` : row.original.numero_financeiro ? `(${row.original.numero_financeiro})` : ''} <Check className="w-4 h-4 text-green-500" />
+                                </Button>
+                            )}
+
                             {podeAprovar && (
                                 <Button
                                     size="sm"
@@ -631,7 +713,7 @@ ${html}
                 }
             }
         ],
-        [userName]
+        [userName, userFinanceiroTotvs]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -755,9 +837,9 @@ ${html}
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "Em Andamento"} onCheckedChange={() => setSituacaoFiltrada("Em Andamento")}>Em Andamento</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Aprovados"} checked={situacaoFiltrada == "Aprovados"} onCheckedChange={() => setSituacaoFiltrada("Aprovados")}>Aprovados</DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Reprovados"} checked={situacaoFiltrada == "Reprovados"} onCheckedChange={() => setSituacaoFiltrada("Reprovados")}>Reprovados</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Em Andamento"} checked={situacaoFiltrada == "EM ANDAMENTO"} onCheckedChange={() => setSituacaoFiltrada("EM ANDAMENTO")}>Em Andamento</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Aprovados"} checked={situacaoFiltrada == "APROVADO"} onCheckedChange={() => setSituacaoFiltrada("APROVADO")}>Aprovados</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem key={"Reprovados"} checked={situacaoFiltrada == "REPROVADO"} onCheckedChange={() => setSituacaoFiltrada("REPROVADO")}>Reprovados</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -813,6 +895,186 @@ ${html}
                         <div className="w-full">
                             <DataTable columns={colunasAprovacoes} data={requisicaoAprovacoesSelecionada} loading={isLoading} />
                         </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Criar Financeiro */}
+            {financeiroComunicado && (
+                <Dialog open={financeiroComunicado !== null} onOpenChange={(open) => { if (!open) setFinanceiroComunicado(null) }}>
+                    <DialogContent className="max-w-lg rounded-xl bg-background p-4 shadow-2xl overflow-y-auto max-h-[90dvh]" onClick={(e) => e.stopPropagation()}>
+                        <DialogHeader>
+                            <DialogTitle>{`Criar financeiro — comunicado n° ${financeiroComunicado.id}`}</DialogTitle>
+                        </DialogHeader>
+                        <Form {...formFinanceiro}>
+                            <form onSubmit={formFinanceiro.handleSubmit(handleCriarFinanceiro)} className="grid gap-4">
+                                <FormField
+                                    control={formFinanceiro.control}
+                                    name="codcfo"
+                                    rules={{ required: 'Fornecedor/credor obrigatório' }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Fornecedor / Credor</FormLabel>
+                                            <FormControl>
+                                                <Popover open={openFornecedor} onOpenChange={setOpenFornecedor} modal={false}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenFornecedor(true)}>
+                                                            <span className="truncate">
+                                                                {fornecedores.find(f => f.codcfo === field.value)?.nome ?? 'Selecione o fornecedor'}
+                                                            </span>
+                                                            <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                                        <Command filter={(value, search) => {
+                                                            const label = fornecedores.find(f => f.codcfo === value)?.nome || ''
+                                                            return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                        }}>
+                                                            <CommandInput placeholder="Buscar fornecedor..." />
+                                                            <CommandList>
+                                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                                <CommandGroup>
+                                                                    {fornecedores.map(f => (
+                                                                        <CommandItem key={f.codcfo} value={f.codcfo} onSelect={() => { field.onChange(f.codcfo); setOpenFornecedor(false) }}>
+                                                                            {f.nome}
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={formFinanceiro.control}
+                                    name="cod_tipo_documento"
+                                    rules={{ required: 'Tipo de documento obrigatório' }}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Tipo de Documento</FormLabel>
+                                            <FormControl>
+                                                <Popover open={openTipoDocumento} onOpenChange={setOpenTipoDocumento} modal={false}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenTipoDocumento(true)}>
+                                                            <span className="truncate">
+                                                                {tiposDocumento.find(t => t.codtdo === field.value)?.descricao ?? 'Selecione o tipo de documento'}
+                                                            </span>
+                                                            <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                                        <Command filter={(value, search) => {
+                                                            const label = tiposDocumento.find(t => t.codtdo === value)?.descricao || ''
+                                                            return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                        }}>
+                                                            <CommandInput placeholder="Buscar tipo de documento..." />
+                                                            <CommandList>
+                                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                                <CommandGroup>
+                                                                    {tiposDocumento.map(t => (
+                                                                        <CommandItem key={t.codtdo} value={t.codtdo} onSelect={() => { field.onChange(t.codtdo); setOpenTipoDocumento(false) }}>
+                                                                            {t.descricao}
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <FormField
+                                        control={formFinanceiro.control}
+                                        name="data_vencimento"
+                                        rules={{ required: 'Data de vencimento obrigatória' }}
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Data de vencimento</FormLabel>
+                                                <FormControl>
+                                                    <Input type="date" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={formFinanceiro.control}
+                                        name="data_emissao"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Data de emissão</FormLabel>
+                                                <FormControl>
+                                                    <Input type="date" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                <FormField
+                                    control={formFinanceiro.control}
+                                    name="numero_documento"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Número do documento</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} maxLength={10} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <div className="border rounded-md p-3">
+                                    <span className="text-sm font-medium text-muted-foreground">Itens financeiros do comunicado</span>
+                                    <div className="mt-2 flex flex-col gap-3 text-sm">
+                                        {(financeiroComunicado.itensFinanceiros ?? []).map((item, i) => (
+                                            <div key={i} className="flex flex-col gap-1 border-b pb-2 last:border-b-0 last:pb-0">
+                                                <div className="flex justify-between">
+                                                    <span>{item.setor} — {item.ccusto} / {item.codconta}</span>
+                                                    <span>{item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <Input
+                                                    placeholder="Natureza Financeira (CODTBORCAMENTO)"
+                                                    value={naturezasFinanceirasSelecionadas[i] ?? ''}
+                                                    onChange={e => {
+                                                        const valor = e.target.value
+                                                        setNaturezasFinanceirasSelecionadas(prev => prev.map((v, idx) => idx === i ? valor : v))
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                        <div className="flex justify-between font-semibold pt-1">
+                                            <span>Total</span>
+                                            <span>
+                                                {(financeiroComunicado.itensFinanceiros ?? []).reduce((acc, item) => acc + (item.valor ?? 0), 0)
+                                                    .toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2">
+                                    <Button type="button" variant="outline" onClick={() => setFinanceiroComunicado(null)}>
+                                        Cancelar
+                                    </Button>
+                                    <Button type="submit" disabled={isCriandoFinanceiro}>
+                                        {isCriandoFinanceiro ? 'Criando…' : 'Criar financeiro'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Form>
                     </DialogContent>
                 </Dialog>
             )}

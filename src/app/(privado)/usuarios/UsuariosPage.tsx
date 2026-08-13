@@ -95,6 +95,7 @@ export default function PageUsuarios() {
       docusign: false,
       projetos: false,
       contratos: false,
+      financeiro_totvs: false,
       replicar_todas_unidades: false,
     }
   })
@@ -228,6 +229,7 @@ export default function PageUsuarios() {
         docusign: response.docusign,
         projetos: response.projetos,
         contratos: response.contratos,
+        financeiro_totvs: response.financeiro_totvs,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -264,6 +266,7 @@ export default function PageUsuarios() {
       docusign: false,
       projetos: false,
       contratos: false,
+      financeiro_totvs: false,
       replicar_todas_unidades: false,
     })
     setUpdateMode(false)
@@ -766,6 +769,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contratos</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="financeiro_totvs"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Financeiro TOTVS</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

@@ -23,6 +23,9 @@ export type Comunicado = {
     usuario_nome: string,
     pagamentos: ComunicadoPagamentos[],
     anexos: ComunicadoAnexo[],
+    financeiro_gerado?: boolean,
+    numero_financeiro?: string | null,
+    idlan_financeiro_totvs?: number | null,
 }
 
 export type ComunicadoPagamentos = {
