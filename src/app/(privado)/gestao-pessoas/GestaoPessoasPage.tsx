@@ -76,6 +76,7 @@ export default function Page() {
     const [isSearching, setIsSearching] = useState(false)
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
+    const [userAdministrativo, setUserAdministrativo] = useState(false);
     const [filtroDashboard, setFiltroDashboard] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
     // Libera a 1ª busca só após ler o usuário do sessionStorage (senão o filtro
@@ -145,6 +146,7 @@ export default function Page() {
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
+            setUserAdministrativo(user.administrativo);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
         }
@@ -236,6 +238,7 @@ export default function Page() {
         situacaoFiltrada,
         filtroDashboard,
         userAdmin,
+        userAdministrativo,
         userCodusuario,
         solicitanteFiltrado,
         tipoMovimentoFiltrado
@@ -296,7 +299,7 @@ export default function Page() {
                 const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
                 const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
                 const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
-                const usuarioAprovador = userAdmin || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const usuarioAprovador = (userAdmin || userAdministrativo) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 
@@ -310,7 +313,7 @@ export default function Page() {
                 const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                 const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
                 // No modo "Pendentes" (botão da home) não há bypass de admin — alinhado ao contador do dashboard.
-                const usuarioAprovador = (filtroDashboard !== "Pendentes" && userAdmin) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const usuarioAprovador = (filtroDashboard !== "Pendentes" && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
                 const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                 switch (filtroDashboard) {

@@ -27,6 +27,7 @@ export type Usuario = {
     docusign: boolean,
     projetos: boolean,
     contratos: boolean,
+    financeiro_totvs: boolean,
     replicar_todas_unidades?: boolean,
 }
 
