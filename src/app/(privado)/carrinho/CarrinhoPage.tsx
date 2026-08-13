@@ -18,11 +18,10 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronsUpDown, Eye, Loader2, Trash2, Check, Filter, SearchIcon } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
-import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAllTiposContrato, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto, TipoContrato } from '@/services/carrinhoService';
+import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
 import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useForm } from "react-hook-form"
 import {
@@ -51,14 +50,6 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-
 export default function Page() {
     const titulo = 'Carrinho de Compras'
 
@@ -71,7 +62,6 @@ export default function Page() {
     const [requisicaoItensSelecionada, setRequisicaoItensSelecionada] = useState<Requisicao_item[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [produtos, setProdutos] = useState<Produto[]>([])
-    const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([])
     // Dados do formulário e itens a enviar
     const [carrinho] = useState<Carrinho>({ descricao: '', tipo_movimento: '', itens: [], anexos: [] })
     const [produtosSubmit, setProdutosSubmit] = useState<ItemCarrinho[]>([])
@@ -120,16 +110,8 @@ export default function Page() {
             destino: "",
             itens: [],
             anexos: [],
-            gerar_contrato: false,
-            codtcn: ""
         }
     })
-
-    // Preview do valor do contrato (soma dos itens já adicionados) — o backend recalcula na hora de gravar.
-    const valorContratoPreview = useMemo(
-        () => produtosSubmit.reduce((soma, item) => soma + (item.quantidade ?? 0) * (item.valor ?? 0), 0),
-        [produtosSubmit]
-    )
 
     // Form de cada item a adicionar (produto, quantidade, valor)
     const formItem = useForm<ItemCarrinho>({
@@ -158,7 +140,6 @@ export default function Page() {
     useEffect(() => {
         buscaCentrosDeCusto();
         buscaUltimasRequisicoes({ dateFrom: trintaDiasAtras, dateTo: hoje });
-        getAllTiposContrato().then(setTiposContrato).catch((err) => setError((err as Error).message))
     }, [])
 
     /** Busca centros de custo da API */
@@ -234,8 +215,6 @@ export default function Page() {
         carrinho.destino = form.getValues("destino")
         carrinho.periodo_de = form.getValues("periodo_de")
         carrinho.periodo_ate = form.getValues("periodo_ate")
-        carrinho.gerar_contrato = form.getValues("gerar_contrato")
-        carrinho.codtcn = form.getValues("codtcn")
         carrinho.itens = produtosSubmit
         carrinho.anexos = anexosSubmit
         try {
@@ -562,99 +541,6 @@ export default function Page() {
                             )}
                         />
 
-                        <FormField
-                            control={form.control}
-                            name="gerar_contrato"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <FormLabel className="!mt-0">Gerar contrato ao aprovar</FormLabel>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {form.watch("gerar_contrato") && (
-                            <div className="grid gap-4 sm:grid-cols-2 border rounded-md p-4">
-                                <FormField
-                                    control={form.control}
-                                    name="periodo_de"
-                                    rules={{ required: "Início da vigência obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Vigência - Início</FormLabel>
-                                            <FormControl>
-                                                <input
-                                                    type="date"
-                                                    className="border rounded-md h-9 px-3 w-full text-sm"
-                                                    value={field.value ?? ""}
-                                                    onChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="periodo_ate"
-                                    rules={{ required: "Fim da vigência obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Vigência - Fim</FormLabel>
-                                            <FormControl>
-                                                <input
-                                                    type="date"
-                                                    className="border rounded-md h-9 px-3 w-full text-sm"
-                                                    value={field.value ?? ""}
-                                                    onChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="codtcn"
-                                    rules={{ required: "Tipo de contrato obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Tipo de contrato</FormLabel>
-                                            <FormControl>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Selecione" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {tiposContrato.map(t => (
-                                                            <SelectItem key={t.codtcn} value={t.codtcn}>
-                                                                {t.codtcn} - {t.descricao}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <div>
-                                    <FormLabel>Valor do contrato</FormLabel>
-                                    <p className="h-9 flex items-center text-sm">
-                                        {valorContratoPreview.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                     </Form>
 
                     <Form {...formItem}>

@@ -21,8 +21,6 @@ export type Carrinho = {
     destino?: string;
     itens: ItemCarrinho[];
     anexos: AnexoCarrinho[];
-    gerar_contrato?: boolean;
-    codtcn?: string;
 };
 
 export type CentroDeCusto = {

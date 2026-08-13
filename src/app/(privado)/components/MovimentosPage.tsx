@@ -95,6 +95,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
     const [userAdministrativo, setUserAdministrativo] = useState(false);
+    const [userContratos, setUserContratos] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
@@ -170,6 +171,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
             setUserAdministrativo(user.administrativo);
+            setUserContratos(user.contratos);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
         }
@@ -676,7 +678,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                                 </Button>
                             )}
 
-                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && (
+                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && userContratos && (
                                 <Button
                                     size="sm"
                                     variant="outline"

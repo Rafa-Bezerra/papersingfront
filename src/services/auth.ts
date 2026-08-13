@@ -36,6 +36,7 @@ export interface LoginResponse {
   financeiro: boolean;
   docusign: boolean;
   projetos: boolean;
+  contratos: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -82,6 +83,7 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
     docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
     projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
+    contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
 
     // 👇 aqui está o conserto
     pagamento_impostos:
@@ -140,6 +142,7 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
     docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
     projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
+    contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
   };
 }
 
