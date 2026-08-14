@@ -2,13 +2,17 @@ const isDev = process.env.NODE_ENV === 'development';
 
 export const GLPI_SUPPORT_URL = "http://servicedesk.grupowaybrasil.com.br/";
 
-export const API_BASE = isDev
-  ? 'http://localhost:5170'
-  : (process.env.NEXT_PUBLIC_API_URL ?? 'https://papersign.grupowaybrasil.com.br:5062');
+function resolveApiBase(): string {
+  if (!isDev) {
+    return process.env.NEXT_PUBLIC_API_URL ?? 'https://papersign.grupowaybrasil.com.br:5062';
+  }
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:5170`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5170';
+}
 
-// export const API_BASE = isDev
-//   ? 'http://localhost:5170'
-//   : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5062');
+export const API_BASE = resolveApiBase();
 
 export const headers = () => ({
   "Content-Type": "application/json",
@@ -20,8 +24,11 @@ export const headersExterno = () => ({
   Authorization: `Bearer ${sessionStorage.getItem("authTokenExterno")}`,
 })
 
-/** Timeout padrão das chamadas de API (ms). Evita que um backend pendurado deixe a tela travada em "Carregando". */
-export const API_TIMEOUT_MS = 30000;
+/** Timeout padrão das chamadas de API (ms). */
+export const API_TIMEOUT_MS = 30_000;
+
+/** Timeout para assinatura (comprovante PlugSign pode levar ~1 min). */
+export const ASSINATURA_TIMEOUT_MS = 180_000;
 
 /**
  * `fetch` com timeout e propagação do AbortSignal do chamador. Se o chamador

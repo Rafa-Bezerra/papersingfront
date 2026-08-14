@@ -1,5 +1,5 @@
 import type { Documento, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
-import { API_BASE, headers } from "@/utils/constants";
+import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, headers } from "@/utils/constants";
 const caminho = "Documentos";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
@@ -79,58 +79,36 @@ export async function aprovar(id: number, aprovado: number): Promise<void> {
 }
 
 export async function assinar(data: DocumentoAnexoAssinar): Promise<string> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/assinar/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    let res: Response;
+    try {
+        res = await apiFetch(
+            `${API_BASE}/api/${caminho}/assinar/${data.id}`,
+            { method: "POST", headers: headers(), body: JSON.stringify(data) },
+            ASSINATURA_TIMEOUT_MS
+        );
+    } catch (err) {
+        const msg = (err as Error).message ?? "";
+        if (msg.includes("demorou") || (err as Error).name === "TimeoutError") {
+            throw new Error("A assinatura demorou mais que o esperado. Aguarde e verifique se o documento foi assinado antes de tentar de novo.");
+        }
+        throw new Error(
+            msg.includes("fetch") || msg.includes("Failed")
+                ? "Não foi possível conectar à API (porta 5170). Verifique se o backend está rodando."
+                : msg
+        );
+    }
     const msg = await res.text();
     if (!res.ok) {
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+        let detalhe = msg || `Erro ${res.status} ao assinar`;
+        try {
+            const json = JSON.parse(msg) as { title?: string; detail?: string };
+            detalhe = json.detail || json.title || detalhe;
+        } catch {
+            // resposta em texto plano
+        }
+        throw new Error(`Erro ${res.status} ao assinar: ${detalhe}`);
     }
     return msg;
-}
-
-export type CertificadoA1Status = {
-    plugsignAtivo: boolean;
-    cadastrado: boolean;
-    vinculadoPlugSign?: boolean;
-    temCertificadoA1?: boolean;
-    motivo?: string;
-    usuario?: string;
-    nome?: string;
-    emailMascarado?: string;
-    plugsignUserId?: number;
-};
-
-export async function getCertificadoStatus(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, { headers: headers() });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao consultar certificado: ${msg}`);
-    }
-    return await res.json();
-}
-
-export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado/vincular`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao vincular conta`);
-    }
-    return await res.json();
-}
-
-export async function postCertificado(certificadoBase64: string, senha: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
-    }
 }
 
 /** Normaliza resposta da API (JSON string ou data URL) para data URL de PDF. */
@@ -163,10 +141,34 @@ export function base64PdfEhValido(dataUrlOuBase64: string): boolean {
 
 export async function getAnexo(caminho_anexo: string): Promise<string> {
     const body = { caminho_anexo };
-    const res = await fetch(`${API_BASE}/api/${caminho}/anexo`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    let res: Response;
+    try {
+        res = await apiFetch(`${API_BASE}/api/${caminho}/anexo`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify(body),
+        }, 120_000);
+    } catch (err) {
+        const msg = (err as Error).message;
+        if ((err as Error).name === "TimeoutError") {
+            throw new Error("O servidor demorou a responder ao carregar o anexo. Tente novamente.");
+        }
+        throw new Error(
+            msg.includes("fetch")
+                ? `Não foi possível conectar à API (${API_BASE}). Verifique se o backend está rodando na porta 5170.`
+                : msg
+        );
+    }
     if (!res.ok) {
       const msg = await res.text();
-      throw new Error(msg || `Erro ${res.status} ao carregar anexo`);
+      let detalhe = msg || `Erro ${res.status} ao carregar anexo`;
+      try {
+        const json = JSON.parse(msg) as { title?: string; detail?: string };
+        detalhe = json.detail || json.title || detalhe;
+      } catch {
+        // resposta em texto plano
+      }
+      throw new Error(detalhe);
     }
     const contentType = res.headers.get("content-type") ?? "";
     const raw = contentType.includes("application/json")

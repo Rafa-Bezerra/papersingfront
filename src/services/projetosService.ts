@@ -1,5 +1,5 @@
 import type { Documento, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
-import { API_BASE, headers } from "@/utils/constants";
+import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, headers } from "@/utils/constants";
 const caminho = "Projetos";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
@@ -79,7 +79,11 @@ export async function aprovar(id: number, aprovado: number): Promise<void> {
 }
 
 export async function assinar(data: DocumentoAnexoAssinar): Promise<string> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/assinar/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const res = await apiFetch(
+        `${API_BASE}/api/${caminho}/assinar/${data.id}`,
+        { method: "POST", headers: headers(), body: JSON.stringify(data) },
+        ASSINATURA_TIMEOUT_MS
+    );
     const msg = await res.text();
     if (!res.ok) {
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
