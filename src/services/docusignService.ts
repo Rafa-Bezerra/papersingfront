@@ -1,5 +1,5 @@
 import type { Documento, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
-import { API_BASE, headers } from "@/utils/constants";
+import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, headers } from "@/utils/constants";
 const caminho = "Docusign";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
@@ -79,7 +79,11 @@ export async function aprovar(id: number, aprovado: number): Promise<void> {
 }
 
 export async function assinar(data: DocumentoAnexoAssinar): Promise<string> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/assinar/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const res = await apiFetch(
+        `${API_BASE}/api/${caminho}/assinar/${data.id}`,
+        { method: "POST", headers: headers(), body: JSON.stringify(data) },
+        ASSINATURA_TIMEOUT_MS
+    );
     const msg = await res.text();
     if (!res.ok) {
       throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
@@ -92,7 +96,10 @@ export type CertificadoA1Status = {
     cadastrado: boolean;
     vinculadoPlugSign?: boolean;
     temCertificadoA1?: boolean;
+    certificadoPersistido?: boolean;
+    podeGerenciarCertificado?: boolean;
     motivo?: string;
+    motivoCertificado?: string;
     usuario?: string;
     nome?: string;
     emailMascarado?: string;
@@ -121,9 +128,9 @@ export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status
     return await res.json();
 }
 
-export async function postCertificado(certificadoBase64: string, senha: string): Promise<void> {
+export async function postCertificado(certificadoBase64: string, senha: string, substituir = false): Promise<CertificadoA1Status> {
     const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
-        method: "POST",
+        method: substituir ? "PUT" : "POST",
         headers: headers(),
         body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
     });
@@ -131,6 +138,19 @@ export async function postCertificado(certificadoBase64: string, senha: string):
         const msg = await res.text();
         throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
     }
+    return await res.json();
+}
+
+export async function deleteCertificado(): Promise<CertificadoA1Status> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
+        method: "DELETE",
+        headers: headers(),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `Erro ${res.status} ao remover certificado`);
+    }
+    return await res.json();
 }
 
 /** Normaliza resposta da API (JSON string ou data URL) para data URL de PDF. */

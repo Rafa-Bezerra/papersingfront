@@ -48,6 +48,7 @@ import {
     normalizarPdfDataUrl,
     getCertificadoStatus,
     postCertificado,
+    deleteCertificado,
     vincularCertificadoPlugSign,
 } from '@/services/docusignService';
 import { notificarAprovador } from '@/services/requisicoesService';
@@ -99,6 +100,7 @@ export default function Page() {
     const [certStatus, setCertStatus] = useState<CertificadoA1Status | null>(null)
     const [isCertDialogOpen, setIsCertDialogOpen] = useState(false)
     const [certSenha, setCertSenha] = useState("")
+    const [certTrocando, setCertTrocando] = useState(false)
     const [certVinculando, setCertVinculando] = useState(false)
     const certFileRef = useRef<HTMLInputElement>(null)
     const [isPending, startTransition] = useTransition()
@@ -182,7 +184,12 @@ export default function Page() {
     }
 
     useEffect(() => {
-        if (!isCertDialogOpen) return;
+        if (!isCertDialogOpen) {
+            setCertTrocando(false);
+            setCertSenha("");
+            if (certFileRef.current) certFileRef.current.value = "";
+            return;
+        }
         void (async () => {
             await carregarCertificadoStatus();
             await sincronizarContaPlugSign();
@@ -199,22 +206,60 @@ export default function Page() {
             toast.error("Informe a senha do certificado.");
             return;
         }
+        const eraTroca = certTrocando || certStatus?.temCertificadoA1 === true || certStatus?.certificadoPersistido === true;
         setIsLoading(true);
         try {
             const base64 = await toBase64(file);
-            await postCertificado(base64, certSenha);
-            toast.success("Certificado A1 cadastrado na PlugSign. Não é necessário enviar de novo a cada acesso.");
-            setIsCertDialogOpen(false);
+            const status = await postCertificado(base64, certSenha, eraTroca);
+            setCertStatus(status);
+            setCertTrocando(false);
             setCertSenha("");
             if (certFileRef.current) certFileRef.current.value = "";
-            await carregarCertificadoStatus();
-            setCertStatus((prev) => prev ? { ...prev, cadastrado: true, temCertificadoA1: true, vinculadoPlugSign: true } : prev);
+            toast.success(
+                eraTroca
+                    ? "Certificado A1 atualizado na PlugSign."
+                    : "Certificado A1 cadastrado na PlugSign."
+            );
         } catch (err) {
             toast.error((err as Error).message);
         } finally {
             setIsLoading(false);
         }
     }
+
+    async function handleRemoverCertificado() {
+        if (!window.confirm("Remover o certificado A1 da PlugSign? Será necessário cadastrar novamente para assinar com ICP-Brasil.")) {
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const status = await deleteCertificado();
+            setCertStatus(status);
+            setCertTrocando(false);
+            setCertSenha("");
+            if (certFileRef.current) certFileRef.current.value = "";
+            toast.success("Certificado A1 removido.");
+        } catch (err) {
+            toast.error((err as Error).message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    function iniciarTrocaCertificado() {
+        setCertTrocando(true);
+        setCertSenha("");
+        if (certFileRef.current) certFileRef.current.value = "";
+    }
+
+    const podeGerenciarCertificado =
+        certStatus?.podeGerenciarCertificado === true
+        || certStatus?.temCertificadoA1 === true
+        || certStatus?.vinculadoPlugSign === true
+        || certStatus?.certificadoPersistido === true;
+
+    const exibirFormularioCertificado =
+        !certStatus?.temCertificadoA1 || certTrocando;
 
     async function buscaUsuarios() {
         setIsLoading(true)
@@ -516,10 +561,14 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo({ page, posX, posY, largura, altura }: PdfSignData) {
-        if (!certStatus?.plugsignAtivo) {
-            toast.message("Integração PlugSign inativa: o documento seguirá o padrão PaperSign.");
-        } else if (!certStatus.cadastrado) {
-            toast.message("Sem certificado A1: o documento seguirá o padrão.");
+        if (certStatus?.plugsignAtivo && !certStatus.temCertificadoA1) {
+            const detalhe = certStatus.motivoCertificado
+                || (certStatus.vinculadoPlugSign
+                    ? "Conta PlugSign encontrada, mas sem certificado A1 ativo. Envie o .pfx."
+                    : "Cadastre seu certificado A1 (.pfx) no DocuSign antes de assinar.");
+            toast.error(detalhe);
+            setIsCertDialogOpen(true);
+            return;
         }
         const pdfBase64 = anexoPdfBase64ParaAssinatura;
         if (!pdfBase64 || !base64PdfEhValido(pdfBase64)) {
@@ -710,10 +759,10 @@ export default function Page() {
                     <div className="flex flex-wrap justify-end items-end gap-3">
                         <Button
                             type="button"
-                            variant={certStatus?.cadastrado ? "outline" : "default"}
+                            variant={certStatus?.temCertificadoA1 ? "outline" : "default"}
                             onClick={() => setIsCertDialogOpen(true)}
                         >
-                            {certStatus?.cadastrado ? "Certificado A1 OK" : "Certificado digital A1"}
+                            {certStatus?.temCertificadoA1 ? "Certificado A1 OK" : "Certificado digital A1"}
                         </Button>
                         {/* Data de */}
                         <div className="flex flex-col">
@@ -1178,11 +1227,50 @@ export default function Page() {
                             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
                                 {certStatus?.motivo ?? "Integração PlugSign indisponível. Solicite ao administrador a configuração do token da empresa."}
                             </div>
-                        ) : certStatus?.temCertificadoA1 ? (
+                        ) : certStatus?.temCertificadoA1 && !certTrocando ? (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
                                 Certificado A1 ativo. Suas assinaturas no Docusign usarão validade ICP-Brasil (PlugSign).
                             </div>
-                        ) : (
+                        ) : certTrocando ? (
+                            <div className="space-y-3">
+                                <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
+                                    Envie o novo arquivo <b>.pfx</b> para substituir o certificado na PlugSign.
+                                </div>
+                                <div className="grid gap-3">
+                                    <div>
+                                        <Label htmlFor="certFile">Novo certificado (.pfx ou .p12)</Label>
+                                        <Input
+                                            id="certFile"
+                                            type="file"
+                                            accept=".pfx,.p12"
+                                            ref={certFileRef}
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="certSenha">Senha do novo certificado</Label>
+                                        <Input
+                                            id="certSenha"
+                                            type="password"
+                                            value={certSenha}
+                                            onChange={(e) => setCertSenha(e.target.value)}
+                                            placeholder="Senha definida ao exportar o .pfx"
+                                            className="mt-1.5"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setCertTrocando(false)}
+                                    disabled={isLoading}
+                                >
+                                    Cancelar troca
+                                </Button>
+                            </div>
+                        ) : exibirFormularioCertificado ? (
                             <div className="grid gap-3">
                                 <div>
                                     <Label htmlFor="certFile">Arquivo do certificado (.pfx ou .p12)</Label>
@@ -1207,18 +1295,46 @@ export default function Page() {
                                     />
                                 </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
-                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t bg-muted/20">
+                    <div className="flex flex-col gap-2 px-6 py-4 border-t bg-muted/20">
+                        {podeGerenciarCertificado && !certTrocando && (
+                            <div className="flex flex-col sm:flex-row gap-2 sm:justify-start">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={iniciarTrocaCertificado}
+                                    disabled={isLoading || certVinculando}
+                                >
+                                    Trocar certificado
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    onClick={handleRemoverCertificado}
+                                    disabled={isLoading || certVinculando}
+                                >
+                                    {isLoading ? "Removendo…" : "Remover certificado"}
+                                </Button>
+                            </div>
+                        )}
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setIsCertDialogOpen(false)}>
                             Fechar
                         </Button>
-                        {!certStatus?.temCertificadoA1 && certStatus?.plugsignAtivo && (
+                        {exibirFormularioCertificado && certStatus?.plugsignAtivo && (
                             <Button type="button" onClick={handleEnviarCertificado} disabled={isLoading || certVinculando}>
-                                {isLoading ? "Enviando…" : "Cadastrar certificado"}
+                                {isLoading
+                                    ? certTrocando || certStatus?.temCertificadoA1 || certStatus?.certificadoPersistido
+                                        ? "Atualizando…"
+                                        : "Enviando…"
+                                    : certTrocando || certStatus?.temCertificadoA1 || certStatus?.certificadoPersistido
+                                        ? "Atualizar certificado"
+                                        : "Cadastrar certificado"}
                             </Button>
                         )}
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
