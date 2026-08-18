@@ -44,6 +44,13 @@ import {
   resetPassword
 } from '@/services/usuariosService'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 
 export default function PageUsuarios() {
   const titulo = 'Usuários'
@@ -280,6 +287,11 @@ export default function PageUsuarios() {
         await updateUsuario(data)
         toast.success('Registro enviado')
       } else {
+        if (!data.replicar_todas_unidades && (!data.empresa || data.empresa === '0')) {
+          toast.error('Selecione uma empresa antes de salvar.')
+          return
+        }
+
         if (!data.replicar_todas_unidades) {
           const duplicado = results.some(
             u =>
@@ -449,26 +461,34 @@ export default function PageUsuarios() {
               <FormField
                 control={form.control}
                 name="empresa"
+                rules={{
+                  validate: value => {
+                    if (form.getValues('replicar_todas_unidades')) return true
+                    return (!!value && value !== '0') || 'Selecione uma empresa'
+                  }
+                }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>EMPRESA</FormLabel>
                     <FormControl>
-                      <select
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background
-                             focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        value={field.value ?? ''}
-                        onChange={e => field.onChange(e.target.value)}
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
                         disabled={!updateMode && form.watch('replicar_todas_unidades')}
                       >
-                        <option value={0}>Selecione…</option>
-                        <option key={'48.851.242'} value={'48.851.242'}>{'WAY 112'}</option>
-                        <option key={'63.929.367'} value={'63.929.367'}>{'WAY 153'}</option>
-                        <option key={'58.492.120'} value={'58.492.120'}>{'WAY 262'}</option>
-                        <option key={'36.128.741'} value={'36.128.741'}>{'WAY 306'}</option>
-                        <option key={'64.017.857'} value={'64.017.857'}>{'WAY 364'}</option>
-                        <option key={'57.190.446'} value={'57.190.446'}>{'MIGRA BR'}</option>
-                        <option key={'57.582.342'} value={'57.582.342'}>{'WAY CSC'}</option>
-                      </select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={'48.851.242'}>{'WAY 112'}</SelectItem>
+                          <SelectItem value={'63.929.367'}>{'WAY 153'}</SelectItem>
+                          <SelectItem value={'58.492.120'}>{'WAY 262'}</SelectItem>
+                          <SelectItem value={'36.128.741'}>{'WAY 306'}</SelectItem>
+                          <SelectItem value={'64.017.857'}>{'WAY 364'}</SelectItem>
+                          <SelectItem value={'57.190.446'}>{'MIGRA BR'}</SelectItem>
+                          <SelectItem value={'57.582.342'}>{'WAY CSC'}</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
