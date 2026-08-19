@@ -532,8 +532,10 @@ export default function Page() {
     async function handleAssinarAnexo(data: DocumentoAnexoAssinar) {
         setIsLoading(true)
         setSearched(false)
+        const toastId = toast.loading("Assinando documento e gerando comprovante PlugSign…")
         try {
             const msg = await assinar(data)
+            toast.dismiss(toastId)
             if (msg.includes("não foi gerado") || msg.includes("PaperSign em anexo (PlugSign")) {
                 toast.warning(msg)
             } else {
@@ -551,6 +553,7 @@ export default function Page() {
                 }
             }
         } catch (err) {
+            toast.dismiss(toastId)
             toast.error((err as Error).message)
         } finally {
             setIsModalVisualizarAnexoOpen(false)
@@ -561,7 +564,7 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo({ page, posX, posY, largura, altura }: PdfSignData) {
-        if (certStatus?.plugsignAtivo && !certStatus.temCertificadoA1) {
+        if (certStatus?.plugsignAtivo && !certStatus.temCertificadoA1 && !certStatus.certificadoPersistido) {
             const detalhe = certStatus.motivoCertificado
                 || (certStatus.vinculadoPlugSign
                     ? "Conta PlugSign encontrada, mas sem certificado A1 ativo. Envie o .pfx."

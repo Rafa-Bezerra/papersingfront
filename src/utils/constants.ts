@@ -27,8 +27,11 @@ export const headersExterno = () => ({
 /** Timeout padrão das chamadas de API (ms). */
 export const API_TIMEOUT_MS = 30_000;
 
-/** Timeout para assinatura (comprovante PlugSign pode levar ~1 min). */
-export const ASSINATURA_TIMEOUT_MS = 180_000;
+/** Timeout para assinatura (comprovante PlugSign pode levar alguns minutos). */
+export const ASSINATURA_TIMEOUT_MS = 300_000;
+
+/** Timeout para upload/sincronização de certificado A1. */
+export const CERTIFICADO_TIMEOUT_MS = 120_000;
 
 /**
  * `fetch` com timeout e propagação do AbortSignal do chamador. Se o chamador
