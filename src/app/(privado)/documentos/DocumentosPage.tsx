@@ -421,8 +421,10 @@ export default function Page() {
     async function handleAssinarAnexo(data: DocumentoAnexoAssinar) {
         setIsLoading(true)
         setSearched(false)
+        const toastId = toast.loading("Assinando documento e gerando comprovante…")
         try {
             const msg = await assinar(data)
+            toast.dismiss(toastId)
             if (msg.includes("não foi gerado") || msg.includes("PaperSign em anexo (PlugSign")) {
                 toast.warning(msg)
             } else {
@@ -440,6 +442,7 @@ export default function Page() {
                 }
             }
         } catch (err) {
+            toast.dismiss(toastId)
             toast.error((err as Error).message)
         } finally {
             setIsModalVisualizarAnexoOpen(false)
