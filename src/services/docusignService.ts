@@ -1,5 +1,5 @@
 import type { Documento, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
-import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, headers } from "@/utils/constants";
+import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, CERTIFICADO_TIMEOUT_MS, headers } from "@/utils/constants";
 const caminho = "Docusign";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
@@ -129,11 +129,11 @@ export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status
 }
 
 export async function postCertificado(certificadoBase64: string, senha: string, substituir = false): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
+    const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
         method: substituir ? "PUT" : "POST",
         headers: headers(),
         body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
-    });
+    }, CERTIFICADO_TIMEOUT_MS);
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
@@ -142,10 +142,10 @@ export async function postCertificado(certificadoBase64: string, senha: string, 
 }
 
 export async function deleteCertificado(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, {
+    const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
         method: "DELETE",
         headers: headers(),
-    });
+    }, CERTIFICADO_TIMEOUT_MS);
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(msg || `Erro ${res.status} ao remover certificado`);
