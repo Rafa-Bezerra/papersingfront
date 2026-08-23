@@ -648,7 +648,7 @@ export default function Page() {
                                 Baixar
                             </Button>
                         )}
-                        {row.original.usuario_criacao === userCodusuario && (
+                        {(row.original.usuario_criacao ?? '').toLowerCase().trim() === userCodusuario.toLowerCase().trim() && (
                             <Button
                                 size="sm"
                                 variant="destructive"

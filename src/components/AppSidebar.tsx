@@ -294,7 +294,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                               }`}
                             title={collapsed ? item.title : undefined}
                           >
-                            <Link href={item.url} onClick={handleMobileToggle}>
+                            <Link href={item.url.endsWith('/') ? item.url : `${item.url}/`} onClick={() => { if (isMobileDevice && mobileOpen) toggleMobile() }}>
                               <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'
                                 }`}>
                                 <span className={`flex-shrink-0 transition-colors duration-200 ${path === item.url || path.startsWith(item.url + '/')
@@ -358,7 +358,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                                   : 'hover:bg-primary/10'
                                 }`}
                             >
-                              <Link href={item.url} onClick={handleMobileToggle}>
+                              <Link href={item.url.endsWith('/') ? item.url : `${item.url}/`} onClick={() => { if (isMobileDevice && mobileOpen) toggleMobile() }}>
                                 {item.title}
                               </Link>
                             </SidebarMenuButton>
