@@ -168,12 +168,16 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
 
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
-            const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);
-            setUserAdministrativo(user.administrativo);
-            setUserContratos(user.contratos);
-            setUserName(user.nome.toUpperCase());
-            setCodusuario(user.codusuario.toUpperCase());
+            try {
+                const user = JSON.parse(storedUser);
+                setUserAdmin(Boolean(user.admin));
+                setUserAdministrativo(Boolean(user.administrativo));
+                setUserContratos(Boolean(user.contratos));
+                setUserName(String(user.nome ?? "").toUpperCase());
+                setCodusuario(String(user.codusuario ?? "").toUpperCase());
+            } catch (parseError) {
+                console.error("Erro ao carregar dados do usuário:", parseError);
+            }
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -426,8 +430,8 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const dados = await getAllAnexos(requisicao.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
+            toast.error((err as Error).message)
             setError((err as Error).message)
-            setResults([])
         } finally {
             setSearched(true)
             setIsProcessing(false)
@@ -750,7 +754,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                                     <Check className="w-4 h-4 text-green-500" />
                                 )}
                             </Button>)}
-                            {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                            {row.original.anexo && normalizeUserCode(row.original.usuario_criacao ?? '') === normalizeUserCode(userCodusuario) && (<Button
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => setDeleteAnexoId(row.original.id)}

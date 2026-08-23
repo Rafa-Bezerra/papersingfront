@@ -809,7 +809,7 @@ export default function Page() {
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
                         </Button>)}
-                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                        {row.original.anexo && normalizeUserCode(row.original.usuario_criacao ?? '') === normalizeUserCode(userCodusuario) && (<Button
                             size="sm"
                             variant="destructive"
                             onClick={() => setDeleteAnexoId(row.original.id)}
