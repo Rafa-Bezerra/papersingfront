@@ -52,3 +52,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# ZIP de deploy IIS (gerado no PC de build)
+/deploy/*.zip
