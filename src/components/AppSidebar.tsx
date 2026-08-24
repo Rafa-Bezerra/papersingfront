@@ -43,7 +43,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [lastMobileClickTime, setLastMobileClickTime] = useState(0)
   const [lastCollapseClickTime, setLastCollapseClickTime] = useState(0)
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -109,17 +108,6 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       document.body.style.overflow = ''
     }
   }, [mobileOpen])
-
-  // Função para lidar com cliques duplos
-  const handleMobileToggle = () => {
-    if (!isMobileDevice) return
-    const now = Date.now()
-    if (now - lastMobileClickTime < 300) { // 300ms de debounce
-      return
-    }
-    setLastMobileClickTime(now)
-    toggleMobile()
-  }
 
   const handleCollapseToggle = () => {
     const now = Date.now()

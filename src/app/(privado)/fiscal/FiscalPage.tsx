@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FiscalDocumento, FiscalGetAll, FiscalGetDocumento, FiscalResponseDto, assinar, getAll, getDocumento, FiscalAssinar, FiscalAprovarDocumento, aprovarFiscal, getAllAnexos } from "@/services/fiscalService";
 import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
-import { base64ToBlob, dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
+import { base64ToBlob, dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
@@ -70,6 +70,7 @@ export default function Page() {
     const [isProcessing, setIsProcessing] = useState(false)
     const [userAdmin, setUserAdmin] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
+    const [userName, setUserName] = useState("");
     // Só liberamos a primeira busca depois de ler o usuário do sessionStorage; caso
     // contrário o filtro por aprovador roda com usuário vazio e esconde os registros.
     const [userCarregado, setUserCarregado] = useState(false);
@@ -133,6 +134,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
             setCodusuario((user.codusuario ?? "").toUpperCase());
+            setUserName(String(user.nome ?? "").toUpperCase());
         }
         setUserCarregado(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -648,7 +650,12 @@ export default function Page() {
                                 Baixar
                             </Button>
                         )}
-                        {(row.original.usuario_criacao ?? '').toLowerCase().trim() === userCodusuario.toLowerCase().trim() && (
+                        {podeExcluirAnexoMovimento({
+                            usuarioCriacao: row.original.usuario_criacao,
+                            nomeSolicitante: selectedResult?.fiscal.nome_solicitante,
+                            userCodusuario,
+                            userName,
+                        }) && (
                             <Button
                                 size="sm"
                                 variant="destructive"
@@ -661,7 +668,7 @@ export default function Page() {
                 )
             }
         ],
-        [handleDownloadAnexoFiscal, userCodusuario]
+        [handleDownloadAnexoFiscal, userCodusuario, userName, selectedResult]
     )
 
     return (
