@@ -4,11 +4,13 @@ export const GLPI_SUPPORT_URL = "http://servicedesk.grupowaybrasil.com.br/";
 
 function resolveApiBase(): string {
   const fromEnv = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const envLocal = fromEnv && /localhost|127\.0\.0\.1/i.test(fromEnv);
 
   if (!isDev) {
+    if (fromEnv && !envLocal) return fromEnv.replace(/\/$/, '');
     return 'https://papersign.grupowaybrasil.com.br:5062';
   }
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
   if (typeof window !== 'undefined') {
     return `http://${window.location.hostname}:5170`;
   }

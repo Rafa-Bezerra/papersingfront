@@ -106,51 +106,79 @@ export type CertificadoA1Status = {
     plugsignUserId?: number;
 };
 
+function mensagemFalhaRede(acao: string, err: unknown): Error {
+    const msg = err instanceof Error ? err.message : String(err ?? "");
+    if ((err as Error)?.name === "TimeoutError" || /timeout/i.test(msg))
+        return new Error("A API demorou a responder ao tratar o certificado. Tente novamente.");
+    if (/failed to fetch|networkerror|load failed/i.test(msg))
+        return new Error(
+            `Não foi possível ${acao}. A tela (:5063) não conseguiu falar com a API (:5062). ` +
+            "Confirme se o endereço é https://papersign.grupowaybrasil.com.br:5063 e se o pool da API está no ar."
+        );
+    return err instanceof Error ? err : new Error(msg || `Erro ao ${acao}.`);
+}
+
 export async function getCertificadoStatus(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado`, { headers: headers() });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao consultar certificado: ${msg}`);
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, { headers: headers() }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(`Erro ${res.status} ao consultar certificado: ${msg}`);
+        }
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("consultar o certificado", err);
     }
-    return await res.json();
 }
 
 export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/certificado/vincular`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao vincular conta`);
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado/vincular`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify({}),
+        }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || `Erro ${res.status} ao vincular conta`);
+        }
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("vincular a conta PlugSign", err);
     }
-    return await res.json();
 }
 
-export async function postCertificado(certificadoBase64: string, senha: string, substituir = false): Promise<CertificadoA1Status> {
-    const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
-        method: substituir ? "PUT" : "POST",
-        headers: headers(),
-        body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
-    }, CERTIFICADO_TIMEOUT_MS);
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
+export async function postCertificado(certificadoBase64: string, senha: string, _substituir = false): Promise<CertificadoA1Status> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify({ Certificado: certificadoBase64, Senha: senha }),
+        }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || `Erro ${res.status} ao enviar certificado`);
+        }
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("enviar o certificado A1", err);
     }
-    return await res.json();
 }
 
 export async function deleteCertificado(): Promise<CertificadoA1Status> {
-    const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
-        method: "DELETE",
-        headers: headers(),
-    }, CERTIFICADO_TIMEOUT_MS);
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Erro ${res.status} ao remover certificado`);
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado/remover`, {
+            method: "POST",
+            headers: headers(),
+        }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || `Erro ${res.status} ao remover certificado`);
+        }
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("remover o certificado A1", err);
     }
-    return await res.json();
 }
 
 /** Normaliza resposta da API (JSON string ou data URL) para data URL de PDF. */
