@@ -36,6 +36,7 @@ export const data = {
         { title: "Aprovadores Borderô", url: "/borderoaprovadores" },
         { title: "Aprovadores Restritos", url: "/restritoaprovadores" },
         { title: "Alçadas", url: "/alcadas" },
+        { title: "Disparos", url: "/disparos" },
         { title: "Painel Fiscal", url: "/fiscal" },
         { title: "Centros de custos", url: "/centros-custos" },
         { title: "Usuários", url: "/usuarios" },

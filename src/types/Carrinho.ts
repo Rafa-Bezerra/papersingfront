@@ -19,6 +19,7 @@ export type Carrinho = {
     periodo_ate?: string;
     origem?: string;
     destino?: string;
+    gerar_contrato?: boolean;
     itens: ItemCarrinho[];
     anexos: AnexoCarrinho[];
 };

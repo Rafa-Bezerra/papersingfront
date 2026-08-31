@@ -146,8 +146,14 @@ export default function Page() {
             cargo: '',
             cidade_origem: '',
             concessionaria: '',
-            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0 }],
+            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0, codigo_natureza_financeira: '' }],
             rodape: '',
+            corpo_documento: '',
+            codcfo: '',
+            cod_tipo_documento: '',
+            data_vencimento: '',
+            data_emissao: '',
+            numero_documento: '',
             pagamentos: [],
         }
     })
@@ -386,14 +392,16 @@ export default function Page() {
 
     function handleAbrirFinanceiro(comunicado: Comunicado) {
         const hoje = new Date().toISOString().substring(0, 10)
+        // Retry manual: reaproveita o que o criador já preencheu na criação do comunicado (falhou na
+        // tentativa automática ao aprovar), permitindo corrigir antes de tentar de novo.
         formFinanceiro.reset({
-            codcfo: '',
-            cod_tipo_documento: '',
-            data_vencimento: '',
-            data_emissao: hoje,
-            numero_documento: `CI${comunicado.id}`,
+            codcfo: comunicado.codcfo ?? '',
+            cod_tipo_documento: comunicado.cod_tipo_documento ?? '',
+            data_vencimento: comunicado.data_vencimento?.substring(0, 10) ?? '',
+            data_emissao: comunicado.data_emissao?.substring(0, 10) ?? hoje,
+            numero_documento: comunicado.numero_documento ?? `CI${comunicado.id}`,
         })
-        setNaturezasFinanceirasSelecionadas((comunicado.itensFinanceiros ?? []).map(() => ''))
+        setNaturezasFinanceirasSelecionadas((comunicado.itensFinanceiros ?? []).map(item => item.codigo_natureza_financeira ?? ''))
         setFinanceiroComunicado(comunicado)
         if (fornecedores.length === 0) {
             getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
@@ -415,7 +423,7 @@ export default function Page() {
             const resultado = await criarFinanceiro(id, { ...data, codigos_natureza_financeira: naturezasFinanceirasSelecionadas })
             toast.success(resultado.message || "Financeiro criado com sucesso.")
             setResults(prev => prev.map(r => r.id === id
-                ? { ...r, financeiro_gerado: true, numero_financeiro: resultado.numeroFinanceiro, idlan_financeiro_totvs: resultado.idlanTotvs }
+                ? { ...r, financeiro_gerado: true, numero_financeiro: resultado.numeroFinanceiro, idlan_financeiro_totvs: resultado.idlanTotvs, erro_financeiro: null }
                 : r
             ))
             setFinanceiroComunicado(null)
@@ -432,8 +440,22 @@ export default function Page() {
             anexo: '',
             nome: '',
             aprovadores: [],
-            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0 }],
+            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0, codigo_natureza_financeira: '' }],
+            corpo_documento: '',
+            codcfo: '',
+            cod_tipo_documento: '',
+            data_vencimento: '',
+            data_emissao: '',
+            numero_documento: '',
         })
+        if (userFinanceiroTotvs) {
+            if (fornecedores.length === 0) {
+                getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
+            }
+            if (tiposDocumento.length === 0) {
+                getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
+            }
+        }
         setUpdateComunicadoMode(false)
         setIsFormComunicadoOpen(true)
     }
@@ -522,6 +544,9 @@ ${html}
             window.addEventListener('message', handler);
         });
 
+        // Captura o texto original de "Corpo do documento" (campo anexo) antes de sobrescrevê-lo
+        // com o PDF gerado — precisa sobreviver como texto puro para virar HISTORICO do financeiro.
+        data.corpo_documento = data.anexo;
         data.anexo = base64;
         data.anexos = anexosSubmit;
 
@@ -670,9 +695,12 @@ ${html}
                                 Aprovações
                             </Button>
 
-                            {row.original.situacao === 'APROVADO' && !row.original.financeiro_gerado && userFinanceiroTotvs && (
-                                <Button size="sm" variant="outline" onClick={() => handleAbrirFinanceiro(row.original)}>
-                                    Criar Financeiro
+                            {/* O financeiro agora é criado automaticamente ao concluir a aprovação
+                                (ComunicadosController.Aprovar). Este botão só reaparece como retry manual
+                                quando essa tentativa automática falhou (erro_financeiro preenchido). */}
+                            {row.original.situacao === 'APROVADO' && !row.original.financeiro_gerado && !!row.original.erro_financeiro && userFinanceiroTotvs && (
+                                <Button size="sm" variant="outline" title={row.original.erro_financeiro} onClick={() => handleAbrirFinanceiro(row.original)}>
+                                    Tentar novamente (Financeiro)
                                 </Button>
                             )}
 
@@ -1230,7 +1258,146 @@ ${html}
                                     setOpenCcustoIndex={setOpenCcustoIndex}
                                     openCodcontaIndex={openCodcontaIndex}
                                     setOpenCodcontaIndex={setOpenCodcontaIndex}
+                                    mostrarNaturezaFinanceira={userFinanceiroTotvs}
                                 />
+
+                                {/* Criação do financeiro (FLAN) — só para quem detém a claim financeiro_totvs.
+                                    O lançamento é criado automaticamente quando o comunicado for totalmente
+                                    aprovado (ver ComunicadosController.Aprovar); não há mais botão manual
+                                    "Criar Financeiro" nesse ponto do fluxo. */}
+                                {userFinanceiroTotvs && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="codcfo"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Fornecedor / Credor</FormLabel>
+                                                        <FormControl>
+                                                            <Popover open={openFornecedor} onOpenChange={setOpenFornecedor} modal={false}>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenFornecedor(true)}>
+                                                                        <span className="truncate">
+                                                                            {fornecedores.find(f => f.codcfo === field.value)?.nome ?? 'Selecione o fornecedor'}
+                                                                        </span>
+                                                                        <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                                                    <Command filter={(value, search) => {
+                                                                        const label = fornecedores.find(f => f.codcfo === value)?.nome || ''
+                                                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                                    }}>
+                                                                        <CommandInput placeholder="Buscar fornecedor..." />
+                                                                        <CommandList>
+                                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                                            <CommandGroup>
+                                                                                {fornecedores.map(f => (
+                                                                                    <CommandItem key={f.codcfo} value={f.codcfo} onSelect={() => { field.onChange(f.codcfo); setOpenFornecedor(false) }}>
+                                                                                        {f.nome}
+                                                                                    </CommandItem>
+                                                                                ))}
+                                                                            </CommandGroup>
+                                                                        </CommandList>
+                                                                    </Command>
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={form.control}
+                                                name="cod_tipo_documento"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Tipo de Documento</FormLabel>
+                                                        <FormControl>
+                                                            <Popover open={openTipoDocumento} onOpenChange={setOpenTipoDocumento} modal={false}>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenTipoDocumento(true)}>
+                                                                        <span className="truncate">
+                                                                            {tiposDocumento.find(t => t.codtdo === field.value)?.descricao ?? 'Selecione o tipo de documento'}
+                                                                        </span>
+                                                                        <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                                                    <Command filter={(value, search) => {
+                                                                        const label = tiposDocumento.find(t => t.codtdo === value)?.descricao || ''
+                                                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                                    }}>
+                                                                        <CommandInput placeholder="Buscar tipo de documento..." />
+                                                                        <CommandList>
+                                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                                            <CommandGroup>
+                                                                                {tiposDocumento.map(t => (
+                                                                                    <CommandItem key={t.codtdo} value={t.codtdo} onSelect={() => { field.onChange(t.codtdo); setOpenTipoDocumento(false) }}>
+                                                                                        {t.descricao}
+                                                                                    </CommandItem>
+                                                                                ))}
+                                                                            </CommandGroup>
+                                                                        </CommandList>
+                                                                    </Command>
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="data_vencimento"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Data de vencimento</FormLabel>
+                                                            <FormControl>
+                                                                <Input type="date" {...field} value={field.value ?? ''} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="data_emissao"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Data de emissão</FormLabel>
+                                                            <FormControl>
+                                                                <Input type="date" {...field} value={field.value ?? ''} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+
+                                            <FormField
+                                                control={form.control}
+                                                name="numero_documento"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Número do documento</FormLabel>
+                                                        <FormControl>
+                                                            <Input {...field} value={field.value ?? ''} maxLength={10} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                )}
 
                                 {/** rodapé */}
                                 <FormField
@@ -1553,6 +1720,7 @@ function ItensFinanceirosSection({
     setOpenCcustoIndex,
     openCodcontaIndex,
     setOpenCodcontaIndex,
+    mostrarNaturezaFinanceira,
 }: {
     form: UseFormReturn<Comunicado>,
     centrosDeCusto: CentroDeCusto[],
@@ -1561,6 +1729,7 @@ function ItensFinanceirosSection({
     setOpenCcustoIndex: (v: number | null) => void,
     openCodcontaIndex: number | null,
     setOpenCodcontaIndex: (v: number | null) => void,
+    mostrarNaturezaFinanceira?: boolean,
 }) {
     const { control } = form;
     const { fields, append, remove } = useFieldArray({ control, name: 'itensFinanceiros' });
@@ -1705,6 +1874,26 @@ function ItensFinanceirosSection({
                                 </FormItem>
                             )}
                         />
+
+                        {/* Natureza Financeira — só quando o criador detém a claim financeiro_totvs;
+                            usada como CODNATFINANCEIRA (FLANRATCCU) na criação automática do financeiro
+                            ao aprovar o comunicado. */}
+                        {mostrarNaturezaFinanceira && (
+                            <FormField
+                                control={control}
+                                name={`itensFinanceiros.${index}.codigo_natureza_financeira`}
+                                rules={{ required: 'Natureza Financeira obrigatória' }}
+                                render={({ field: f }) => (
+                                    <FormItem>
+                                        <FormLabel>Natureza Financeira (CODTBORCAMENTO)</FormLabel>
+                                        <FormControl>
+                                            <Input {...f} value={f.value ?? ''} placeholder="Ex: 1.01.001" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
                     </div>
                 ))}
             </CardContent>
