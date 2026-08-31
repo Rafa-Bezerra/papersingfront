@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions'
+import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64, TIPOS_MOVIMENTO_CONTRATO, podeExcluirAnexoMovimento } from '@/utils/functions'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -129,6 +129,14 @@ export default function Page() {
     const [apenasComNF, setApenasComNF] = useState<boolean>(false)
     const normalizeUserCode = (value: string) =>
         stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
+
+    const podeExcluirAnexo = (anexo: Anexo) =>
+        podeExcluirAnexoMovimento({
+            usuarioCriacao: anexo.usuario_criacao,
+            nomeSolicitante: requisicaoSelecionada?.requisicao.nome_solicitante,
+            userCodusuario,
+            userName,
+        });
     function clearQuery() {
         setQuery('')
     }
@@ -825,7 +833,7 @@ export default function Page() {
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
                         </Button>)}
-                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                        {row.original.anexo && podeExcluirAnexo(row.original) && (<Button
                             size="sm"
                             variant="destructive"
                             onClick={() => setDeleteAnexoId(row.original.id)}
@@ -836,7 +844,7 @@ export default function Page() {
                 )
             }
         ],
-        [userCodusuario]
+        [userCodusuario, userName, requisicaoSelecionada]
     )
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {

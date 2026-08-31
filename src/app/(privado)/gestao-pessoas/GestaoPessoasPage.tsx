@@ -27,7 +27,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, rotinaTipoMovimento, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -120,6 +120,14 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
+
+    const podeExcluirAnexo = (anexo: Anexo) =>
+        podeExcluirAnexoMovimento({
+            usuarioCriacao: anexo.usuario_criacao,
+            nomeSolicitante: requisicaoSelecionada?.requisicao.nome_solicitante,
+            userCodusuario,
+            userName,
+        });
 
     function clearQuery() {
         setQuery('')
@@ -761,7 +769,7 @@ export default function Page() {
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
                         </Button>)}
-                        {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                        {row.original.anexo && podeExcluirAnexo(row.original) && (<Button
                             size="sm"
                             variant="destructive"
                             onClick={() => setDeleteAnexoId(row.original.id)}
@@ -772,7 +780,7 @@ export default function Page() {
                 )
             }
         ],
-        [userName]
+        [userCodusuario, userName, requisicaoSelecionada]
     )
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {
