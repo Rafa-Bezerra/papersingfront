@@ -36,7 +36,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { dateToIso, imprimirPdfBase64, safeDateLabel, stripDiacritics, toBase64, toMoney, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions'
+import { dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -136,6 +136,14 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const normalizeUserCode = (value: string) =>
         stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
 
+    const podeExcluirAnexo = (anexo: Anexo) =>
+        podeExcluirAnexoMovimento({
+            usuarioCriacao: anexo.usuario_criacao,
+            nomeSolicitante: requisicaoSelecionada?.requisicao.nome_solicitante,
+            userCodusuario,
+            userName,
+        });
+
     function clearQuery() {
         setQuery('')
     }
@@ -159,12 +167,16 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
 
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
-            const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);
-            setUserAdministrativo(user.administrativo);
-            setUserContratos(user.contratos);
-            setUserName(user.nome.toUpperCase());
-            setCodusuario(user.codusuario.toUpperCase());
+            try {
+                const user = JSON.parse(storedUser);
+                setUserAdmin(Boolean(user.admin));
+                setUserAdministrativo(Boolean(user.administrativo));
+                setUserContratos(Boolean(user.contratos));
+                setUserName(String(user.nome ?? "").toUpperCase());
+                setCodusuario(String(user.codusuario ?? "").toUpperCase());
+            } catch (parseError) {
+                console.error("Erro ao carregar dados do usuário:", parseError);
+            }
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -417,8 +429,8 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const dados = await getAllAnexos(requisicao.requisicao.idmov)
             setAnexos(dados)
         } catch (err) {
+            toast.error((err as Error).message)
             setError((err as Error).message)
-            setResults([])
         } finally {
             setSearched(true)
             setIsProcessing(false)
@@ -741,7 +753,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                                     <Check className="w-4 h-4 text-green-500" />
                                 )}
                             </Button>)}
-                            {row.original.anexo && row.original.usuario_criacao == userCodusuario && (<Button
+                            {row.original.anexo && podeExcluirAnexo(row.original) && (<Button
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => setDeleteAnexoId(row.original.id)}
@@ -753,7 +765,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 }
             }
         ],
-        [userCodusuario]
+        [userCodusuario, userName, requisicaoSelecionada]
     )
 
     async function handleAvaliacoes(requisicao: RequisicaoDto) {

@@ -381,3 +381,23 @@ export function imprimirPdfBase64(base64String: string) {
     iframe.contentWindow?.print();
   };
 }
+
+export function normalizeUserCode(value?: string | null) {
+    return stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
+}
+
+/** Quem anexou ou o solicitante da requisição pode excluir, em qualquer unidade. */
+export function podeExcluirAnexoMovimento(opts: {
+    usuarioCriacao?: string | null;
+    nomeSolicitante?: string | null;
+    userCodusuario?: string | null;
+    userName?: string | null;
+}) {
+    const login = normalizeUserCode(opts.userCodusuario);
+    const nome = normalizeUserCode(opts.userName);
+    const criador = normalizeUserCode(opts.usuarioCriacao);
+    const solicitante = normalizeUserCode(opts.nomeSolicitante);
+    if (criador && login && criador === login) return true;
+    if (!solicitante) return false;
+    return (login && solicitante === login) || (nome && solicitante === nome);
+}
