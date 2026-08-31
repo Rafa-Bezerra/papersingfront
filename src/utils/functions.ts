@@ -292,6 +292,9 @@ export async function htmlToPdfBase64(html: string): Promise<string> {
   return pdf.output("datauristring").split(",")[1]; // base64 puro
 }
 
+// Tipos de movimento elegíveis para a rotina "Criar Contrato" (TOTVS).
+export const TIPOS_MOVIMENTO_CONTRATO = ['1.1.30', '1.1.32', '1.1.33'];
+
 export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): string {
   if (!tipo_movimento) return "Desconhecida";
   const t = tipo_movimento.trim().replace(/,/g, ".");
