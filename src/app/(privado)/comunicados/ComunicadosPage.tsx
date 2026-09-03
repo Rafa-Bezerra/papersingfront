@@ -18,6 +18,7 @@ import { DataTable } from '@/components/ui/data-table'
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
@@ -67,12 +68,22 @@ import {
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService'
 import { Label } from '@/components/ui/label'
 
+function limparPdfBase64(raw: string): string {
+    let s = (raw ?? '').trim()
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+        try { s = JSON.parse(s) as string } catch { s = s.slice(1, -1) }
+    }
+    return s.replace(/^data:.*;base64,/, '').trim()
+}
+
 export default function Page() {
     const titulo = 'Pagamentos CI'
     const router = useRouter()
     const searchParams = useSearchParams()
     const [logo, setLogo] = useState("/way.jpg");
     const [isLoading, setIsLoading] = useState(false)
+    const [isSearching, setIsSearching] = useState(false)
+    const [isSigning, setIsSigning] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
@@ -263,7 +274,7 @@ export default function Page() {
     }, [query, situacaoFiltrada, dateFrom, dateTo, solicitanteFiltrado])
 
     async function handleSearch(q: string) {
-        setIsLoading(true)
+        setIsSearching(true)
         setError(null)
         try {
             const dados = await getAll()
@@ -298,7 +309,7 @@ export default function Page() {
             setResults([])
         } finally {
             setSearched(true)
-            setIsLoading(false)
+            setIsSearching(false)
         }
     }
 
@@ -316,7 +327,7 @@ export default function Page() {
         setIsLoading(true)
         try {
             const arquivo = await getDocumento(requisicao.id);
-            const pdfClean = arquivo.replace(/^data:.*;base64,/, '').trim();
+            const pdfClean = limparPdfBase64(arquivo);
             setArquivoParaImpressao(pdfClean);
             setRequisicaoComunicadoSelecionada(pdfClean);
             setAnexoParaAssinatura(pdfClean);
@@ -324,17 +335,24 @@ export default function Page() {
             setIsModalComunicadosOpen(true)
         } catch (err) {
             console.log(err);
+            toast.error("Não foi possível abrir o documento.");
         } finally {
             setIsLoading(false)
         }
     }
 
     async function confirmarAssinatura(data: PdfSignData) {
-        setIsLoading(true)
+        if (!requisicaoSelecionada) return
+        const pdf = limparPdfBase64(anexoParaAssinatura)
+        if (!pdf) {
+            toast.error("Documento não carregado. Feche e abra o Documento novamente antes de assinar.")
+            return
+        }
+        setIsSigning(true)
         try {
             const dadosAssinatura: ComunicadoAssinar = {
-                id: requisicaoSelecionada!.id,
-                anexo: anexoParaAssinatura!,
+                id: requisicaoSelecionada.id,
+                anexo: pdf,
                 pagina: data.page,
                 posX: data.posX,
                 posY: data.posY,
@@ -343,13 +361,13 @@ export default function Page() {
                 dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
             };
             await updateElement(dadosAssinatura);
-            handleSearchClick()
             toast.success("Pagamento assinado com sucesso!");
+            setIsModalComunicadosOpen(false)
+            await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
-            setIsModalComunicadosOpen(false)
-            setIsLoading(false)
+            setIsSigning(false)
         }
     }
 
@@ -373,14 +391,12 @@ export default function Page() {
     }
 
     async function handleAprovar(id: number, aprovado: number) {
-        setIsLoading(true)
         try {
             await aprovar(id, aprovado)
-            handleSearchClick()
+            toast.success(aprovado === 1 ? "Pagamento aprovado." : "Pagamento reprovado.")
+            await handleSearchClick()
         } catch (err) {
-            setError((err as Error).message)
-        } finally {
-            setIsLoading(false)
+            toast.error((err as Error).message)
         }
     }
 
@@ -638,7 +654,7 @@ ${html}
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
 
-                    const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
+                    const usuarioCriador = stripDiacritics(row.original.usuario_criacao.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim());
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
@@ -648,8 +664,8 @@ ${html}
                     const status_bloqueado = ['Reprovado'].includes(row.original.situacao);
 
                     const assinouOuSemAnexo = row.original.anexo !== "SIM" || row.original.documento_assinado === 1;
-                    const podeAprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado && assinouOuSemAnexo;
-                    const podeReprovar = (usuarioAprovador || usuarioCriador) && !usuarioAprovou && !status_bloqueado;
+                    const podeAprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado && assinouOuSemAnexo;
+                    const podeReprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
                     return (
@@ -713,7 +729,7 @@ ${html}
                 }
             }
         ],
-        [userName, userFinanceiroTotvs]
+        [userName, userCodusuario, userFinanceiroTotvs]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -878,7 +894,7 @@ ${html}
 
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable columns={colunas} data={results} loading={isSearching} />
                 </CardContent>
             </Card>
 
@@ -1088,18 +1104,19 @@ ${html}
                 canSign={requisicaoSelecionada?.documento_assinado == 0}
                 onSign={confirmarAssinatura}
                 onPrint={handleImprimir}
-                isLoading={isLoading}
+                isLoading={isSigning}
             />
 
             {/* Loading */}
-            <Dialog open={isLoading} onOpenChange={setIsLoading}>
+            <Dialog open={isLoading && !isModalComunicadosOpen} onOpenChange={setIsLoading}>
                 <DialogContent
                     showCloseButton={false}
                     scrollBody={false}
                     className="flex flex-col items-center justify-center gap-4 border-none shadow-none bg-transparent max-w-[200px]"
                 >
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-semibold text-center"></DialogTitle>
+                        <DialogTitle className="text-lg font-semibold text-center">Aguarde</DialogTitle>
+                        <DialogDescription className="sr-only">Carregando</DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col items-center justify-center rounded-2xl p-6 shadow-lg">
                         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />

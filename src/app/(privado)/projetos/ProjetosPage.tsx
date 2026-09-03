@@ -82,6 +82,7 @@ export default function Page() {
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
+    const [podeVerTodos, setPodeVerTodos] = useState(false);
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -174,6 +175,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
+            setPodeVerTodos(Boolean(user.admin || user.projetos || user.financeiro));
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -198,6 +200,15 @@ export default function Page() {
         setError(null)
         try {
             const dados = await getAll()
+
+            let verTodos = podeVerTodos
+            try {
+                const stored = sessionStorage.getItem('userData')
+                if (stored) {
+                    const u = JSON.parse(stored)
+                    verTodos = Boolean(u.admin || u.projetos || u.financeiro)
+                }
+            } catch { /* ignore */ }
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -224,7 +235,7 @@ export default function Page() {
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                return matchQuery && matchSituacao && (usuarioAprovador || d.usuario_criacao == userCodusuario) && matchSolicitante && matchDateFrom && matchDateTo
+                return matchQuery && matchSituacao && (verTodos || usuarioAprovador || d.usuario_criacao == userCodusuario) && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)
@@ -558,7 +569,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName]
+        [userName, userCodusuario, podeVerTodos]
     )
 
     async function handleNotificarAprovador(usuario: string) {

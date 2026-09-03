@@ -93,6 +93,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               setIsAuthorized(false);
             }
 
+            // Painel de disparos: só administrador.
+            if (normalizedPath === "/disparos" && !isAdmin) {
+              setIsAuthorized(false);
+            }
+
             // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
             if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
               setIsAuthorized(false);
