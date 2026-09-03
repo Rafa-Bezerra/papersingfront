@@ -41,7 +41,8 @@ import {
     CommandGroup,
     CommandItem,
 } from "@/components/ui/command"
-import { safeDateLabel, toBase64, toMoney } from '@/utils/functions';
+import { safeDateLabel, toBase64, toMoney, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -215,6 +216,7 @@ export default function Page() {
         carrinho.destino = form.getValues("destino")
         carrinho.periodo_de = form.getValues("periodo_de")
         carrinho.periodo_ate = form.getValues("periodo_ate")
+        carrinho.gerar_contrato = TIPOS_MOVIMENTO_CONTRATO.includes(carrinho.tipo_movimento) ? form.getValues("gerar_contrato") : undefined
         carrinho.itens = produtosSubmit
         carrinho.anexos = anexosSubmit
         try {
@@ -540,6 +542,20 @@ export default function Page() {
                                 </FormItem>
                             )}
                         />
+
+                        {TIPOS_MOVIMENTO_CONTRATO.includes(form.watch("tipo_movimento")) && <FormField
+                            control={form.control}
+                            name="gerar_contrato"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">Gerar contrato</FormLabel>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />}
 
                     </Form>
 

@@ -36,7 +36,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney } from '@/utils/functions'
+import { dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -49,12 +49,11 @@ import {
     Requisicao_avaliacoes,
     getAllAvaliacoes,
     createAvaliacao,
-    notificarAprovador,
-    criarContrato,
-    CriarContratoPayload
+    notificarAprovador
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { getAllTiposContrato, TipoContrato } from '@/services/carrinhoService'
+import CriarContratoDialog from './CriarContratoDialog'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
@@ -79,13 +78,6 @@ import {
     FormLabel,
     FormMessage
 } from '@/components/ui/form'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 
 export default function Page({ titulo, tipos_movimento, materiais = false }: Props) {
     const router = useRouter()
@@ -131,7 +123,6 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
     const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
     const [contratoRequisicao, setContratoRequisicao] = useState<RequisicaoDto | null>(null)
-    const [isCriandoContrato, setIsCriandoContrato] = useState(false)
     const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([])
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
@@ -690,7 +681,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                                 </Button>
                             )}
 
-                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && userContratos && (
+                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && userContratos && TIPOS_MOVIMENTO_CONTRATO.includes(requisicao.tipo_movimento) && (
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -838,47 +829,18 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
         }
     }
 
-    const formContrato = useForm<CriarContratoPayload>({
-        defaultValues: { codtcn: '', periodo_de: '', periodo_ate: '', descricao: '', valor_contrato: 0 }
-    })
-
     function handleAbrirContrato(requisicao: RequisicaoDto) {
-        // TCNT.OBSERVACAO no TOTVS é varchar(60): normaliza quebras de linha do histórico
-        // e corta pro tamanho real, senão o backend recorta e o campo fica com o texto cortado.
-        const descricaoLimpa = (requisicao.requisicao.historico_movimento ?? '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 60)
-        formContrato.reset({
-            codtcn: '',
-            periodo_de: '',
-            periodo_ate: '',
-            descricao: descricaoLimpa,
-            valor_contrato: requisicao.requisicao.valor_total
-        })
         setContratoRequisicao(requisicao)
         if (tiposContrato.length === 0) {
             getAllTiposContrato().then(setTiposContrato).catch((err) => toast.error((err as Error).message))
         }
     }
 
-    async function handleCriarContrato(data: CriarContratoPayload) {
-        if (!contratoRequisicao) return
-        const idmov = contratoRequisicao.requisicao.idmov
-        setIsCriandoContrato(true)
-        try {
-            const resultado = await criarContrato(idmov, data)
-            toast.success(resultado.message || "Contrato criado com sucesso.")
-            setResults(prev => prev.map(r => r.requisicao.idmov === idmov
-                ? { ...r, requisicao: { ...r.requisicao, contrato_gerado: true, numero_contrato: resultado.numeroContrato } }
-                : r
-            ))
-            setContratoRequisicao(null)
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
-            setIsCriandoContrato(false)
-        }
+    function handleContratoCriado(idmov: number, resultado: { numeroContrato?: string }) {
+        setResults(prev => prev.map(r => r.requisicao.idmov === idmov
+            ? { ...r, requisicao: { ...r.requisicao, contrato_gerado: true, numero_contrato: resultado.numeroContrato } }
+            : r
+        ))
     }
 
     return (
@@ -1338,131 +1300,12 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 </DialogContent>
             </Dialog>)}
 
-            {contratoRequisicao && (<Dialog open={contratoRequisicao !== null} onOpenChange={(open) => { if (!open) setContratoRequisicao(null) }}>
-                <DialogContent
-                    className="max-w-lg rounded-xl bg-background p-4 shadow-2xl"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <DialogHeader>
-                        <DialogTitle>Criar contrato — movimentação n° {contratoRequisicao.requisicao.idmov}</DialogTitle>
-                    </DialogHeader>
-                    <Form {...formContrato}>
-                        <form onSubmit={formContrato.handleSubmit(handleCriarContrato)} className="grid gap-4">
-                            <div>
-                                <Label className="text-sm text-muted-foreground">Fornecedor</Label>
-                                <p className="h-9 flex items-center text-sm">
-                                    {contratoRequisicao.requisicao.codigo_fornecedor} - {contratoRequisicao.requisicao.nome_fornecedor || '-'}
-                                </p>
-                            </div>
-
-                            <FormField
-                                control={formContrato.control}
-                                name="descricao"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Descrição</FormLabel>
-                                        <FormControl>
-                                            <Input maxLength={60} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <FormField
-                                    control={formContrato.control}
-                                    name="periodo_de"
-                                    rules={{ required: "Início da vigência obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Vigência - Início</FormLabel>
-                                            <FormControl>
-                                                <input
-                                                    type="date"
-                                                    className="border rounded-md h-9 px-3 w-full text-sm"
-                                                    value={field.value ?? ""}
-                                                    onChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={formContrato.control}
-                                    name="periodo_ate"
-                                    rules={{ required: "Fim da vigência obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Vigência - Fim</FormLabel>
-                                            <FormControl>
-                                                <input
-                                                    type="date"
-                                                    className="border rounded-md h-9 px-3 w-full text-sm"
-                                                    value={field.value ?? ""}
-                                                    onChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <FormField
-                                    control={formContrato.control}
-                                    name="codtcn"
-                                    rules={{ required: "Tipo de contrato obrigatório" }}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Tipo de contrato</FormLabel>
-                                            <FormControl>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Selecione" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {tiposContrato.map(t => (
-                                                            <SelectItem key={t.codtcn} value={t.codtcn}>
-                                                                {t.codtcn} - {t.descricao}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={formContrato.control}
-                                    name="valor_contrato"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Valor do contrato</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" step="0.01" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setContratoRequisicao(null)}>
-                                    Cancelar
-                                </Button>
-                                <Button type="submit" disabled={isCriandoContrato}>
-                                    {isCriandoContrato ? 'Criando…' : 'Criar contrato'}
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>)}
+            <CriarContratoDialog
+                requisicao={contratoRequisicao}
+                onOpenChange={(open) => { if (!open) setContratoRequisicao(null) }}
+                tiposContrato={tiposContrato}
+                onCriado={handleContratoCriado}
+            />
 
             {error && (
                 <p className="mb-4 text-center text-sm text-destructive">

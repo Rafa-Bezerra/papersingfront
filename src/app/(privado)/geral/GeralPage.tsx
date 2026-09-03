@@ -28,7 +28,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { imprimirPdfBase64, rotinaTipoMovimento, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64, TIPOS_MOVIMENTO_CONTRATO, podeExcluirAnexoMovimento } from '@/utils/functions'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -44,6 +44,8 @@ import {
     notificarAprovador
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
+import { getAllTiposContrato, TipoContrato } from '@/services/carrinhoService'
+import CriarContratoDialog from '../components/CriarContratoDialog'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
@@ -78,6 +80,7 @@ export default function Page() {
     const [userName, setUserName] = useState("");
     const [userAdmin, setUserAdmin] = useState(false);
     const [userAdministrativo, setUserAdministrativo] = useState(false);
+    const [userContratos, setUserContratos] = useState(false);
     const [filtroDashboard, setFiltroDashboard] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
     const [dateFrom, setDateFrom] = useState("");
@@ -113,6 +116,8 @@ export default function Page() {
     const [avaliacoes, setAvaliacoes] = useState<Requisicao_avaliacoes[]>([])
     const [isModalAvaliacoesOpen, setIsModalAvaliacoesOpen] = useState(false)
     const [avaliarRequisicao, setAvaliarRequisicao] = useState<RequisicaoDto | null>()
+    const [contratoRequisicao, setContratoRequisicao] = useState<RequisicaoDto | null>(null)
+    const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([])
     const [tipoMovimentoFiltrado, setTipoMovimentoFiltrado] = useState<string>("")
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
@@ -163,6 +168,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
             setUserAdministrativo(user.administrativo);
+            setUserContratos(user.contratos);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
         }
@@ -755,12 +761,22 @@ export default function Page() {
                                     Avaliações
                                 </Button>
                             )}
+
+                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && userContratos && TIPOS_MOVIMENTO_CONTRATO.includes(requisicao.tipo_movimento) && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleAbrirContrato(row.original)}
+                                >
+                                    Criar Contrato
+                                </Button>
+                            )}
                         </div>
                     );
                 }
             }
         ],
-        [userName]
+        [userName, userContratos]
     )
 
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
@@ -888,6 +904,20 @@ export default function Page() {
             }
             setAvaliarRequisicao(null)
         }
+    }
+
+    function handleAbrirContrato(requisicao: RequisicaoDto) {
+        setContratoRequisicao(requisicao)
+        if (tiposContrato.length === 0) {
+            getAllTiposContrato().then(setTiposContrato).catch((err) => toast.error((err as Error).message))
+        }
+    }
+
+    function handleContratoCriado(idmov: number, resultado: { numeroContrato?: string }) {
+        setResults(prev => prev.map(r => r.requisicao.idmov === idmov
+            ? { ...r, requisicao: { ...r.requisicao, contrato_gerado: true, numero_contrato: resultado.numeroContrato } }
+            : r
+        ))
     }
 
     return (
@@ -1343,6 +1373,12 @@ export default function Page() {
                 </DialogContent>
             </Dialog>)}
 
+            <CriarContratoDialog
+                requisicao={contratoRequisicao}
+                onOpenChange={(open) => { if (!open) setContratoRequisicao(null) }}
+                tiposContrato={tiposContrato}
+                onCriado={handleContratoCriado}
+            />
 
             {error && (
                 <p className="mb-4 text-center text-sm text-destructive">

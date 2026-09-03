@@ -69,3 +69,21 @@ export type PagamentoAssinarDocumento = {
     altura: number
     dataHoraAssinatura: string
 }
+export type CriarFinanceiroPagamentoPayload = {
+    grupo: string;
+    codcfo: string;
+    cod_tipo_documento: string;
+    data_vencimento: string;
+    data_emissao?: string;
+    numero_documento?: string;
+    valor: number;
+    codigo_natureza_financeira: string;
+    cod_ccusto?: string;
+}
+export type CriarFinanceiroPagamentoResult = {
+    sucesso: boolean;
+    message?: string;
+    erro?: string;
+    numeroFinanceiro?: string;
+    idlanTotvs?: number;
+}

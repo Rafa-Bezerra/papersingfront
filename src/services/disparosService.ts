@@ -129,3 +129,36 @@ export async function enviarEmailTeste(email: string): Promise<void> {
     "Erro ao enviar e-mail de teste"
   );
 }
+
+export interface EmailContratoNotificacao {
+  id: number;
+  unidade?: string;
+  email: string;
+}
+
+export async function getEmailsContrato(): Promise<EmailContratoNotificacao[]> {
+  return fetchJson<EmailContratoNotificacao[]>(`${API_BASE}/api/Disparos/contrato-emails`);
+}
+
+export async function criarEmailContrato(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/contrato-emails`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao adicionar e-mail de contrato`);
+  }
+}
+
+export async function excluirEmailContrato(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/contrato-emails/${id}`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao excluir e-mail de contrato`);
+  }
+}
