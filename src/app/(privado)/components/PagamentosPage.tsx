@@ -3,8 +3,11 @@
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from "@/components/ui/button";
-import { Pagamento, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoGerarDocumento, gerarDocumento, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento } from "@/services/pagamentosService";
+import { Pagamento, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoGerarDocumento, gerarDocumento, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento, criarFinanceiro, CriarFinanceiroPagamentoPayload } from "@/services/pagamentosService";
 import { notificarAprovador } from '@/services/requisicoesService';
+import { getAllTiposDocumento, TipoDocumento } from '@/services/comunicadoService';
+import { getAllFornecedores } from '@/services/fornecedoresRestritosService';
+import { Fornecedor } from '@/types/Rdv';
 import { dateToIso, htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
 import { ColumnDef } from "@tanstack/react-table";
 import { useSearchParams } from "next/navigation";
@@ -23,7 +26,16 @@ import {
     DialogHeader,
     DialogTitle
 } from '@/components/ui/dialog'
-import { Bell, Check, Filter, Loader2, SearchIcon, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Command,
+    CommandInput,
+    CommandList,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+} from "@/components/ui/command"
+import { Bell, Check, ChevronsUpDown, Filter, Loader2, Plus, SearchIcon, X } from "lucide-react";
 import { DataTable } from '@/components/ui/data-table'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { toast } from 'sonner';
@@ -61,6 +73,20 @@ export default function Page({ titulo, grupo }: Props) {
     const [isModalDocumentoOpen, setIsModalDocumentoOpen] = useState(false)
     const [documentoParaImpressao, setDocumentoParaImpressao] = useState<string | null>(null)
 
+    // Criar Financeiro (TASKS.md — pagamentos-impostos/pagamentos-rh: rotina de criar financeiro)
+    const [userFinanceiroTotvs, setUserFinanceiroTotvs] = useState(false)
+    const [isFinanceiroDialogOpen, setIsFinanceiroDialogOpen] = useState(false)
+    const [isCriandoFinanceiro, setIsCriandoFinanceiro] = useState(false)
+    const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+    const [tiposDocumento, setTiposDocumento] = useState<TipoDocumento[]>([])
+    const [openFornecedor, setOpenFornecedor] = useState(false)
+    const [openTipoDocumento, setOpenTipoDocumento] = useState(false)
+    const financeiroInicial = {
+        codcfo: '', cod_tipo_documento: '', data_vencimento: '', data_emissao: '',
+        numero_documento: '', valor: '', codigo_natureza_financeira: '', cod_ccusto: '',
+    }
+    const [formFinanceiro, setFormFinanceiro] = useState(financeiroInicial)
+
     useEffect(() => {
         if (searchParams.get("filtro") === "pendentes") {
             setFiltroDashboard("Pendentes");
@@ -94,6 +120,7 @@ export default function Page({ titulo, grupo }: Props) {
         if (storedUser) {
             const user = JSON.parse(storedUser);
             setUserName(user.nome.toUpperCase());
+            setUserFinanceiroTotvs(Boolean(user.financeiro_totvs));
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -170,6 +197,49 @@ export default function Page({ titulo, grupo }: Props) {
         } finally {
             // só a requisição vigente controla o loading; a abortada não mexe
             if (!controller.signal.aborted) setIsSearching(false)
+        }
+    }
+
+    function handleAbrirFinanceiro() {
+        setFormFinanceiro(financeiroInicial)
+        setIsFinanceiroDialogOpen(true)
+        if (fornecedores.length === 0) {
+            getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
+        }
+        if (tiposDocumento.length === 0) {
+            getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
+        }
+    }
+
+    async function handleCriarFinanceiro() {
+        if (!formFinanceiro.codcfo) { toast.error('Selecione o fornecedor/credor.'); return }
+        if (!formFinanceiro.cod_tipo_documento) { toast.error('Selecione o tipo de documento.'); return }
+        if (!formFinanceiro.data_vencimento) { toast.error('Informe a data de vencimento.'); return }
+        if (!formFinanceiro.valor || Number(formFinanceiro.valor) <= 0) { toast.error('Informe um valor válido.'); return }
+        if (!formFinanceiro.codigo_natureza_financeira) { toast.error('Informe a natureza financeira.'); return }
+
+        setIsCriandoFinanceiro(true)
+        try {
+            const payload: CriarFinanceiroPagamentoPayload = {
+                grupo,
+                codcfo: formFinanceiro.codcfo,
+                cod_tipo_documento: formFinanceiro.cod_tipo_documento,
+                data_vencimento: formFinanceiro.data_vencimento,
+                data_emissao: formFinanceiro.data_emissao || undefined,
+                numero_documento: formFinanceiro.numero_documento || undefined,
+                valor: Number(formFinanceiro.valor),
+                codigo_natureza_financeira: formFinanceiro.codigo_natureza_financeira,
+                cod_ccusto: formFinanceiro.cod_ccusto || undefined,
+            }
+            const resultado = await criarFinanceiro(payload)
+            toast.success(resultado.message ?? 'Financeiro criado com sucesso.')
+            setIsFinanceiroDialogOpen(false)
+            setFormFinanceiro(financeiroInicial)
+            await handleSearch(query)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setIsCriandoFinanceiro(false)
         }
     }
 
@@ -587,7 +657,14 @@ export default function Page({ titulo, grupo }: Props) {
             <Card className="mb-6">
                 {/* Filtros */}
                 <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <div className="flex items-center gap-3">
+                        <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                        {userFinanceiroTotvs && (
+                            <Button size="sm" variant="outline" onClick={handleAbrirFinanceiro}>
+                                <Plus className="mr-1 h-4 w-4" /> Criar Financeiro
+                            </Button>
+                        )}
+                    </div>
                     <div className="flex flex-wrap justify-end items-end gap-4">
                         {/* Data de */}
                         <div className="flex flex-col">
@@ -682,6 +759,120 @@ export default function Page({ titulo, grupo }: Props) {
                     <DataTable columns={colunas} data={results} loading={isSearching} />
                 </CardContent>
             </Card>
+
+            {/* Criar Financeiro */}
+            <Dialog open={isFinanceiroDialogOpen} onOpenChange={setIsFinanceiroDialogOpen}>
+                    <DialogContent className="sm:max-w-[480px]">
+                        <DialogHeader>
+                            <DialogTitle>Criar Financeiro</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <Label>Fornecedor / Credor</Label>
+                                <Popover open={openFornecedor} onOpenChange={setOpenFornecedor} modal={false}>
+                                    <PopoverTrigger asChild>
+                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenFornecedor(true)}>
+                                            <span className="truncate">
+                                                {fornecedores.find(f => f.codcfo === formFinanceiro.codcfo)?.nome ?? 'Selecione o fornecedor'}
+                                            </span>
+                                            <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                        <Command filter={(value, search) => {
+                                            const label = fornecedores.find(f => f.codcfo === value)?.nome || ''
+                                            return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                        }}>
+                                            <CommandInput placeholder="Buscar fornecedor..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                <CommandGroup>
+                                                    {fornecedores.map(f => (
+                                                        <CommandItem key={f.codcfo} value={f.codcfo} onSelect={() => { setFormFinanceiro(s => ({ ...s, codcfo: f.codcfo })); setOpenFornecedor(false) }}>
+                                                            {f.nome}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <Label>Tipo de Documento</Label>
+                                <Popover open={openTipoDocumento} onOpenChange={setOpenTipoDocumento} modal={false}>
+                                    <PopoverTrigger asChild>
+                                        <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenTipoDocumento(true)}>
+                                            <span className="truncate">
+                                                {tiposDocumento.find(t => t.codtdo === formFinanceiro.cod_tipo_documento)?.descricao ?? 'Selecione o tipo de documento'}
+                                            </span>
+                                            <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="p-0 w-[420px] pointer-events-auto">
+                                        <Command filter={(value, search) => {
+                                            const label = tiposDocumento.find(t => t.codtdo === value)?.descricao || ''
+                                            return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                        }}>
+                                            <CommandInput placeholder="Buscar tipo de documento..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                <CommandGroup>
+                                                    {tiposDocumento.map(t => (
+                                                        <CommandItem key={t.codtdo} value={t.codtdo} onSelect={() => { setFormFinanceiro(s => ({ ...s, cod_tipo_documento: t.codtdo })); setOpenTipoDocumento(false) }}>
+                                                            {t.descricao}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="fin-data-vencimento">Data de vencimento</Label>
+                                    <Input id="fin-data-vencimento" type="date" value={formFinanceiro.data_vencimento} onChange={e => setFormFinanceiro(s => ({ ...s, data_vencimento: e.target.value }))} />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="fin-data-emissao">Data de emissão</Label>
+                                    <Input id="fin-data-emissao" type="date" value={formFinanceiro.data_emissao} onChange={e => setFormFinanceiro(s => ({ ...s, data_emissao: e.target.value }))} />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="fin-numero-documento">Número do documento</Label>
+                                <Input id="fin-numero-documento" maxLength={10} value={formFinanceiro.numero_documento} onChange={e => setFormFinanceiro(s => ({ ...s, numero_documento: e.target.value }))} />
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="fin-valor">Valor</Label>
+                                <Input id="fin-valor" type="number" step="0.01" min="0" value={formFinanceiro.valor} onChange={e => setFormFinanceiro(s => ({ ...s, valor: e.target.value }))} />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="fin-natureza">Natureza Financeira</Label>
+                                    <Input id="fin-natureza" value={formFinanceiro.codigo_natureza_financeira} onChange={e => setFormFinanceiro(s => ({ ...s, codigo_natureza_financeira: e.target.value }))} />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="fin-ccusto">Centro de custo</Label>
+                                    <Input id="fin-ccusto" value={formFinanceiro.cod_ccusto} onChange={e => setFormFinanceiro(s => ({ ...s, cod_ccusto: e.target.value }))} />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setIsFinanceiroDialogOpen(false)} disabled={isCriandoFinanceiro}>Cancelar</Button>
+                                <Button type="button" onClick={handleCriarFinanceiro} disabled={isCriandoFinanceiro}>
+                                    {isCriandoFinanceiro ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                                    Criar Financeiro
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
             {/* Aprovações */}
             {selectedResult && (

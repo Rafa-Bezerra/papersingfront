@@ -3,6 +3,7 @@ export type ComunicadoItemFinanceiro = {
     ccusto: string,
     codconta: string,
     valor: number,
+    codigo_natureza_financeira?: string | null,
 }
 
 export type Comunicado = {
@@ -20,12 +21,20 @@ export type Comunicado = {
     concessionaria: string,
     itensFinanceiros: ComunicadoItemFinanceiro[],
     rodape: string,
+    corpo_documento?: string | null,
     usuario_nome: string,
     pagamentos: ComunicadoPagamentos[],
     anexos: ComunicadoAnexo[],
     financeiro_gerado?: boolean,
     numero_financeiro?: string | null,
     idlan_financeiro_totvs?: number | null,
+    erro_financeiro?: string | null,
+    // Campos de criação do financeiro — só relevantes/persistidos para quem detém a claim financeiro_totvs.
+    codcfo?: string | null,
+    cod_tipo_documento?: string | null,
+    data_vencimento?: string | null,
+    data_emissao?: string | null,
+    numero_documento?: string | null,
 }
 
 export type ComunicadoPagamentos = {

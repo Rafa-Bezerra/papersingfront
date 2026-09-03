@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
-import { FolderLock, Mail, RefreshCw, SearchIcon, Send, Settings } from 'lucide-react'
+import { FolderLock, Mail, RefreshCw, SearchIcon, Send, Settings, SquarePlus } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Input } from '@/components/ui/input'
@@ -23,14 +23,18 @@ import {
 import {
   DisparoDestinatario,
   DisparoEmail,
+  EmailContratoNotificacao,
   EmailPainelConfig,
   MODULOS_EMAIL,
   PERFIS_DISPARO,
+  criarEmailContrato,
   enviarDisparoPerfil,
   enviarEmailTeste,
+  excluirEmailContrato,
   getConfigDisparos,
   getDestinatariosDisparo,
   getDisparos,
+  getEmailsContrato,
   reenviarDisparo,
   salvarConfigDisparos
 } from '@/services/disparosService'
@@ -76,6 +80,12 @@ export default function DisparosPage() {
   const [plugProcessando, setPlugProcessando] = useState(false)
   const [plugTrancando, setPlugTrancando] = useState(false)
 
+  const [emailsContrato, setEmailsContrato] = useState<EmailContratoNotificacao[]>([])
+  const [carregandoContrato, setCarregandoContrato] = useState(false)
+  const [novoEmailContrato, setNovoEmailContrato] = useState('')
+  const [salvandoContrato, setSalvandoContrato] = useState(false)
+  const [excluindoContrato, setExcluindoContrato] = useState<number | null>(null)
+
   function togglePerfil(id: string, checked: boolean) {
     setPerfis((atual) => {
       const next = checked ? [...atual, id] : atual.filter((p) => p !== id)
@@ -111,6 +121,7 @@ export default function DisparosPage() {
       return
     }
     carregar()
+    carregarEmailsContrato()
     getConfigDisparos()
       .then((cfg) => {
         setConfig(cfg)
@@ -316,6 +327,69 @@ export default function DisparosPage() {
     }
   }
 
+  async function carregarEmailsContrato() {
+    setCarregandoContrato(true)
+    try {
+      const lista = await getEmailsContrato()
+      setEmailsContrato(lista)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível listar e-mails de contrato.')
+    } finally {
+      setCarregandoContrato(false)
+    }
+  }
+
+  async function handleSalvarEmailContrato() {
+    if (!novoEmailContrato.trim()) {
+      toast.error('Informe o e-mail.')
+      return
+    }
+    setSalvandoContrato(true)
+    try {
+      await criarEmailContrato(novoEmailContrato.trim())
+      toast.success('E-mail cadastrado para notificação de contrato.')
+      setNovoEmailContrato('')
+      await carregarEmailsContrato()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar e-mail.')
+    } finally {
+      setSalvandoContrato(false)
+    }
+  }
+
+  async function handleExcluirEmailContrato(id: number) {
+    if (!window.confirm(`Excluir o e-mail #${id} das notificações de contrato?`)) return
+    setExcluindoContrato(id)
+    try {
+      await excluirEmailContrato(id)
+      toast.success('E-mail excluído.')
+      await carregarEmailsContrato()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir e-mail.')
+    } finally {
+      setExcluindoContrato(null)
+    }
+  }
+
+  const colunasContrato: ColumnDef<EmailContratoNotificacao>[] = useMemo(() => [
+    { accessorKey: 'id', header: 'ID' },
+    { accessorKey: 'email', header: 'Email' },
+    {
+      id: 'actions',
+      header: 'Ações',
+      cell: ({ row }) => (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={excluindoContrato === row.original.id}
+          onClick={() => handleExcluirEmailContrato(row.original.id)}
+        >
+          {excluindoContrato === row.original.id ? 'Excluindo…' : 'Excluir'}
+        </Button>
+      ),
+    },
+  ], [excluindoContrato])
+
   const columns = useMemo<ColumnDef<DisparoEmail>[]>(() => [
     {
       accessorKey: 'data_envio',
@@ -374,6 +448,7 @@ export default function DisparosPage() {
     <Tabs defaultValue="config" className="space-y-4">
       <TabsList className="flex-wrap h-auto">
         <TabsTrigger value="config"><Settings className="w-4 h-4" /> Configuração</TabsTrigger>
+        <TabsTrigger value="contratos"><SquarePlus className="w-4 h-4" /> Contratos</TabsTrigger>
         <TabsTrigger value="disparar"><Send className="w-4 h-4" /> Disparar por perfil</TabsTrigger>
         <TabsTrigger value="historico"><Mail className="w-4 h-4" /> Histórico</TabsTrigger>
         <TabsTrigger value="plugsign"><FolderLock className="w-4 h-4" /> PlugSign</TabsTrigger>
@@ -506,6 +581,38 @@ export default function DisparosPage() {
                 </Button>
               </>
             )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="contratos">
+        <Card className="border-0 shadow-none">
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-xl">Emails de notificação de contrato</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Sempre que um contrato for criado pela rotina &quot;Criar Contrato&quot;, os e-mails
+              cadastrados abaixo serão notificados. Se a lista estiver vazia, nenhuma notificação é enviada.
+            </p>
+          </CardHeader>
+          <CardContent className="px-0 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                className="max-w-sm"
+                type="email"
+                value={novoEmailContrato}
+                onChange={(e) => setNovoEmailContrato(e.target.value)}
+                placeholder="email@grupowaybrasil.com.br"
+              />
+              <Button type="button" onClick={handleSalvarEmailContrato} disabled={salvandoContrato}>
+                <SquarePlus className="mr-1 h-4 w-4" />
+                {salvandoContrato ? 'Salvando…' : 'Novo'}
+              </Button>
+            </div>
+            <DataTable
+              columns={colunasContrato}
+              data={emailsContrato}
+              loading={carregandoContrato}
+            />
           </CardContent>
         </Card>
       </TabsContent>
