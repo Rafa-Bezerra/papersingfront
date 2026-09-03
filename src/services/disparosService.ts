@@ -1,35 +1,164 @@
-import { Disparo } from "@/types/Disparo";
-import { API_BASE, headers } from "@/utils/constants";
-const caminho = "Disparos";
-const elemento_singular = "email";
-const elemento_plural = "emails";
+import { API_BASE, fetchJson, headers } from "@/utils/constants";
 
-export async function getAll(): Promise<Disparo[]> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, {
-        headers: headers(),
-    });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
-    }
-    const list: Disparo[] = await res.json();
-    return list;
+export interface DisparoEmail {
+  id: number;
+  data_envio: string;
+  unidade: string;
+  destinatarios: string;
+  assunto: string;
+  status: string;
+  erro: string;
 }
 
-export async function createElement(email: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify({ email }) });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao adicionar ${elemento_singular}: ${msg}`);
-    }
+export interface DisparoDestinatario {
+  usuario: string;
+  nome: string;
+  email: string;
 }
 
-export async function deleteElement(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "POST", headers: headers() });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao excluir ${elemento_singular}: ${msg}`);
-    }
+export interface DisparoEnvioResultado {
+  ok: boolean;
+  enviados: number;
+  falhas: number;
+  erros: string[];
 }
 
-export type { Disparo }
+export const PERFIS_DISPARO = [
+  { id: "admin", label: "Admin" },
+  { id: "documentos", label: "Documentos" },
+  { id: "bordero", label: "Borderô" },
+  { id: "comunicados", label: "Pagamentos" },
+  { id: "rdv", label: "RDV" },
+  { id: "ccusto", label: "Centros de custo" },
+  { id: "restrito", label: "Restrito" },
+  { id: "pagamento_impostos", label: "Pag. Impostos" },
+  { id: "pagamento_rh", label: "Pag. RH" },
+  { id: "fiscal", label: "P. Fiscal" },
+  { id: "externo", label: "Doc. Externo" },
+  { id: "administrativo", label: "Administrativo" },
+  { id: "solicitante", label: "Solicitante" },
+  { id: "gestao_pessoas", label: "Gestão de pessoas" },
+  { id: "financeiro", label: "Financeiro" },
+  { id: "docusign", label: "PlugSing" },
+  { id: "projetos", label: "Projetos" },
+  { id: "contratos", label: "Contratos" },
+  { id: "financeiro_totvs", label: "Financeiro TOTVS" },
+] as const;
+
+export async function getDisparos(q = "", status = ""): Promise<DisparoEmail[]> {
+  const url = new URL(`${API_BASE}/api/Disparos`);
+  if (q.trim()) url.searchParams.set("q", q.trim());
+  if (status.trim()) url.searchParams.set("status", status.trim());
+  return fetchJson<DisparoEmail[]>(url.toString());
+}
+
+export async function getDestinatariosDisparo(perfis: string[]): Promise<DisparoDestinatario[]> {
+  const url = new URL(`${API_BASE}/api/Disparos/destinatarios`);
+  url.searchParams.set("perfis", perfis.join(","));
+  return fetchJson<DisparoDestinatario[]>(url.toString());
+}
+
+export async function enviarDisparoPerfil(
+  perfis: string[],
+  assunto: string,
+  corpo: string
+): Promise<DisparoEnvioResultado> {
+  return fetchJson<DisparoEnvioResultado>(
+    `${API_BASE}/api/Disparos/enviar`,
+    {
+      method: "POST",
+      body: JSON.stringify({ perfis: perfis.join(","), assunto, corpo }),
+    },
+    "Erro ao disparar e-mail",
+    180_000
+  );
+}
+
+export async function reenviarDisparo(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/${id}/reenviar`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao reenviar`);
+  }
+}
+
+export interface EmailPainelConfig {
+  modo_teste: boolean;
+  email_teste: string;
+  lembrete_horas: number;
+  max_emails_ciclo: number;
+  financeiro_recebe_alertas: boolean;
+  senha_novo_usuario: boolean;
+  smtp: string;
+  remetente: string;
+  modulos: Record<string, boolean>;
+}
+
+export const MODULOS_EMAIL = [
+  { id: "Movimentos", label: "Movimentos" },
+  { id: "Comunicados", label: "Pagamentos CI" },
+  { id: "Documentos", label: "Documentos" },
+  { id: "Rdv", label: "RDV" },
+  { id: "Restritos", label: "Gestão de pessoas" },
+  { id: "PagRh", label: "Pag. RH" },
+  { id: "PagImpostos", label: "Pag. Impostos" },
+  { id: "Bordero", label: "Borderô" },
+  { id: "DocExternos", label: "Doc. externos" },
+  { id: "Fiscal", label: "Fiscal" },
+] as const;
+
+export async function getConfigDisparos(): Promise<EmailPainelConfig> {
+  return fetchJson<EmailPainelConfig>(`${API_BASE}/api/Disparos/config`);
+}
+
+export async function salvarConfigDisparos(cfg: EmailPainelConfig): Promise<EmailPainelConfig> {
+  return fetchJson<EmailPainelConfig>(
+    `${API_BASE}/api/Disparos/config`,
+    { method: "PUT", body: JSON.stringify(cfg) },
+    "Erro ao salvar configuração"
+  );
+}
+
+export async function enviarEmailTeste(email: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>(
+    `${API_BASE}/api/Disparos/teste`,
+    { method: "POST", body: JSON.stringify({ email }) },
+    "Erro ao enviar e-mail de teste"
+  );
+}
+
+export interface EmailContratoNotificacao {
+  id: number;
+  unidade?: string;
+  email: string;
+}
+
+export async function getEmailsContrato(): Promise<EmailContratoNotificacao[]> {
+  return fetchJson<EmailContratoNotificacao[]>(`${API_BASE}/api/Disparos/contrato-emails`);
+}
+
+export async function criarEmailContrato(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/contrato-emails`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao adicionar e-mail de contrato`);
+  }
+}
+
+export async function excluirEmailContrato(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/contrato-emails/${id}`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao excluir e-mail de contrato`);
+  }
+}
