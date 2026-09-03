@@ -756,7 +756,7 @@ export default function PageUsuarios() {
                   name="docusign"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Docusign</FormLabel>
+                      <FormLabel>PlugSing</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

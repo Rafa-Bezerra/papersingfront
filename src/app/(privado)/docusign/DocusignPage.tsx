@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, Eye, Filter, SearchIcon, ShieldCheck, SquarePlus, Trash2, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, Filter, SearchIcon, ShieldCheck, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -83,7 +83,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 
 
 export default function Page() {
-    const titulo = 'Docusign'
+    const titulo = 'PlugSing'
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -100,9 +100,9 @@ export default function Page() {
     const [certStatus, setCertStatus] = useState<CertificadoA1Status | null>(null)
     const [isCertDialogOpen, setIsCertDialogOpen] = useState(false)
     const [certSenha, setCertSenha] = useState("")
-    const [certTrocando, setCertTrocando] = useState(false)
     const [certVinculando, setCertVinculando] = useState(false)
     const certFileRef = useRef<HTMLInputElement>(null)
+    const certStatusSeq = useRef(0)
     const [isPending, startTransition] = useTransition()
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     // Valores retornados pela API: 'EM ANDAMENTO' | 'APROVADO' | 'REPROVADO'
@@ -162,30 +162,36 @@ export default function Page() {
         carregarCertificadoStatus();
     }, [])
 
+    function aplicarStatusCertificado(status: CertificadoA1Status, seq: number) {
+        if (seq !== certStatusSeq.current) return;
+        setCertStatus(status);
+    }
+
     async function carregarCertificadoStatus() {
+        const seq = ++certStatusSeq.current;
         try {
             const status = await getCertificadoStatus();
-            setCertStatus(status);
+            aplicarStatusCertificado(status, seq);
         } catch {
-            setCertStatus(null);
+            if (seq === certStatusSeq.current) setCertStatus(null);
         }
     }
 
     async function sincronizarContaPlugSign() {
+        const seq = ++certStatusSeq.current;
         setCertVinculando(true);
         try {
             const status = await vincularCertificadoPlugSign();
-            setCertStatus(status);
+            aplicarStatusCertificado(status, seq);
         } catch (err) {
             toast.error((err as Error).message);
         } finally {
-            setCertVinculando(false);
+            if (seq === certStatusSeq.current) setCertVinculando(false);
         }
     }
 
     useEffect(() => {
         if (!isCertDialogOpen) {
-            setCertTrocando(false);
             setCertSenha("");
             if (certFileRef.current) certFileRef.current.value = "";
             return;
@@ -206,20 +212,15 @@ export default function Page() {
             toast.error("Informe a senha do certificado.");
             return;
         }
-        const eraTroca = certTrocando || certStatus?.temCertificadoA1 === true || certStatus?.certificadoPersistido === true;
         setIsLoading(true);
+        const seq = ++certStatusSeq.current;
         try {
             const base64 = await toBase64(file);
-            const status = await postCertificado(base64, certSenha, eraTroca);
-            setCertStatus(status);
-            setCertTrocando(false);
+            const status = await postCertificado(base64, certSenha);
+            aplicarStatusCertificado(status, seq);
             setCertSenha("");
             if (certFileRef.current) certFileRef.current.value = "";
-            toast.success(
-                eraTroca
-                    ? "Certificado A1 atualizado na PlugSign."
-                    : "Certificado A1 cadastrado na PlugSign."
-            );
+            toast.success("Certificado A1 cadastrado na PlugSign.");
         } catch (err) {
             toast.error((err as Error).message);
         } finally {
@@ -232,10 +233,15 @@ export default function Page() {
             return;
         }
         setIsLoading(true);
+        const seq = ++certStatusSeq.current;
         try {
             const status = await deleteCertificado();
-            setCertStatus(status);
-            setCertTrocando(false);
+            aplicarStatusCertificado({
+                ...status,
+                temCertificadoA1: false,
+                certificadoPersistido: false,
+                cadastrado: false,
+            }, seq);
             setCertSenha("");
             if (certFileRef.current) certFileRef.current.value = "";
             toast.success("Certificado A1 removido.");
@@ -246,20 +252,9 @@ export default function Page() {
         }
     }
 
-    function iniciarTrocaCertificado() {
-        setCertTrocando(true);
-        setCertSenha("");
-        if (certFileRef.current) certFileRef.current.value = "";
-    }
+    const temCertificado = certStatus?.temCertificadoA1 === true;
 
-    const podeGerenciarCertificado =
-        certStatus?.podeGerenciarCertificado === true
-        || certStatus?.temCertificadoA1 === true
-        || certStatus?.vinculadoPlugSign === true
-        || certStatus?.certificadoPersistido === true;
-
-    const exibirFormularioCertificado =
-        !certStatus?.temCertificadoA1 || certTrocando;
+    const exibirFormularioCertificado = !temCertificado;
 
     async function buscaUsuarios() {
         setIsLoading(true)
@@ -758,7 +753,19 @@ export default function Page() {
             {/* Header */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                        <a
+                            href="https://app.plugsign.com.br/signin/?secure=true"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+                            title="Abrir PlugSing"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            PlugSing
+                        </a>
+                    </div>
                     <div className="flex flex-wrap justify-end items-end gap-3">
                         <Button
                             type="button"
@@ -1230,48 +1237,9 @@ export default function Page() {
                             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
                                 {certStatus?.motivo ?? "Integração PlugSign indisponível. Solicite ao administrador a configuração do token da empresa."}
                             </div>
-                        ) : certStatus?.temCertificadoA1 && !certTrocando ? (
+                        ) : temCertificado ? (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-                                Certificado A1 ativo. Suas assinaturas no Docusign usarão validade ICP-Brasil (PlugSign).
-                            </div>
-                        ) : certTrocando ? (
-                            <div className="space-y-3">
-                                <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
-                                    Envie o novo arquivo <b>.pfx</b> para substituir o certificado na PlugSign.
-                                </div>
-                                <div className="grid gap-3">
-                                    <div>
-                                        <Label htmlFor="certFile">Novo certificado (.pfx ou .p12)</Label>
-                                        <Input
-                                            id="certFile"
-                                            type="file"
-                                            accept=".pfx,.p12"
-                                            ref={certFileRef}
-                                            className="mt-1.5"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="certSenha">Senha do novo certificado</Label>
-                                        <Input
-                                            id="certSenha"
-                                            type="password"
-                                            value={certSenha}
-                                            onChange={(e) => setCertSenha(e.target.value)}
-                                            placeholder="Senha definida ao exportar o .pfx"
-                                            className="mt-1.5"
-                                            autoComplete="off"
-                                        />
-                                    </div>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setCertTrocando(false)}
-                                    disabled={isLoading}
-                                >
-                                    Cancelar troca
-                                </Button>
+                                Certificado A1 ativo. Suas assinaturas no PlugSing usarão validade ICP-Brasil (PlugSign).
                             </div>
                         ) : exibirFormularioCertificado ? (
                             <div className="grid gap-3">
@@ -1302,23 +1270,15 @@ export default function Page() {
                     </div>
 
                     <div className="flex flex-col gap-2 px-6 py-4 border-t bg-muted/20">
-                        {podeGerenciarCertificado && !certTrocando && (
+                        {temCertificado && (
                             <div className="flex flex-col sm:flex-row gap-2 sm:justify-start">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={iniciarTrocaCertificado}
-                                    disabled={isLoading || certVinculando}
-                                >
-                                    Trocar certificado
-                                </Button>
                                 <Button
                                     type="button"
                                     variant="destructive"
                                     onClick={handleRemoverCertificado}
                                     disabled={isLoading || certVinculando}
                                 >
-                                    {isLoading ? "Removendo…" : "Remover certificado"}
+                                    {isLoading ? "Excluindo…" : "Excluir certificado"}
                                 </Button>
                             </div>
                         )}
@@ -1328,13 +1288,7 @@ export default function Page() {
                         </Button>
                         {exibirFormularioCertificado && certStatus?.plugsignAtivo && (
                             <Button type="button" onClick={handleEnviarCertificado} disabled={isLoading || certVinculando}>
-                                {isLoading
-                                    ? certTrocando || certStatus?.temCertificadoA1 || certStatus?.certificadoPersistido
-                                        ? "Atualizando…"
-                                        : "Enviando…"
-                                    : certTrocando || certStatus?.temCertificadoA1 || certStatus?.certificadoPersistido
-                                        ? "Atualizar certificado"
-                                        : "Cadastrar certificado"}
+                                {isLoading ? "Enviando…" : "Adicionar certificado"}
                             </Button>
                         )}
                         </div>
