@@ -148,7 +148,7 @@ export async function vincularCertificadoPlugSign(): Promise<CertificadoA1Status
     }
 }
 
-export async function postCertificado(certificadoBase64: string, senha: string, _substituir = false): Promise<CertificadoA1Status> {
+export async function postCertificado(certificadoBase64: string, senha: string): Promise<CertificadoA1Status> {
     try {
         const res = await apiFetch(`${API_BASE}/api/${caminho}/certificado`, {
             method: "POST",
@@ -227,6 +227,95 @@ export async function getAnexo(caminho_anexo: string): Promise<string> {
         );
     }
     return dataUrl;
+}
+
+export type PlugSignFolderInfo = {
+    id: number;
+    name: string;
+    accessibility: string;
+};
+
+export type PlugSignFileInfo = {
+    documentKey: string;
+    name: string;
+    accessibility: string;
+    folderName?: string | null;
+    folderId?: number | null;
+};
+
+export type PlugSignPastasResponse = {
+    accessibilityPadrao: string;
+    folderIdPadrao: number;
+    pastas: PlugSignFolderInfo[];
+};
+
+export type PlugSignPrivatizarResultado = {
+    totalListados: number;
+    pendentesEveryone: number;
+    atualizados: number;
+    dryRun: boolean;
+    erros: string[];
+    amostra: PlugSignFileInfo[];
+};
+
+async function lerErroApi(res: Response, acao: string): Promise<string> {
+    const msg = (await res.text()).trim().split("\n")[0].trim();
+    return msg || `Erro ${res.status} ao ${acao}`;
+}
+
+export async function getPlugSignPastas(): Promise<PlugSignPastasResponse> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/plugsign/pastas`, { headers: headers() }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "listar pastas PlugSign"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("listar pastas PlugSign", err);
+    }
+}
+
+export async function privatizarPlugSign(opts: {
+    dryRun: boolean;
+    folderId?: number;
+    maxArquivos?: number;
+}): Promise<PlugSignPrivatizarResultado> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/plugsign/privatizar`, {
+            method: "POST",
+            headers: headers(),
+            body: JSON.stringify({
+                dryRun: opts.dryRun,
+                folderId: opts.folderId && opts.folderId > 0 ? opts.folderId : null,
+                maxArquivos: opts.maxArquivos ?? 150,
+            }),
+        }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "privatizar documentos PlugSign"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("privatizar documentos PlugSign", err);
+    }
+}
+
+export async function atualizarPastaPlugSign(opts: {
+    folderId: number;
+    name: string;
+    accessibility?: string;
+    senhaAtual?: string;
+}): Promise<void> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/plugsign/pasta`, {
+            method: "PUT",
+            headers: headers(),
+            body: JSON.stringify({
+                folderId: opts.folderId,
+                name: opts.name,
+                accessibility: opts.accessibility ?? "OnlyMe",
+                senhaAtual: opts.senhaAtual ?? "",
+            }),
+        }, CERTIFICADO_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "atualizar pasta PlugSign"));
+    } catch (err) {
+        throw mensagemFalhaRede("atualizar pasta PlugSign", err);
+    }
 }
 
 export type { Documento, DocumentoAssinar, DocumentoAprovacao, DocumentoAnexoAssinar }
