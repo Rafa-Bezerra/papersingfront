@@ -762,7 +762,7 @@ export default function Page() {
                                 </Button>
                             )}
 
-                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && userContratos && TIPOS_MOVIMENTO_CONTRATO.includes(requisicao.tipo_movimento) && (
+                            {requisicao.status_movimento?.startsWith('Concluído') && requisicao.codigo_fornecedor && requisicao.codigo_fornecedor !== 'EM_COTACAO' && !requisicao.contrato_gerado && requisicao.contrato_solicitado && userContratos && TIPOS_MOVIMENTO_CONTRATO.includes(requisicao.tipo_movimento) && (
                                 <Button
                                     size="sm"
                                     variant="outline"

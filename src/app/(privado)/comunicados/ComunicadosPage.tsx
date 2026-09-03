@@ -1138,7 +1138,7 @@ ${html}
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="max-w-2xl overflow-y-auto max-h-[90dvh]">
+                <DialogContent className="sm:max-w-4xl overflow-y-auto max-h-[90dvh]">
                     <div className="overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
@@ -1845,7 +1845,11 @@ function ItensFinanceirosSection({
                                                         <CommandEmpty>Nenhum encontrado</CommandEmpty>
                                                         <CommandGroup>
                                                             {contasFinanceiras.map(x => (
-                                                                <CommandItem key={x.codconta} value={x.codconta} onSelect={() => { f.onChange(x.codconta); setOpenCodcontaIndex(null) }}>
+                                                                <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
+                                                                    f.onChange(x.codconta);
+                                                                    form.setValue(`itensFinanceiros.${index}.codigo_natureza_financeira`, x.codconta);
+                                                                    setOpenCodcontaIndex(null)
+                                                                }}>
                                                                     {x.codconta} - {x.contabil}
                                                                 </CommandItem>
                                                             ))}

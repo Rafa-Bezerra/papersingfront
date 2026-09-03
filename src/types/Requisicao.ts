@@ -25,6 +25,7 @@ export type Requisicao = {
     quantidade_aprovacoes: number,
     situacao_entrega?: string,
     contrato_gerado?: boolean,
+    contrato_solicitado?: boolean,
     numero_contrato?: string | null,
     requisicao_itens: Requisicao_item[],
     requisicao_aprovacoes?: Requisicao_aprovacao[]
