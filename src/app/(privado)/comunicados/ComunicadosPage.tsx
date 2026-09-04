@@ -111,7 +111,7 @@ export default function Page() {
     const carregou = useRef(false)
 
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
-    const [openCodcontaIndex, setOpenCodcontaIndex] = useState<number | null>(null)
+    const [openCodcontaIndex, setOpenCodcontaIndex] = useState<string | null>(null)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
     const [openCcustoIndex, setOpenCcustoIndex] = useState<number | null>(null)
     const [file, setFile] = useState<File | null>(null)
@@ -135,6 +135,14 @@ export default function Page() {
     const [financeiroComunicado, setFinanceiroComunicado] = useState<Comunicado | null>(null)
     const [isCriandoFinanceiro, setIsCriandoFinanceiro] = useState(false)
     const [naturezasFinanceirasSelecionadas, setNaturezasFinanceirasSelecionadas] = useState<string[]>([])
+    // Linhas de rateio achatadas (uma por conta contábil) do comunicado aberto no modal "Criar financeiro" —
+    // a ordem precisa bater com naturezasFinanceirasSelecionadas (indexadas em paralelo).
+    const linhasRateioFinanceiroComunicado = useMemo(
+        () => (financeiroComunicado?.itensFinanceiros ?? []).flatMap(item =>
+            item.rateio.map(r => ({ setor: item.setor, ccusto: item.ccusto, codconta: r.codconta, valor: r.valor }))
+        ),
+        [financeiroComunicado]
+    )
 
     const formFinanceiro = useForm<CriarFinanceiroPayload>({
         defaultValues: {
@@ -157,7 +165,7 @@ export default function Page() {
             cargo: '',
             cidade_origem: '',
             concessionaria: '',
-            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0, codigo_natureza_financeira: '' }],
+            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
             rodape: '',
             corpo_documento: '',
             codcfo: '',
@@ -417,7 +425,9 @@ export default function Page() {
             data_emissao: comunicado.data_emissao?.substring(0, 10) ?? hoje,
             numero_documento: comunicado.numero_documento ?? `CI${comunicado.id}`,
         })
-        setNaturezasFinanceirasSelecionadas((comunicado.itensFinanceiros ?? []).map(item => item.codigo_natureza_financeira ?? ''))
+        setNaturezasFinanceirasSelecionadas(
+            (comunicado.itensFinanceiros ?? []).flatMap(item => item.rateio.map(r => r.codigo_natureza_financeira ?? ''))
+        )
         setFinanceiroComunicado(comunicado)
         if (fornecedores.length === 0) {
             getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
@@ -456,7 +466,7 @@ export default function Page() {
             anexo: '',
             nome: '',
             aprovadores: [],
-            itensFinanceiros: [{ setor: '', ccusto: '', codconta: '', valor: 0, codigo_natureza_financeira: '' }],
+            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
             corpo_documento: '',
             codcfo: '',
             cod_tipo_documento: '',
@@ -490,6 +500,14 @@ export default function Page() {
     }
 
     async function submitComunicado(data: Comunicado) {
+        for (const [i, item] of (data.itensFinanceiros ?? []).entries()) {
+            const soma = (item.rateio ?? []).reduce((acc, r) => acc + (Number(r.valor) || 0), 0)
+            if (Math.abs(soma - (Number(item.valor_total) || 0)) > 0.01) {
+                toast.error(`O rateio do item ${i + 1} (R$ ${soma.toFixed(2)}) não bate com o valor total informado (R$ ${(item.valor_total ?? 0).toFixed(2)}).`)
+                return
+            }
+        }
+
         setIsLoading(true)
 
         const proxId = results.length > 0 ? Math.max(...results.map(x => x.id)) + 1 : 1;
@@ -664,7 +682,7 @@ ${html}
             { accessorKey: 'usuario_nome', header: 'Solicitante' },
             { accessorKey: 'nome', header: 'Descrição' },
             { id: 'ccusto', header: 'Centro de custo', accessorFn: (row) => row.itensFinanceiros?.[0]?.ccusto ?? '' },
-            { id: 'codconta', header: 'Conta', accessorFn: (row) => row.itensFinanceiros?.[0]?.codconta ?? '' },
+            { id: 'codconta', header: 'Conta', accessorFn: (row) => row.itensFinanceiros?.[0]?.rateio?.[0]?.codconta ?? '' },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'financeiro',
@@ -1083,7 +1101,7 @@ ${html}
                                 <div className="border rounded-md p-3">
                                     <span className="text-sm font-medium text-muted-foreground">Itens financeiros do comunicado</span>
                                     <div className="mt-2 flex flex-col gap-3 text-sm">
-                                        {(financeiroComunicado.itensFinanceiros ?? []).map((item, i) => (
+                                        {linhasRateioFinanceiroComunicado.map((item, i) => (
                                             <div key={i} className="flex flex-col gap-1 border-b pb-2 last:border-b-0 last:pb-0">
                                                 <div className="flex justify-between">
                                                     <span>{item.setor} — {item.ccusto} / {item.codconta}</span>
@@ -1102,7 +1120,7 @@ ${html}
                                         <div className="flex justify-between font-semibold pt-1">
                                             <span>Total</span>
                                             <span>
-                                                {(financeiroComunicado.itensFinanceiros ?? []).reduce((acc, item) => acc + (item.valor ?? 0), 0)
+                                                {linhasRateioFinanceiroComunicado.reduce((acc, item) => acc + (item.valor ?? 0), 0)
                                                     .toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
@@ -1744,8 +1762,8 @@ function ItensFinanceirosSection({
     contasFinanceiras: ContaFinanceira[],
     openCcustoIndex: number | null,
     setOpenCcustoIndex: (v: number | null) => void,
-    openCodcontaIndex: number | null,
-    setOpenCodcontaIndex: (v: number | null) => void,
+    openCodcontaIndex: string | null,
+    setOpenCodcontaIndex: (v: string | null) => void,
     mostrarNaturezaFinanceira?: boolean,
 }) {
     const { control } = form;
@@ -1754,171 +1772,359 @@ function ItensFinanceirosSection({
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Dados Financeiros</CardTitle>
+                <CardTitle className="text-base">Rateio dos Itens</CardTitle>
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ setor: '', ccusto: '', codconta: '', valor: 0 })}
+                    onClick={() => append({
+                        setor: '', ccusto: '', valor_total: 0,
+                        rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }],
+                    })}
                 >
                     + Adicionar item
                 </Button>
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="border rounded-md p-3 flex flex-col gap-3 relative">
-                        {fields.length > 1 && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 h-7 w-7"
-                                onClick={() => remove(index)}
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                        )}
-                        <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                    <ItemFinanceiroFields
+                        key={field.id}
+                        itemIndex={index}
+                        podeRemover={fields.length > 1}
+                        onRemover={() => remove(index)}
+                        form={form}
+                        centrosDeCusto={centrosDeCusto}
+                        contasFinanceiras={contasFinanceiras}
+                        openCcustoIndex={openCcustoIndex}
+                        setOpenCcustoIndex={setOpenCcustoIndex}
+                        openCodcontaIndex={openCodcontaIndex}
+                        setOpenCodcontaIndex={setOpenCodcontaIndex}
+                        mostrarNaturezaFinanceira={mostrarNaturezaFinanceira}
+                    />
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
 
-                        {/* Setor */}
-                        <FormField
-                            control={control}
-                            name={`itensFinanceiros.${index}.setor`}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Setor</FormLabel>
-                                    <FormControl>
-                                        <Input {...f} placeholder="Ex: Tecnologia da Informação" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
+// Um item do rateio: setor + centro de custo + valor total, distribuído entre uma ou mais contas
+// contábeis (cada linha em modo "valor" ou "percentual" — o campo não editado é sempre recalculado).
+function ItemFinanceiroFields({
+    itemIndex,
+    podeRemover,
+    onRemover,
+    form,
+    centrosDeCusto,
+    contasFinanceiras,
+    openCcustoIndex,
+    setOpenCcustoIndex,
+    openCodcontaIndex,
+    setOpenCodcontaIndex,
+    mostrarNaturezaFinanceira,
+}: {
+    itemIndex: number,
+    podeRemover: boolean,
+    onRemover: () => void,
+    form: UseFormReturn<Comunicado>,
+    centrosDeCusto: CentroDeCusto[],
+    contasFinanceiras: ContaFinanceira[],
+    openCcustoIndex: number | null,
+    setOpenCcustoIndex: (v: number | null) => void,
+    openCodcontaIndex: string | null,
+    setOpenCodcontaIndex: (v: string | null) => void,
+    mostrarNaturezaFinanceira?: boolean,
+}) {
+    const { control, setValue, getValues } = form;
+    const { fields: rateioFields, append: appendRateio, remove: removeRateio } = useFieldArray({
+        control, name: `itensFinanceiros.${itemIndex}.rateio`,
+    });
+    const item = form.watch(`itensFinanceiros.${itemIndex}`);
+    const valorTotal = item?.valor_total ?? 0;
+    const somaRateio = (item?.rateio ?? []).reduce((acc, r) => acc + (Number(r?.valor) || 0), 0);
+    const restante = Math.round((valorTotal - somaRateio) * 100) / 100;
+
+    function recalcularRateioPorValorTotal(novoTotal: number) {
+        const linhas = getValues(`itensFinanceiros.${itemIndex}.rateio`) ?? [];
+        linhas.forEach((linha, ri) => {
+            if (linha.modo === 'percentual') {
+                const novoValor = Math.round((Number(linha.percentual) || 0) / 100 * novoTotal * 100) / 100;
+                setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
+            }
+        });
+    }
+
+    function onChangeValorLinha(ri: number, novoValor: number) {
+        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
+        const total = getValues(`itensFinanceiros.${itemIndex}.valor_total`) || 0;
+        const novoPercentual = total > 0 ? Math.round((novoValor / total) * 100 * 100) / 100 : 0;
+        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`, novoPercentual);
+    }
+
+    function onChangePercentualLinha(ri: number, novoPercentual: number) {
+        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`, novoPercentual);
+        const total = getValues(`itensFinanceiros.${itemIndex}.valor_total`) || 0;
+        const novoValor = Math.round((novoPercentual / 100) * total * 100) / 100;
+        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
+    }
+
+    return (
+        <div className="border rounded-md p-3 flex flex-col gap-3 relative">
+            {podeRemover && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-7 w-7"
+                    onClick={onRemover}
+                >
+                    <X className="w-4 h-4" />
+                </Button>
+            )}
+            <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
+
+            {/* Setor */}
+            <FormField
+                control={control}
+                name={`itensFinanceiros.${itemIndex}.setor`}
+                render={({ field: f }) => (
+                    <FormItem>
+                        <FormLabel>Setor</FormLabel>
+                        <FormControl>
+                            <Input {...f} placeholder="Ex: Tecnologia da Informação" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            {/* Centro de Custo */}
+            <FormField
+                control={control}
+                name={`itensFinanceiros.${itemIndex}.ccusto`}
+                rules={{ required: 'Centro de custo obrigatório' }}
+                render={({ field: f }) => (
+                    <FormItem>
+                        <FormLabel>Centro de Custo</FormLabel>
+                        <FormControl>
+                            <Popover open={openCcustoIndex === itemIndex} onOpenChange={open => setOpenCcustoIndex(open ? itemIndex : null)} modal={false}>
+                                <PopoverTrigger asChild>
+                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(itemIndex)}>
+                                        {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
+                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                    <Command filter={(value, search) => {
+                                        const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
+                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                    }}>
+                                        <CommandInput placeholder="Buscar centro..." />
+                                        <CommandList>
+                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                            <CommandGroup>
+                                                {centrosDeCusto.map(c => (
+                                                    <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
+                                                        {c.ccusto} - {c.custo}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            {/* Valor Total do item */}
+            <FormField
+                control={control}
+                name={`itensFinanceiros.${itemIndex}.valor_total`}
+                rules={{ required: 'Valor total obrigatório' }}
+                render={({ field: f }) => (
+                    <FormItem>
+                        <FormLabel>Valor Total do Item (R$)</FormLabel>
+                        <FormControl>
+                            <Input
+                                type="number" step="0.01" min="0"
+                                {...f}
+                                onChange={e => {
+                                    const novoTotal = parseFloat(e.target.value) || 0;
+                                    f.onChange(novoTotal);
+                                    recalcularRateioPorValorTotal(novoTotal);
+                                }}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            {/* Rateio entre contas contábeis */}
+            <div className="flex flex-col gap-3 border-t pt-3">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Rateio entre contas contábeis</span>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendRateio({ codconta: '', modo: 'valor', percentual: 0, valor: 0, codigo_natureza_financeira: '' })}
+                    >
+                        + Adicionar conta
+                    </Button>
+                </div>
+
+                {rateioFields.map((rateioField, ri) => {
+                    const linha = item?.rateio?.[ri];
+                    const modo = linha?.modo ?? 'valor';
+                    const popoverKey = `${itemIndex}-${ri}`;
+                    return (
+                        <div key={rateioField.id} className="border rounded-md p-3 flex flex-col gap-3 relative">
+                            {rateioFields.length > 1 && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-7 w-7"
+                                    onClick={() => removeRateio(ri)}
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
                             )}
-                        />
 
-                        {/* Centro de Custo */}
-                        <FormField
-                            control={control}
-                            name={`itensFinanceiros.${index}.ccusto`}
-                            rules={{ required: 'Centro de custo obrigatório' }}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Centro de Custo</FormLabel>
-                                    <FormControl>
-                                        <Popover open={openCcustoIndex === index} onOpenChange={open => setOpenCcustoIndex(open ? index : null)} modal={false}>
-                                            <PopoverTrigger asChild>
-                                                <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(index)}>
-                                                    {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                <Command filter={(value, search) => {
-                                                    const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
-                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                }}>
-                                                    <CommandInput placeholder="Buscar centro..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {centrosDeCusto.map(c => (
-                                                                <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
-                                                                    {c.ccusto} - {c.custo}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Conta Contábil */}
-                        <FormField
-                            control={control}
-                            name={`itensFinanceiros.${index}.codconta`}
-                            rules={{ required: 'Conta contábil obrigatória' }}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Conta Contábil</FormLabel>
-                                    <FormControl>
-                                        <Popover open={openCodcontaIndex === index} onOpenChange={open => setOpenCodcontaIndex(open ? index : null)} modal={false}>
-                                            <PopoverTrigger asChild>
-                                                <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(index)}>
-                                                    {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                <Command filter={(value, search) => {
-                                                    const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
-                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                }}>
-                                                    <CommandInput placeholder="Buscar conta..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {contasFinanceiras.map(x => (
-                                                                <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
-                                                                    f.onChange(x.codconta);
-                                                                    form.setValue(`itensFinanceiros.${index}.codigo_natureza_financeira`, x.codconta);
-                                                                    setOpenCodcontaIndex(null)
-                                                                }}>
-                                                                    {x.codconta} - {x.contabil}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Valor */}
-                        <FormField
-                            control={control}
-                            name={`itensFinanceiros.${index}.valor`}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Valor (R$)</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.01" min="0" {...f} onChange={e => f.onChange(parseFloat(e.target.value) || 0)} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Natureza Financeira — só quando o criador detém a claim financeiro_totvs;
-                            usada como CODNATFINANCEIRA (FLANRATCCU) na criação automática do financeiro
-                            ao aprovar o comunicado. */}
-                        {mostrarNaturezaFinanceira && (
+                            {/* Conta Contábil */}
                             <FormField
                                 control={control}
-                                name={`itensFinanceiros.${index}.codigo_natureza_financeira`}
-                                rules={{ required: 'Natureza Financeira obrigatória' }}
+                                name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codconta`}
+                                rules={{ required: 'Conta contábil obrigatória' }}
                                 render={({ field: f }) => (
                                     <FormItem>
-                                        <FormLabel>Natureza Financeira (CODTBORCAMENTO)</FormLabel>
+                                        <FormLabel>Conta Contábil</FormLabel>
                                         <FormControl>
-                                            <Input {...f} value={f.value ?? ''} placeholder="Ex: 1.01.001" />
+                                            <Popover open={openCodcontaIndex === popoverKey} onOpenChange={open => setOpenCodcontaIndex(open ? popoverKey : null)} modal={false}>
+                                                <PopoverTrigger asChild>
+                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(popoverKey)}>
+                                                        {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
+                                                        <ChevronsUpDown className="opacity-50 size-4" />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                    <Command filter={(value, search) => {
+                                                        const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
+                                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                    }}>
+                                                        <CommandInput placeholder="Buscar conta..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                            <CommandGroup>
+                                                                {contasFinanceiras.map(x => (
+                                                                    <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
+                                                                        f.onChange(x.codconta);
+                                                                        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`, x.codconta);
+                                                                        setOpenCodcontaIndex(null)
+                                                                    }}>
+                                                                        {x.codconta} - {x.contabil}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
-                    </div>
-                ))}
-            </CardContent>
-        </Card>
+
+                            {/* Toggle valor absoluto / percentual */}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={modo === 'valor' ? 'default' : 'outline'}
+                                    onClick={() => setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.modo`, 'valor')}
+                                >
+                                    Valor (R$)
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={modo === 'percentual' ? 'default' : 'outline'}
+                                    onClick={() => setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.modo`, 'percentual')}
+                                >
+                                    Percentual (%)
+                                </Button>
+                            </div>
+
+                            {modo === 'valor' ? (
+                                <FormField
+                                    control={control}
+                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`}
+                                    render={({ field: f }) => (
+                                        <FormItem>
+                                            <FormLabel>Valor (R$)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" min="0" {...f}
+                                                    onChange={e => onChangeValorLinha(ri, parseFloat(e.target.value) || 0)} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            ) : (
+                                <FormField
+                                    control={control}
+                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`}
+                                    render={({ field: f }) => (
+                                        <FormItem>
+                                            <FormLabel>Percentual (%)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" step="0.01" min="0" max="100" {...f}
+                                                    onChange={e => onChangePercentualLinha(ri, parseFloat(e.target.value) || 0)} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+
+                            <span className="text-xs text-muted-foreground">
+                                {modo === 'valor'
+                                    ? `≈ ${(linha?.percentual ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do valor total`
+                                    : `≈ R$ ${(linha?.valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            </span>
+
+                            {/* Natureza Financeira — só quando o criador detém a claim financeiro_totvs;
+                                usada como CODNATFINANCEIRA (FLANRATCCU) na criação automática do financeiro
+                                ao aprovar o comunicado. */}
+                            {mostrarNaturezaFinanceira && (
+                                <FormField
+                                    control={control}
+                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`}
+                                    rules={{ required: 'Natureza Financeira obrigatória' }}
+                                    render={({ field: f }) => (
+                                        <FormItem>
+                                            <FormLabel>Natureza Financeira (CODTBORCAMENTO)</FormLabel>
+                                            <FormControl>
+                                                <Input {...f} value={f.value ?? ''} placeholder="Ex: 1.01.001" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                        </div>
+                    );
+                })}
+
+                <span className={`text-sm font-medium ${Math.abs(restante) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
+                    Restante a ratear: R$ {restante.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+            </div>
+        </div>
     );
 }
 
@@ -2050,29 +2256,48 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
             ${data.anexo ?? ""}
         </div>
 
-        <!-- ITENS FINANCEIROS -->
+        <!-- ITENS FINANCEIROS / RATEIO -->
 
         ${(data.itensFinanceiros ?? []).length > 0 ? `
         <table class="table-bordada" style="margin-top:20px; font-size:13px;">
             <thead>
                 <tr>
-                    <th style="padding:6px 8px; text-align:center; background:#f0f0f0;">Seq.</th>
+                    <th style="padding:6px 8px; text-align:center; background:#f0f0f0;">Item</th>
                     <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Setor</th>
                     <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Centro de Custo</th>
-                    <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Conta Contábil</th>
+                    <th style="padding:6px 8px; text-align:left; background:#f0f0f0;">Conta Contábil (Rateio)</th>
+                    <th style="padding:6px 8px; text-align:right; background:#f0f0f0;">%</th>
                     <th style="padding:6px 8px; text-align:right; background:#f0f0f0;">Valor (R$)</th>
                 </tr>
             </thead>
             <tbody>
-                ${(data.itensFinanceiros ?? []).map((item, i) => `
+                ${(data.itensFinanceiros ?? []).map((item, i) => {
+                    const ccustoDesc = centrosDeCusto.find(c => c.ccusto === item.ccusto)?.custo;
+                    const linhasRateio = (item.rateio ?? []).map((linha, ri) => {
+                        const contaDesc = contasFinanceiras.find(c => c.codconta === linha.codconta)?.contabil;
+                        return `
                 <tr>
-                    <td style="padding:5px 8px; text-align:center;">${i + 1}</td>
-                    <td style="padding:5px 8px;">${item.setor ?? ""}</td>
-                    <td style="padding:5px 8px;">${item.ccusto ?? ""}${(() => { const desc = centrosDeCusto.find(c => c.ccusto === item.ccusto)?.custo; return desc ? ` - ${desc}` : ''; })()}</td>
-                    <td style="padding:5px 8px;">${item.codconta ?? ""}${(() => { const desc = contasFinanceiras.find(c => c.codconta === item.codconta)?.contabil; return desc ? ` - ${desc}` : ''; })()}</td>
-                    <td style="padding:5px 8px; text-align:right;">${item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                </tr>`).join("")}
+                    <td style="padding:5px 8px; text-align:center;">${ri === 0 ? i + 1 : ""}</td>
+                    <td style="padding:5px 8px;">${ri === 0 ? (item.setor ?? "") : ""}</td>
+                    <td style="padding:5px 8px;">${ri === 0 ? `${item.ccusto ?? ""}${ccustoDesc ? ` - ${ccustoDesc}` : ""}` : ""}</td>
+                    <td style="padding:5px 8px;">${linha.codconta ?? ""}${contaDesc ? ` - ${contaDesc}` : ""}</td>
+                    <td style="padding:5px 8px; text-align:right;">${(linha.percentual ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td>
+                    <td style="padding:5px 8px; text-align:right;">${(linha.valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>`;
+                    }).join("");
+                    return `${linhasRateio}
+                <tr style="font-weight:bold; background:#fafafa;">
+                    <td colspan="5" style="padding:5px 8px; text-align:right;">Total do item ${i + 1}</td>
+                    <td style="padding:5px 8px; text-align:right;">${(item.valor_total ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>`;
+                }).join("")}
             </tbody>
+            <tfoot>
+                <tr style="font-weight:bold;">
+                    <td colspan="5" style="padding:6px 8px; text-align:right; border-top:2px solid #333;">Total geral</td>
+                    <td style="padding:6px 8px; text-align:right; border-top:2px solid #333;">${(data.itensFinanceiros ?? []).reduce((acc, item) => acc + (item.valor_total ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+            </tfoot>
         </table>` : ""}
 
         <div style="margin-top:40px; white-space:pre-wrap;">

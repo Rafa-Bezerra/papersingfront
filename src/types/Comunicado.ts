@@ -1,9 +1,34 @@
+// Uma linha do rateio: uma conta contábil dentro de um item, com valor absoluto ou percentual do
+// valor total do item — o campo não editado é sempre recalculado a partir do que foi digitado.
+export type ComunicadoRateioConta = {
+    id?: number,
+    codconta: string,
+    modo: 'valor' | 'percentual',
+    percentual: number,
+    valor: number,
+    codigo_natureza_financeira?: string | null,
+}
+
+// Um item do comunicado: centro de custo + valor total, rateado entre uma ou mais contas contábeis.
 export type ComunicadoItemFinanceiro = {
     setor: string,
     ccusto: string,
-    codconta: string,
+    valor_total: number,
+    rateio: ComunicadoRateioConta[],
+}
+
+// Formato "flat" usado pela API (uma linha por conta contábil) — espelha ComunicadoItemFinanceiroDto
+// no backend. numero_item agrupa as linhas que pertencem ao mesmo item.
+export type ComunicadoItemFinanceiroFlat = {
+    id?: number,
+    setor?: string | null,
+    ccusto?: string | null,
+    codconta?: string | null,
     valor: number,
     codigo_natureza_financeira?: string | null,
+    numero_item?: number | null,
+    valor_total_item?: number | null,
+    percentual?: number | null,
 }
 
 export type Comunicado = {
