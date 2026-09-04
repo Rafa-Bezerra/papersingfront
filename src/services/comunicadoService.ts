@@ -1,11 +1,15 @@
-import type { Comunicado, ComunicadoAprovacao, ComunicadoAssinar } from "@/types/Comunicado";
+import type { Comunicado, ComunicadoAprovacao, ComunicadoAssinar, ComunicadoItemFinanceiroFlat } from "@/types/Comunicado";
+import { achatarItensFinanceiros, agruparItensFinanceiros } from "@/utils/comunicadoRateio";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Comunicados";
 const elemento_singular = "comunicado";
 const elemento_plural = "comunicados";
 
+// Shape bruto retornado pela API: itensFinanceiros vem "flat" (uma linha por conta contábil).
+type ComunicadoFlat = Omit<Comunicado, "itensFinanceiros"> & { itensFinanceiros: ComunicadoItemFinanceiroFlat[] };
+
 export async function getAll(): Promise<Comunicado[]> {
-    const url = new URL(`${API_BASE}/api/${caminho}`);       
+    const url = new URL(`${API_BASE}/api/${caminho}`);
     const res = await fetch(url.toString(), {
         headers: headers(),
     });
@@ -13,12 +17,13 @@ export async function getAll(): Promise<Comunicado[]> {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
     }
-    const list: Comunicado[] = await res.json();
-    return list;
+    const list: ComunicadoFlat[] = await res.json();
+    return list.map(d => ({ ...d, itensFinanceiros: agruparItensFinanceiros(d.itensFinanceiros) }));
 }
 
 export async function createElement(data: Comunicado): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const payload = { ...data, itensFinanceiros: achatarItensFinanceiros(data.itensFinanceiros) };
+    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(payload) });
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
