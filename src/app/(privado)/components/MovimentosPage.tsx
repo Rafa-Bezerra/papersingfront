@@ -214,7 +214,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais)
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, undefined, q)
 
             const solicitantesUnicos = Array.from(
                 new Set(
