@@ -9,12 +9,13 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { ChevronsUpDown, Link2, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,8 @@ import {
   Usuario,
   getAll as getAllUsuarios
 } from '@/services/usuariosService'
+import CadastroCentroCustoPanel from '@/components/CadastroCentroCustoPanel'
+import CadastroContaContabilPanel from '@/components/CadastroContaContabilPanel'
 
 
 export default function Page() {
@@ -365,84 +368,117 @@ export default function Page() {
 
   return (
     <div className="p-6">
-      {/* Filtros */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-        </CardHeader>
+      <Tabs defaultValue="vinculos" className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold">{titulo}</h1>
+          <TabsList className="flex-wrap h-auto w-fit">
+            <TabsTrigger value="vinculos">
+              <Link2 className="w-4 h-4" /> Vínculos
+            </TabsTrigger>
+            <TabsTrigger value="cadastro">
+              <SquarePlus className="w-4 h-4" /> Cadastro
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <CardContent className="flex flex-col gap-2 md:flex-row">
-          <div className="relative flex-1 w-full">
-            <Input
-              placeholder="Pesquise por Centro de custo ou ID"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="pr-10"
-              aria-label="Campo de busca"
-            />
-            {query && (
-              <button
-                aria-label="Limpar busca"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
-                onClick={clearQuery}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+        <TabsContent value="vinculos" className="space-y-6">
+          {/* Filtros */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-semibold">Busca</CardTitle>
+            </CardHeader>
 
-          <Button onClick={handleSearchClick} className="flex items-center">
-            <SearchIcon className="mr-1 h-4 w-4" />
-            Buscar
-          </Button>
+            <CardContent className="flex flex-col gap-2 md:flex-row">
+              <div className="relative flex-1 w-full">
+                <Input
+                  placeholder="Pesquise por Centro de custo ou ID"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="pr-10"
+                  aria-label="Campo de busca"
+                />
+                {query && (
+                  <button
+                    aria-label="Limpar busca"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
+                    onClick={clearQuery}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
 
-        </CardContent>
-      </Card>
+              <Button onClick={handleSearchClick} className="flex items-center">
+                <SearchIcon className="mr-1 h-4 w-4" />
+                Buscar
+              </Button>
+            </CardContent>
+          </Card>
 
-      {/* Centro de custo vs usuários */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl font-bold">Centro de custo vs Usuários</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col">
-          <DataTable
-            columns={colunasCcusto}
-            data={centrosDeCusto}
-            loading={loading}
-            searchPlaceholder="Pesquisar..."
-            globalFilterAccessorKey={[
-              'ccusto',
-              'custo',
-            ]}
+          {/* Centro de custo vs usuários */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-2xl font-bold">Centro de custo vs Usuários</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col">
+              <DataTable
+                columns={colunasCcusto}
+                data={centrosDeCusto}
+                loading={loading}
+                searchPlaceholder="Pesquisar..."
+                globalFilterAccessorKey={[
+                  'ccusto',
+                  'custo',
+                ]}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Centro de custo vs conta contábil */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-2xl font-bold">Centro de custo vs Conta contábil</CardTitle>
+              <Button onClick={handleInserir} className="flex items-center">
+                <SquarePlus className="mr-1 h-4 w-4" />
+                Novo vínculo
+              </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col">
+              <DataTable
+                columns={colunas}
+                data={results}
+                loading={loading}
+                searchPlaceholder="Pesquisar..."
+                globalFilterAccessorKey={[
+                  'centro_custo',
+                  'centro_custo_nome',
+                  'conta_contabil',
+                  'conta_contabil_nome'
+                ]}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cadastro" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Cadastre no PaperSign a partir do RM. Só grava se o código existir no Corpore da unidade logada.
+          </p>
+          <CadastroCentroCustoPanel
+            onSuccess={() => {
+              void buscaCentrosDeCusto()
+              void handleSearch(query)
+            }}
           />
-        </CardContent>
-      </Card>
-
-      {/* Centro de custo vs conta contábil */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl font-bold">Centro de custo vs Conta contábil</CardTitle>
-          <Button onClick={handleInserir} className="flex items-center">
-            <SquarePlus className="mr-1 h-4 w-4" />
-            Novo vínculo
-          </Button>
-        </CardHeader>
-        <CardContent className="flex flex-col">
-          <DataTable
-            columns={colunas}
-            data={results}
-            loading={loading}
-            searchPlaceholder="Pesquisar..."
-            globalFilterAccessorKey={[
-              'centro_custo',
-              'centro_custo_nome',
-              'conta_contabil',
-              'conta_contabil_nome'
-            ]}
+          <CadastroContaContabilPanel
+            onSuccess={() => {
+              void buscaContasFinanceiras()
+              void handleSearch(query)
+            }}
           />
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Formulário */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
