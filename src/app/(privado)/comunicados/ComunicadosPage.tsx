@@ -1870,73 +1870,73 @@ function ItemFinanceiroFields({
     return (
         <div className="border rounded-md p-3 flex flex-col gap-3 relative">
             {podeRemover && (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7"
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-2 right-2 h-7 w-7"
                     onClick={onRemover}
-                >
-                    <X className="w-4 h-4" />
-                </Button>
-            )}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        )}
             <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
 
-            {/* Setor */}
-            <FormField
-                control={control}
+                        {/* Setor */}
+                        <FormField
+                            control={control}
                 name={`itensFinanceiros.${itemIndex}.setor`}
-                render={({ field: f }) => (
-                    <FormItem>
-                        <FormLabel>Setor</FormLabel>
-                        <FormControl>
-                            <Input {...f} placeholder="Ex: Tecnologia da Informação" />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Setor</FormLabel>
+                                    <FormControl>
+                                        <Input {...f} placeholder="Ex: Tecnologia da Informação" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-            {/* Centro de Custo */}
-            <FormField
-                control={control}
+                        {/* Centro de Custo */}
+                        <FormField
+                            control={control}
                 name={`itensFinanceiros.${itemIndex}.ccusto`}
-                rules={{ required: 'Centro de custo obrigatório' }}
-                render={({ field: f }) => (
-                    <FormItem>
-                        <FormLabel>Centro de Custo</FormLabel>
-                        <FormControl>
+                            rules={{ required: 'Centro de custo obrigatório' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Centro de Custo</FormLabel>
+                                    <FormControl>
                             <Popover open={openCcustoIndex === itemIndex} onOpenChange={open => setOpenCcustoIndex(open ? itemIndex : null)} modal={false}>
-                                <PopoverTrigger asChild>
+                                            <PopoverTrigger asChild>
                                     <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(itemIndex)}>
-                                        {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
-                                        <ChevronsUpDown className="opacity-50 size-4" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                    <Command filter={(value, search) => {
-                                        const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
-                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                    }}>
-                                        <CommandInput placeholder="Buscar centro..." />
-                                        <CommandList>
-                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                            <CommandGroup>
-                                                {centrosDeCusto.map(c => (
-                                                    <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
-                                                        {c.ccusto} - {c.custo}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+                                                    {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar centro..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {centrosDeCusto.map(c => (
+                                                                <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
+                                                                    {c.ccusto} - {c.custo}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
             {/* Valor Total do item */}
             <FormField
@@ -1994,50 +1994,50 @@ function ItemFinanceiroFields({
                                 </Button>
                             )}
 
-                            {/* Conta Contábil */}
-                            <FormField
-                                control={control}
+                        {/* Conta Contábil */}
+                        <FormField
+                            control={control}
                                 name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codconta`}
-                                rules={{ required: 'Conta contábil obrigatória' }}
-                                render={({ field: f }) => (
-                                    <FormItem>
-                                        <FormLabel>Conta Contábil</FormLabel>
-                                        <FormControl>
+                            rules={{ required: 'Conta contábil obrigatória' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Conta Contábil</FormLabel>
+                                    <FormControl>
                                             <Popover open={openCodcontaIndex === popoverKey} onOpenChange={open => setOpenCodcontaIndex(open ? popoverKey : null)} modal={false}>
-                                                <PopoverTrigger asChild>
+                                            <PopoverTrigger asChild>
                                                     <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(popoverKey)}>
-                                                        {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
-                                                        <ChevronsUpDown className="opacity-50 size-4" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                    <Command filter={(value, search) => {
-                                                        const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
-                                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                    }}>
-                                                        <CommandInput placeholder="Buscar conta..." />
-                                                        <CommandList>
-                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                            <CommandGroup>
-                                                                {contasFinanceiras.map(x => (
+                                                    {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar conta..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {contasFinanceiras.map(x => (
                                                                     <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
                                                                         f.onChange(x.codconta);
                                                                         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`, x.codconta);
                                                                         setOpenCodcontaIndex(null)
                                                                     }}>
-                                                                        {x.codconta} - {x.contabil}
-                                                                    </CommandItem>
-                                                                ))}
-                                                            </CommandGroup>
-                                                        </CommandList>
-                                                    </Command>
-                                                </PopoverContent>
-                                            </Popover>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                                                    {x.codconta} - {x.contabil}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                             {/* Toggle valor absoluto / percentual */}
                             <div className="flex items-center gap-2">
@@ -2060,20 +2060,20 @@ function ItemFinanceiroFields({
                             </div>
 
                             {modo === 'valor' ? (
-                                <FormField
-                                    control={control}
+                        <FormField
+                            control={control}
                                     name={`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`}
-                                    render={({ field: f }) => (
-                                        <FormItem>
-                                            <FormLabel>Valor (R$)</FormLabel>
-                                            <FormControl>
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Valor (R$)</FormLabel>
+                                    <FormControl>
                                                 <Input type="number" step="0.01" min="0" {...f}
                                                     onChange={e => onChangeValorLinha(ri, parseFloat(e.target.value) || 0)} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                             ) : (
                                 <FormField
                                     control={control}
@@ -2116,7 +2116,7 @@ function ItemFinanceiroFields({
                                     )}
                                 />
                             )}
-                        </div>
+                    </div>
                     );
                 })}
 

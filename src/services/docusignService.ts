@@ -109,12 +109,16 @@ export type CertificadoA1Status = {
 function mensagemFalhaRede(acao: string, err: unknown): Error {
     const msg = err instanceof Error ? err.message : String(err ?? "");
     if ((err as Error)?.name === "TimeoutError" || /timeout/i.test(msg))
-        return new Error("A API demorou a responder ao tratar o certificado. Tente novamente.");
-    if (/failed to fetch|networkerror|load failed/i.test(msg))
+        return new Error("A API demorou a responder. Tente novamente.");
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        const api = API_BASE.replace(/\/$/, "");
+        const local = /localhost|127\.0\.0\.1|:5170/i.test(api);
         return new Error(
-            `Não foi possível ${acao}. A tela (:5063) não conseguiu falar com a API (:5062). ` +
-            "Confirme se o endereço é https://papersign.grupowaybrasil.com.br:5063 e se o pool da API está no ar."
+            local
+                ? `Não foi possível ${acao}. Confirme se a API local está no ar em ${api} (porta 5170).`
+                : `Não foi possível ${acao}. A tela não conseguiu falar com a API (${api}). Confirme se o pool da API está no ar.`
         );
+    }
     return err instanceof Error ? err : new Error(msg || `Erro ao ${acao}.`);
 }
 
@@ -315,6 +319,285 @@ export async function atualizarPastaPlugSign(opts: {
         if (!res.ok) throw new Error(await lerErroApi(res, "atualizar pasta PlugSign"));
     } catch (err) {
         throw mensagemFalhaRede("atualizar pasta PlugSign", err);
+    }
+}
+
+export type SolicitacaoCampo = {
+    type: string;
+    page: number;
+    width?: number;
+    height?: number;
+    xPos?: number;
+    yPos?: number;
+    posX?: number;
+    posY?: number;
+    largura?: number;
+    altura?: number;
+    text?: string;
+    paginaExtra?: boolean;
+};
+
+export type SolicitacaoDocumento = {
+    base64: string;
+    nome?: string;
+};
+
+export type SolicitacaoDestinatario = {
+    nome: string;
+    email: string;
+    mensagemPrivada?: string;
+    modoAssinatura?: string;
+    /** Posição na cadeia (1, 2, 3…). */
+    ordem?: number;
+    campos?: SolicitacaoCampo[];
+};
+
+export type SolicitacaoAssinaturaPayload = {
+    pdfBase64?: string;
+    nomeDocumento?: string;
+    documentos?: SolicitacaoDocumento[];
+    mensagem?: string;
+    assunto?: string;
+    /** Legado: e-mails separados por vírgula */
+    destinatarios?: string;
+    nomes?: string;
+    /** Preferencial: cards com ordem de assinatura */
+    destinatariosLista?: SolicitacaoDestinatario[];
+    identificarSignatarios?: boolean;
+    exigirCertificadoDigital?: boolean;
+    tipoCertificado?: number;
+    adicionarObservadores?: boolean;
+    observadores?: string;
+    monitorarValidade?: boolean;
+    validadeMeses?: number;
+    autodestruir?: boolean;
+    dataExpiracao?: string;
+    autenticacaoDoisFatores?: boolean;
+    solicitarCpf?: boolean;
+    solicitarDataNascimento?: boolean;
+    solicitarSelfieDocumento?: boolean;
+    emCadeia?: boolean;
+    modoAssinatura?: string;
+};
+
+export type SolicitacaoAssinaturaResult = {
+    message: string;
+    documentKey: string;
+    destinatarios: Array<{ email: string; signingKey: string; signingUrl: string }>;
+    documentos?: Array<{
+        nome: string;
+        documentKey: string;
+        destinatarios: Array<{ email: string; signingKey: string; signingUrl: string }>;
+    }>;
+    erros?: string[];
+};
+
+export async function criarSolicitacaoAssinatura(
+    data: SolicitacaoAssinaturaPayload
+): Promise<SolicitacaoAssinaturaResult> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao-assinatura`,
+            {
+                method: "POST",
+                headers: headers(),
+                body: JSON.stringify(data),
+            },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "criar solicitação de assinatura"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("criar solicitação de assinatura", err);
+    }
+}
+
+export type BaixarAssinadoResult = {
+    message: string;
+    documentKey: string;
+    caminhoRelativo: string;
+    nome: string;
+    base64: string;
+    tamanho: number;
+};
+
+export async function baixarDocumentoAssinadoSolicitacao(
+    documentKey: string,
+    nome?: string
+): Promise<BaixarAssinadoResult> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao-assinatura/baixar`,
+            {
+                method: "POST",
+                headers: headers(),
+                body: JSON.stringify({ documentKey, nome }),
+            },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "baixar documento assinado"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("baixar documento assinado", err);
+    }
+}
+
+export type EquipePlugSignMembro = {
+    id: number;
+    nome: string;
+    primeiroNome?: string;
+    ultimoNome?: string;
+    email: string;
+};
+
+export async function listarEquipePlugSign(q?: string): Promise<EquipePlugSignMembro[]> {
+    try {
+        const url = new URL(`${API_BASE}/api/${caminho}/equipe-plugsign`);
+        if (q?.trim()) url.searchParams.set("q", q.trim());
+        const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "listar equipe PlugSign"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("listar equipe PlugSign", err);
+    }
+}
+
+export type MinhaSolicitacaoItem = {
+    id: number;
+    documentKey: string;
+    email: string;
+    status: string;
+    message?: string | null;
+    signingKey: string;
+    sendTime?: string | null;
+    updateTime?: string | null;
+    senderName?: string | null;
+    senderEmail?: string | null;
+    nomeDocumento?: string | null;
+    caminhoLocal?: string | null;
+    pdfNoPaperSign?: boolean;
+    statusPaperSign?: string | null;
+};
+
+export type MinhasSolicitacoesResult = {
+    data: MinhaSolicitacaoItem[];
+    page: number;
+    lastPage: number;
+    total: number;
+};
+
+export async function listarMinhasSolicitacoes(
+    page = 1,
+    status?: string
+): Promise<MinhasSolicitacoesResult> {
+    try {
+        const url = new URL(`${API_BASE}/api/${caminho}/minhas-solicitacoes`);
+        url.searchParams.set("page", String(page));
+        if (status?.trim()) url.searchParams.set("status", status.trim());
+        const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "listar minhas solicitações"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("listar minhas solicitações", err);
+    }
+}
+
+export type HistoricoSolicitacaoItem = {
+    id: number;
+    activity: string;
+    time: string;
+    type?: string | null;
+    user?: string | null;
+    file: string;
+    signingKey?: string | null;
+};
+
+export async function obterHistoricoSolicitacao(
+    documentKey: string
+): Promise<{ documentKey: string; data: HistoricoSolicitacaoItem[] }> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/minhas-solicitacoes/${encodeURIComponent(documentKey)}/historico`,
+            { headers: headers() },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "obter histórico da solicitação"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("obter histórico da solicitação", err);
+    }
+}
+
+export type LembreteSolicitacaoResult = {
+    message: string;
+    enviados: number;
+    destinatarios?: string[];
+    erros?: string[];
+};
+
+export async function enviarLembreteSolicitacao(
+    documentKey: string,
+    opts?: { mensagem?: string; assunto?: string }
+): Promise<LembreteSolicitacaoResult> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/minhas-solicitacoes/lembrete`,
+            {
+                method: "POST",
+                headers: headers(),
+                body: JSON.stringify({
+                    documentKey,
+                    mensagem: opts?.mensagem,
+                    assunto: opts?.assunto,
+                }),
+            },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "enviar lembrete da solicitação"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("enviar lembrete da solicitação", err);
+    }
+}
+
+export type FornecedorParceiroPayload = {
+    primeiroNome: string;
+    ultimoNome: string;
+    email: string;
+    telefone?: string;
+    nascimento?: string;
+    cpf?: string;
+    endereco?: string;
+};
+
+export type FornecedorParceiroResult = {
+    message: string;
+    plugSign: { email: string; name: string; lastName: string; id: number };
+    paperSign?: {
+        id: number;
+        usuario: string;
+        senhaTemporaria: string;
+        aviso: string;
+    } | null;
+};
+
+export async function criarFornecedorParceiro(
+    data: FornecedorParceiroPayload
+): Promise<FornecedorParceiroResult> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/fornecedor-parceiro`,
+            {
+                method: "POST",
+                headers: headers(),
+                body: JSON.stringify(data),
+            },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "criar fornecedor/parceiro"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("criar fornecedor/parceiro", err);
     }
 }
 
