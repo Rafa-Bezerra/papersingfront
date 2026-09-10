@@ -83,8 +83,14 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const canDocusign = Boolean(parsedUser?.docusign);
             const canProjetos = Boolean(parsedUser?.projetos);
 
-            // Bloqueia acesso direto a centros de custos sem permissão.
-            if (normalizedPath === "/centros-custos" && !isAdmin && !canCentrosCustos) {
+            // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
+            if (
+              (normalizedPath === "/centros-custos" ||
+                normalizedPath === "/cadastro-centro-custo" ||
+                normalizedPath === "/cadastro-conta-contabil") &&
+              !isAdmin &&
+              !canCentrosCustos
+            ) {
               setIsAuthorized(false);
             }
 
