@@ -1,8 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm, SubmitHandler } from 'react-hook-form'
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { login, LoginPayload } from '@/services/auth'
+import { getSamlStatus, login, LoginPayload, startMicrosoftLogin } from '@/services/auth'
 import Image from "next/image"
 import { Eye, EyeOff } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,26 +31,38 @@ interface LoginFormValues {
   base: string
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
   const form = useForm<LoginFormValues>({
     defaultValues: { usuario: '', password: '', base: '' }
   })
   const {
     control,
     handleSubmit,
+    setValue,
+    watch,
     formState: { isSubmitting },
     clearErrors
   } = form
   const router = useRouter()
+  const search = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
-  
+  const [samlEnabled, setSamlEnabled] = useState(false)
+  const [ssoBusy, setSsoBusy] = useState(false)
+  const baseSelecionada = watch('base')
+
+  useEffect(() => {
+    const err = search.get('sso_error')
+    if (err) alert(err)
+    getSamlStatus().then(setSamlEnabled).catch(() => setSamlEnabled(false))
+  }, [search])
+
   const onSubmit: SubmitHandler<LoginFormValues> = async values => {
     try {
       if (!values.usuario || !values.password) {
         alert('Por favor, preencha todos os campos')
-        return;
+        return
       }
-      
+
       clearErrors()
 
       const payload: LoginPayload = {
@@ -60,7 +72,7 @@ export default function LoginPage() {
       }
 
       const usuario = await login(payload)
-      
+
       sessionStorage.setItem('authToken', usuario.token)
       sessionStorage.setItem('userData', JSON.stringify(usuario))
       router.push('/home/')
@@ -69,6 +81,16 @@ export default function LoginPage() {
         error instanceof Error ? error.message : 'Falha na autenticação'
       alert(message)
     }
+  }
+
+  const onMicrosoft = () => {
+    const base = (baseSelecionada || '').trim()
+    if (!base) {
+      alert('Selecione a base antes de entrar com Microsoft.')
+      return
+    }
+    setSsoBusy(true)
+    startMicrosoftLogin(base)
   }
 
   return (
@@ -134,7 +156,7 @@ export default function LoginPage() {
                       <FormControl>
                         <div className="relative">
                           <Input
-                            type={showPassword ? "text" : "password"}
+                            type={showPassword ? 'text' : 'password'}
                             placeholder="Digite sua senha"
                             {...field}
                             className="h-12 pr-12 border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
@@ -162,21 +184,27 @@ export default function LoginPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Base</FormLabel>
-                      <FormControl>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger>
+                      <Select
+                        value={field.value || undefined}
+                        onValueChange={(v) => {
+                          field.onChange(v)
+                          setValue('base', v, { shouldDirty: true, shouldValidate: true })
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecione a base" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="WAY 112">WAY 112</SelectItem>
-                            <SelectItem value="WAY 153">WAY 153</SelectItem>
-                            <SelectItem value="WAY 262">WAY 262</SelectItem>
-                            <SelectItem value="WAY 306">WAY 306</SelectItem>
-                            <SelectItem value="WAY 364">WAY 364</SelectItem>
-                            <SelectItem value="WAY CSC">WAY CSC</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="WAY 112">WAY 112</SelectItem>
+                          <SelectItem value="WAY 153">WAY 153</SelectItem>
+                          <SelectItem value="WAY 262">WAY 262</SelectItem>
+                          <SelectItem value="WAY 306">WAY 306</SelectItem>
+                          <SelectItem value="WAY 364">WAY 364</SelectItem>
+                          <SelectItem value="WAY CSC">WAY CSC</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -196,11 +224,45 @@ export default function LoginPage() {
                     'Entrar'
                   )}
                 </Button>
+
+                {samlEnabled && (
+                  <>
+                    <div className="relative py-1">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-slate-200 dark:border-slate-600" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white/80 dark:bg-slate-800/80 px-2 text-slate-500">ou</span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={ssoBusy || !baseSelecionada}
+                      onClick={onMicrosoft}
+                      className="w-full h-12 rounded-lg border-slate-300"
+                    >
+                      {ssoBusy
+                        ? 'Redirecionando...'
+                        : !baseSelecionada
+                          ? 'Selecione a base para Microsoft'
+                          : 'Entrar com Microsoft'}
+                    </Button>
+                  </>
+                )}
               </form>
             </Form>
           </CardContent>
         </Card>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen" />}>
+      <LoginPageInner />
+    </Suspense>
   )
 }
