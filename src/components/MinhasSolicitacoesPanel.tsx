@@ -144,7 +144,6 @@ export default function MinhasSolicitacoesPanel() {
 
   useEffect(() => {
     carregar(1, status)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
   const documentosAgrupados = useMemo(() => {

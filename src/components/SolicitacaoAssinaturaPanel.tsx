@@ -536,7 +536,12 @@ export default function SolicitacaoAssinaturaPanel({
       mensagemPrivada: d.mensagemPrivada?.trim() || undefined,
       modoAssinatura: d.modoAssinatura || 'all',
       ordem: i + 1,
-      campos: d.camposUi.map(({ id: _id, label: _label, ...rest }) => rest),
+      campos: d.camposUi.map((c) => {
+        const { id, label, ...rest } = c
+        void id
+        void label
+        return rest
+      }),
     }))
 
     if (lista.some((d) => !d.email)) {
