@@ -28,14 +28,18 @@ export type PdfClickCoords = {
 };
 
 /**
- * Retorna o estilo ABSOLUTO do preview da assinatura
- * Baseado APENAS em coordenadas normalizadas
+ * Retorna o estilo ABSOLUTO do preview da assinatura.
+ * A posição é calculada a partir de coordenadas normalizadas (0–1),
+ * portanto é estável independente do zoom.
+ * boxW / boxH são o tamanho da caixa em unidades normalizadas (0–1).
  */
 export function getSignaturePreviewStyle(
   coords: PdfClickCoords,
   viewport?: PdfViewport | null,
   baseWidth = 90,
-  baseHeight = 30
+  baseHeight = 30,
+  boxW?: number,   // normalizado 0–1
+  boxH?: number,   // normalizado 0–1
 ): {
   left: number;
   top: number;
@@ -45,25 +49,19 @@ export function getSignaturePreviewStyle(
 } | null {
   if (!viewport) return null;
 
-  const scale = viewport.scale ?? 1;
   const refWidth = coords.w || viewport.width;
   const refHeight = coords.h || viewport.height;
+  const scale = viewport.scale ?? 1;
 
-  // tamanho visual da assinatura (acompanha zoom)
-  const width = Math.max(6, baseWidth * scale);
-  const height = Math.max(4, baseHeight * scale);
+  // tamanho visual: usa boxW/boxH normalizados se disponíveis, senão fallback em px×scale
+  const width  = boxW != null ? boxW * refWidth  : Math.max(6, baseWidth  * scale);
+  const height = boxH != null ? boxH * refHeight : Math.max(4, baseHeight * scale);
 
-  // posição absoluta no PDF (sem zoom)
+  // posição: centro da caixa no ponto clicado (coordenadas normalizadas → px overlay)
   const left = coords.x * refWidth;
-  const top = (1 - coords.yI) * refHeight;
+  const top  = (1 - coords.yI) * refHeight;
 
-  return {
-    left,
-    top,
-    width,
-    height,
-    transform: "translate(-50%, -50%)",
-  };
+  return { left, top, width, height, transform: "translate(-50%, -50%)" };
 }
 
 /**
@@ -73,7 +71,9 @@ export function getSignaturePreviewStyleFromPointer(
   coords: PdfClickCoords,
   viewport?: PdfViewport | null,
   baseWidth = 90,
-  baseHeight = 30
+  baseHeight = 30,
+  boxW?: number,
+  boxH?: number,
 ): {
   left: number;
   top: number;
@@ -81,23 +81,25 @@ export function getSignaturePreviewStyleFromPointer(
   height: number;
   transform: string;
 } | null {
-  const scale = viewport?.scale ?? 1;
-  const width = Math.max(6, baseWidth * scale);
-  const height = Math.max(4, baseHeight * scale);
+  const refWidth  = coords.w || viewport?.width  || baseWidth;
+  const refHeight = coords.h || viewport?.height || baseHeight;
+  const scale     = viewport?.scale ?? 1;
 
-  const maxWidth = coords.w || viewport?.width || width;
+  const width  = boxW != null ? boxW * refWidth  : Math.max(6, baseWidth  * scale);
+  const height = boxH != null ? boxH * refHeight : Math.max(4, baseHeight * scale);
+
+  const maxWidth  = coords.w || viewport?.width  || width;
   const maxHeight = coords.h || viewport?.height || height;
 
   const left = Math.min(Math.max(coords.x2, 0), maxWidth);
-  const top = Math.min(Math.max(coords.y2, 0), maxHeight);
+  const top  = Math.min(Math.max(coords.y2, 0), maxHeight);
 
-  return {
-    left,
-    top,
-    width,
-    height,
-    transform: "translate(-50%, -50%)",
-  };
+  return { left, top, width, height, transform: "translate(-50%, -50%)" };
+}
+
+/** Converte tamanho em px (no overlay atual) para normalizado 0–1. */
+export function pxParaNorm(px: number, refPx: number): number {
+  return refPx > 0 ? px / refPx : 0;
 }
 
 /**

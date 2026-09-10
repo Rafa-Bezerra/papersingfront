@@ -107,16 +107,24 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
   return normalized;
 }
 
-export async function getSamlStatus(): Promise<boolean> {
+export type SamlStatus = {
+  enabled: boolean
+  requireMicrosoftLogin: boolean
+}
+
+export async function getSamlStatus(): Promise<SamlStatus> {
   try {
     const res = await fetch(`${API_BASE}/api/Saml/status`, {
       headers: { Accept: 'application/json' },
     });
-    if (!res.ok) return false;
+    if (!res.ok) return { enabled: false, requireMicrosoftLogin: false };
     const data = await res.json();
-    return Boolean(data?.enabled);
+    return {
+      enabled: Boolean(data?.enabled),
+      requireMicrosoftLogin: Boolean(data?.requireMicrosoftLogin),
+    };
   } catch {
-    return false;
+    return { enabled: false, requireMicrosoftLogin: false };
   }
 }
 
