@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
 import TopNav from "./TopNav";
+import RafaelaTour from "./RafaelaTour";
 import { data } from "@/lib/data";
 import { toast } from "sonner";
 
@@ -44,6 +45,7 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
           <div className="w-full">{children}</div>
         </main>
       </div>
+      <RafaelaTour />
     </div>
   );
 }

@@ -758,17 +758,17 @@ export default function Page() {
     return (
         <div className="p-6">
             <Tabs value={aba} onValueChange={setAba} className="space-y-4">
-                <TabsList className="flex-wrap h-auto w-fit">
-                    <TabsTrigger value="documentos">
+                <TabsList id="tour-plugsign-guias" className="flex-wrap h-auto w-fit">
+                    <TabsTrigger id="tour-plugsign-documentos" value="documentos">
                         <FileSignature className="w-4 h-4" /> Documentos
                     </TabsTrigger>
-                    <TabsTrigger value="solicitacao">
+                    <TabsTrigger id="tour-plugsign-solicitacao" value="solicitacao">
                         <SquarePlus className="w-4 h-4" /> Solicitação de assinatura
                     </TabsTrigger>
-                    <TabsTrigger value="minhas-solicitacoes">
+                    <TabsTrigger id="tour-plugsign-minhas" value="minhas-solicitacoes">
                         <History className="w-4 h-4" /> Minhas solicitações
                     </TabsTrigger>
-                    <TabsTrigger value="fornecedor">
+                    <TabsTrigger id="tour-plugsign-fornecedor" value="fornecedor">
                         <UserPlus className="w-4 h-4" /> Fornecedor / parceiro
                     </TabsTrigger>
                 </TabsList>
