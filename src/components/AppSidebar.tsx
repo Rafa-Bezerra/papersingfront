@@ -176,7 +176,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       {/* Container do sidebar com botão de toggle */}
       <div className={`relative ${mobileOpen ? 'block' : 'hidden'} lg:block lg:h-full`}>
         {/* Sidebar para mobile e desktop */}
-        <div className={`sidebar-container relative transition-all duration-300 ease-in-out flex-shrink-0 h-full ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'
+        <div
+          id="tour-sidebar"
+          className={`sidebar-container relative transition-all duration-300 ease-in-out flex-shrink-0 h-full ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'
           } border-r bg-card ${mobileOpen ? 'fixed left-0 top-0 z-50 w-64' : ''}`}>
           <div className={`h-full flex flex-col transition-all duration-300 ${collapsed ? 'px-1 py-4' : 'px-4 py-4'
             }`}>
@@ -275,7 +277,10 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                           ].includes(item.url)) return null;
                       }
                       return (
-                        <SidebarMenuItem key={item.title}>
+                        <SidebarMenuItem
+                          key={item.title}
+                          id={item.url === '/docusign' ? 'tour-menu-plugsign' : undefined}
+                        >
                           <SidebarMenuButton
                             asChild
                             isActive={path === item.url || path.startsWith(item.url + '/')}
