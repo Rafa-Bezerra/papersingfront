@@ -135,7 +135,7 @@ function LoginPageInner() {
             </CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
               {soMicrosoft
-                ? 'Acesse com sua conta Microsoft (Active Directory)'
+                ? 'Acesso apenas com Microsoft. Conta desligada ou senha alterada no AD exige novo login aqui.'
                 : 'Faça login na sua conta para continuar'}
             </CardDescription>
           </CardHeader>

@@ -263,7 +263,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/docusign" && !userDocusign) return null;
                         if (item.url === "/projetos" && !userProjetos) return null;
                         if ([
-                            "/alcadas", 
+                            "/alcadas",
                             "/usuarios", 
                             "/borderoaprovadores", 
                             '/restritoaprovadores',

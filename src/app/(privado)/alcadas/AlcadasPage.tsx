@@ -9,18 +9,21 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { SearchIcon, SquarePlus, X } from 'lucide-react'
+import { SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import SubstituicaoAprovadoresPanel from '@/components/SubstituicaoAprovadoresPanel'
+import TransferenciaAlcadasPanel from '@/components/TransferenciaAlcadasPanel'
 import { stripDiacritics } from '@/utils/functions'
 import { 
     Alcada, 
@@ -59,6 +62,15 @@ export default function Page() {
     const tituloInsertAprovador = 'Novo aprovador'
     const router = useRouter()
     const searchParams = useSearchParams()
+    const tabParam = searchParams.get('tab')
+    const [aba, setAba] = useState(
+      tabParam === 'substituicao'
+        ? 'substituicao'
+        : tabParam === 'transferencia'
+          ? 'transferencia'
+          : 'alcadas'
+    )
+    const [ehCsc, setEhCsc] = useState(false)
 
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Alcada[]>([])
@@ -116,6 +128,26 @@ export default function Page() {
         handleSearch(searchParams.get('q') ?? '')
         if (carregouUsuarios.current) return
         buscaUsuarios()
+    }, [])
+
+    useEffect(() => {
+        let csc = false
+        try {
+            const raw = sessionStorage.getItem('userData')
+            if (raw) {
+                const u = JSON.parse(raw)
+                csc = String(u.unidade ?? u.UNIDADE ?? '').trim().toUpperCase() === 'WAY CSC'
+            }
+        } catch { /* ignore */ }
+        setEhCsc(csc)
+        if (!csc && (aba === 'substituicao' || aba === 'transferencia')) {
+            setAba('alcadas')
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('tab')
+            const qs = params.toString()
+            router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     async function buscaUsuarios() {
@@ -379,8 +411,36 @@ export default function Page() {
         [handleEditarAprovador, usuarios]
     )
 
+    function trocarAba(value: string) {
+        if ((value === 'substituicao' || value === 'transferencia') && !ehCsc) return
+        setAba(value)
+        const params = new URLSearchParams(searchParams.toString())
+        if (value === 'substituicao' || value === 'transferencia') params.set('tab', value)
+        else params.delete('tab')
+        const qs = params.toString()
+        router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
+    }
+
     return (
         <div className="p-6">
+            <Tabs value={aba} onValueChange={trocarAba} className="space-y-4">
+                <TabsList className="flex-wrap h-auto w-fit">
+                    <TabsTrigger value="alcadas">
+                        <Users className="w-4 h-4" /> Alçadas
+                    </TabsTrigger>
+                    {ehCsc && (
+                        <TabsTrigger value="substituicao">
+                            <UserCog className="w-4 h-4" /> Substituição de Aprovadores
+                        </TabsTrigger>
+                    )}
+                    {ehCsc && (
+                        <TabsTrigger value="transferencia">
+                            <ArrowRightLeft className="w-4 h-4" /> Transferência definitiva
+                        </TabsTrigger>
+                    )}
+                </TabsList>
+
+                <TabsContent value="alcadas" className="mt-0 space-y-4">
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -422,6 +482,39 @@ export default function Page() {
                     <DataTable columns={colunas} data={results} loading={loading} />
                 </CardContent>
             </Card>
+
+            {error && (
+                <p className="mb-4 text-center text-sm text-destructive">
+                    Erro: {error}
+                </p>
+            )}
+
+            {!searched && (
+                <div className="grid gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+                    ))}
+                </div>
+            )}
+
+            {searched && results.length === 0 && !loading && !error && (
+                <p className="text-center text-sm text-muted-foreground">
+                    Nenhum registro encontrado.
+                </p>
+            )}
+                </TabsContent>
+
+                {ehCsc && (
+                    <TabsContent value="substituicao" className="mt-0">
+                        <SubstituicaoAprovadoresPanel />
+                    </TabsContent>
+                )}
+                {ehCsc && (
+                    <TabsContent value="transferencia" className="mt-0">
+                        <TransferenciaAlcadasPanel />
+                    </TabsContent>
+                )}
+            </Tabs>
 
             {/* Modal */}
             {alcadaSelecionada && (
@@ -622,26 +715,6 @@ export default function Page() {
                     </Form>
                 </DialogContent>
             </Dialog>
-
-            {error && (
-                <p className="mb-4 text-center text-sm text-destructive">
-                    Erro: {error}
-                </p>
-            )}
-
-            {!searched && (
-                <div className="grid gap-4">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
-                    ))}
-                </div>
-            )}
-
-            {searched && results.length === 0 && !loading && !error && (
-                <p className="text-center text-sm text-muted-foreground">
-                    Nenhum registro encontrado.
-                </p>
-            )}
 
             
         </div>
