@@ -263,8 +263,18 @@ export type PlugSignPrivatizarResultado = {
 };
 
 async function lerErroApi(res: Response, acao: string): Promise<string> {
-    const msg = (await res.text()).trim().split("\n")[0].trim();
-    return msg || `Erro ${res.status} ao ${acao}`;
+    const raw = (await res.text()).trim()
+    const msg = raw.split("\n")[0].trim()
+    if (
+        /1015|rate.?limit|too many (requests|attempts)|429/i.test(raw) ||
+        res.status === 429
+    ) {
+        return (
+            "A PlugSign limitou as requisições (Too Many Attempts / rate limit). " +
+            "Aguarde 15–30 minutos sem enviar de novo e tente outra vez."
+        )
+    }
+    return msg || `Erro ${res.status} ao ${acao}`
 }
 
 export async function getPlugSignPastas(): Promise<PlugSignPastasResponse> {
@@ -335,6 +345,8 @@ export type SolicitacaoCampo = {
     altura?: number;
     text?: string;
     paginaExtra?: boolean;
+    /** Índice do PDF em `documentos` — cada arquivo tem campos independentes. */
+    documentoIndex?: number;
 };
 
 export type SolicitacaoDocumento = {
@@ -383,6 +395,7 @@ export type SolicitacaoAssinaturaPayload = {
 export type SolicitacaoAssinaturaResult = {
     message: string;
     documentKey: string;
+    loteId?: number;
     destinatarios: Array<{ email: string; signingKey: string; signingUrl: string }>;
     documentos?: Array<{
         nome: string;

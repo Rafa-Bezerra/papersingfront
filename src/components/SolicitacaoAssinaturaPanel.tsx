@@ -169,13 +169,14 @@ function membroNaEquipe(equipe: EquipePlugSignMembro[], nome: string, email: str
   )
 }
 
-function labelCampo(c: CampoUi) {
+function labelCampo(c: CampoUi, nomeArquivo?: string) {
   const tipo =
     c.type === 'rubric' ? 'Rubrica' : c.type === 'signature' ? 'Assinatura' : c.label
   const pos = c.paginaExtra
     ? 'página extra'
     : `pág. ${c.page}${c.posX != null ? ` @ ${Math.round((c.posX ?? 0) * 100)}%,${Math.round((c.posY ?? 0) * 100)}%` : ''}`
-  return `${tipo}${c.label && c.label !== tipo ? ` (${c.label})` : ''} — ${pos}`
+  const arq = nomeArquivo ? `${nomeArquivo} · ` : ''
+  return `${arq}${tipo}${c.label && c.label !== tipo ? ` (${c.label})` : ''} — ${pos}`
 }
 
 export default function SolicitacaoAssinaturaPanel({
@@ -236,8 +237,8 @@ export default function SolicitacaoAssinaturaPanel({
     return placeDest.email?.trim() || placeDest.nome?.trim() || undefined
   }, [placeDest])
 
-  /** Todas as marcas posicionadas (todos os destinatários) — usadas no Ver e no Posicionar. */
-  const allPdfMarkers = useMemo(() => {
+  /** Marcas do PDF atual (cada arquivo tem campos independentes). */
+  const markersDoPdfAtual = useMemo(() => {
     const list: {
       page: number
       posX: number
@@ -249,10 +250,12 @@ export default function SolicitacaoAssinaturaPanel({
       owner?: string
       kind?: string
     }[] = []
+    const idx = Math.min(placePdfIndex, Math.max(0, arquivos.length - 1))
     for (const d of destinatarios) {
       const owner = d.email?.trim() || d.nome?.trim() || undefined
       for (const c of d.camposUi) {
         if (c.paginaExtra || c.posX == null || c.posY == null) continue
+        if ((c.documentoIndex ?? 0) !== idx) continue
         const kind = (c.type || '').toLowerCase()
         const displayText =
           kind === 'rubric'
@@ -274,9 +277,23 @@ export default function SolicitacaoAssinaturaPanel({
       }
     }
     return list
-  }, [destinatarios])
+  }, [destinatarios, placePdfIndex, arquivos.length])
 
-  const placeMarkers = allPdfMarkers
+  const placeMarkers = markersDoPdfAtual
+  const allPdfMarkers = markersDoPdfAtual
+
+  /** Quantidade de marcas (assinatura/rúbrica/campo) por índice de PDF. */
+  const marcasPorPdf = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const d of destinatarios) {
+      for (const c of d.camposUi) {
+        if (c.paginaExtra) continue
+        const idx = c.documentoIndex ?? 0
+        map.set(idx, (map.get(idx) ?? 0) + 1)
+      }
+    }
+    return map
+  }, [destinatarios])
 
   useEffect(() => {
     equipeRef.current = equipe
@@ -289,11 +306,20 @@ export default function SolicitacaoAssinaturaPanel({
       setEquipeErro(null)
       try {
         const list = await listarEquipePlugSign()
-        if (!cancel) setEquipe(list)
+        if (!cancel) {
+          setEquipe(list)
+          setEquipeErro(null)
+        }
       } catch (e) {
         if (!cancel) {
           setEquipe([])
-          setEquipeErro(e instanceof Error ? e.message : 'Falha ao carregar equipe PlugSign.')
+          const msg = e instanceof Error ? e.message : 'Falha ao carregar equipe PlugSign.'
+          // Rate-limit: formulário segue utilizável (digitar e-mail / criar fornecedor).
+          if (/too many|rate.?limit|1015|429/i.test(msg)) {
+            setEquipeErro(null)
+          } else {
+            setEquipeErro(msg)
+          }
         }
       } finally {
         if (!cancel) setEquipeLoading(false)
@@ -401,10 +427,27 @@ export default function SolicitacaoAssinaturaPanel({
 
   function removerArquivo(index: number) {
     setArquivos((prev) => prev.filter((_, i) => i !== index))
+    setDestinatarios((prev) =>
+      prev.map((d) => ({
+        ...d,
+        camposUi: d.camposUi
+          .filter((c) => (c.documentoIndex ?? 0) !== index)
+          .map((c) => {
+            const di = c.documentoIndex ?? 0
+            return di > index ? { ...c, documentoIndex: di - 1 } : c
+          }),
+      }))
+    )
+    setPlacePdfIndex((prev) => {
+      if (prev === index) return Math.max(0, index - 1)
+      if (prev > index) return prev - 1
+      return prev
+    })
   }
 
   function adicionarCampoExtra(destId: string, tipoValue: string) {
     const tipo = TIPOS_CAMPO.find((t) => t.value === tipoValue) ?? TIPOS_CAMPO[0]
+    const docIdx = Math.min(placePdfIndex, Math.max(0, arquivos.length - 1))
     const campo: CampoUi = {
       id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       label: tipo.label,
@@ -414,6 +457,7 @@ export default function SolicitacaoAssinaturaPanel({
       width: tipo.w,
       height: tipo.h,
       text: tipo.text,
+      documentoIndex: arquivos.length > 0 ? docIdx : 0,
     }
     setDestinatarios((prev) =>
       prev.map((d) => (d.id === destId ? { ...d, camposUi: [...d.camposUi, campo], expandCampos: true } : d))
@@ -464,8 +508,11 @@ export default function SolicitacaoAssinaturaPanel({
     if (!placeDestId) return
     const w = Math.round(data.largura || placeTipo.w)
     const h = Math.round(data.altura || placeTipo.h)
-    const nAssin = (placeDest?.camposUi.filter((c) => c.type === 'signature' && !c.paginaExtra).length ?? 0) + 1
-    const nRub = (placeDest?.camposUi.filter((c) => c.type === 'rubric' && !c.paginaExtra).length ?? 0) + 1
+    const docIdx = Math.min(placePdfIndex, Math.max(0, arquivos.length - 1))
+    const camposDoPdf =
+      placeDest?.camposUi.filter((c) => (c.documentoIndex ?? 0) === docIdx && !c.paginaExtra) ?? []
+    const nAssin = camposDoPdf.filter((c) => c.type === 'signature').length + 1
+    const nRub = camposDoPdf.filter((c) => c.type === 'rubric').length + 1
     const label =
       placeTipo.apiType === 'signature'
         ? `Assinatura ${nAssin}`
@@ -486,6 +533,7 @@ export default function SolicitacaoAssinaturaPanel({
       width: w,
       height: h,
       text: placeTipo.text,
+      documentoIndex: docIdx,
     }
     setDestinatarios((prev) =>
       prev.map((d) =>
@@ -499,7 +547,7 @@ export default function SolicitacaoAssinaturaPanel({
       )
     )
     // mantém o diálogo aberto (placeMode) para N assinaturas / N rúbricas
-    toast.success(`${label} na página ${data.page}. Pode posicionar outra.`)
+    toast.success(`${label} em ${arquivos[docIdx]?.name ?? `PDF ${docIdx + 1}`} (pág. ${data.page}). Pode posicionar outra.`)
   }
 
   function removerCampo(destId: string, campoId: string) {
@@ -540,7 +588,11 @@ export default function SolicitacaoAssinaturaPanel({
         const { id, label, ...rest } = c
         void id
         void label
-        return rest
+        return {
+          ...rest,
+          // Garante vínculo campo → PDF (evita empilhar todas as marcas no 1º documento).
+          documentoIndex: c.documentoIndex ?? 0,
+        }
       }),
     }))
 
@@ -594,6 +646,12 @@ export default function SolicitacaoAssinaturaPanel({
           }))
         )
 
+        if (arquivos.length > 1) {
+          toast.message('Enviando lote…', {
+            description: `${arquivos.length} documentos em 1 solicitação (1 e-mail na PlugSign).`,
+          })
+        }
+
         const payload: SolicitacaoAssinaturaPayload = {
           documentos,
           nomeDocumento: nomeDocumento.trim() || undefined,
@@ -616,7 +674,15 @@ export default function SolicitacaoAssinaturaPanel({
         }
 
         const res = await criarSolicitacaoAssinatura(payload)
+        if (arquivos.length > 1 && res.loteId == null) {
+          setResultado(res)
+          toast.error(
+            'Não foi um lote: a API ainda enviou documento a documento (vários e-mails). Reinicie a API e envie de novo.'
+          )
+          return
+        }
         setResultado(res)
+        limparFormularioAposEnvio()
         toast.success(res.message || 'Solicitação enviada.')
         if (res.erros?.length) {
           toast.message('Alguns documentos falharam', {
@@ -659,6 +725,37 @@ export default function SolicitacaoAssinaturaPanel({
     }
   }
 
+  /** Limpa o formulário para um novo envio (mantém o bloco de resultado). */
+  function limparFormularioAposEnvio() {
+    setMensagem('')
+    setDefinirOrdem(true)
+    setDestinatarios([novoDestinatario()])
+    setArquivos([])
+    setObservadores('')
+    setValidadeMeses('12')
+    setDataExpiracao('')
+    setNomeDocumento('')
+    setOpenNomeId(null)
+    setFlags({
+      exigirCertificadoDigital: false,
+      adicionarObservadores: false,
+      monitorarValidade: false,
+      autodestruir: false,
+      autenticacaoDoisFatores: false,
+      solicitarCpf: true,
+      solicitarDataNascimento: true,
+      solicitarSelfieDocumento: false,
+    })
+    setPlaceOpen(false)
+    setPlaceDestId(null)
+    setPlaceTipo(TIPOS_CAMPO[0])
+    setPlacePdfIndex(0)
+    setViewOnlyOpen(false)
+    setPdfPreviewB64(null)
+    const input = document.getElementById(`${formId}-pdf`) as HTMLInputElement | null
+    if (input) input.value = ''
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -666,8 +763,8 @@ export default function SolicitacaoAssinaturaPanel({
           <div className="min-w-0">
             <CardTitle className="text-2xl font-bold">Solicitação de assinatura</CardTitle>
             <p className="text-sm text-muted-foreground mt-0.5">
-              A PlugSign envia o e-mail; o destinatário assina na PlugSign. Andamento e PDF assinado
-              voltam automaticamente ao PaperSign (Minhas solicitações).
+              Com vários PDFs, a PlugSign envia <strong>1 e-mail</strong> (lote) e o destinatário
+              assina todos de uma vez. Andamento e PDFs assinados voltam ao PaperSign.
             </p>
           </div>
           <Button type="button" onClick={handleEnviar} disabled={isPending} className="shrink-0">
@@ -710,13 +807,29 @@ export default function SolicitacaoAssinaturaPanel({
             </div>
             {arquivos.length > 0 && (
               <ul className="space-y-1.5">
-                {arquivos.map((f, i) => (
+                {arquivos.map((f, i) => {
+                  const qtdMarcas = marcasPorPdf.get(i) ?? 0
+                  const posicionado = qtdMarcas > 0
+                  return (
                   <li
                     key={`${f.name}-${f.size}-${i}`}
-                    className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs"
+                    className={`flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+                      posicionado
+                        ? 'border-emerald-500/50 bg-emerald-500/10'
+                        : 'border-border'
+                    }`}
                   >
-                    <FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    {posicionado ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    )}
                     <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
+                    {posicionado && (
+                      <span className="shrink-0 rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                        {qtdMarcas} marca{qtdMarcas > 1 ? 's' : ''}
+                      </span>
+                    )}
                     <Button
                       type="button"
                       variant="outline"
@@ -731,15 +844,27 @@ export default function SolicitacaoAssinaturaPanel({
                     </Button>
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant={posicionado ? 'default' : 'secondary'}
                       size="sm"
-                      className="h-7 px-2 text-[10px]"
+                      className={`h-7 px-2 text-[10px] ${
+                        posicionado
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : ''
+                      }`}
                       disabled={isPending || destinatarios.length === 0}
                       onClick={() => abrirPosicionar(destinatarios[0].id, 'signature', i)}
-                      title="Posicionar assinatura/rúbrica neste PDF"
+                      title={
+                        posicionado
+                          ? 'Já posicionado — clique para ajustar ou adicionar marcas'
+                          : 'Posicionar assinatura/rúbrica neste PDF'
+                      }
                     >
-                      <MapPin className="h-3 w-3 mr-1" />
-                      Posicionar
+                      {posicionado ? (
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                      ) : (
+                        <MapPin className="h-3 w-3 mr-1" />
+                      )}
+                      {posicionado ? 'Posicionado' : 'Posicionar'}
                     </Button>
                     <Button
                       type="button"
@@ -752,14 +877,24 @@ export default function SolicitacaoAssinaturaPanel({
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
             {arquivos.length > 0 && (
               <p className="text-[11px] text-muted-foreground">
-                As marcas no PDF ficam visíveis para o destinatário ao abrir o link: ele vê onde
-                assinar/rubricar e, depois de assinar, a marca some e entra a assinatura real.
-                Use <strong>Campos / posição no PDF</strong> no card ou Posicionar.
+                {arquivos.length > 1 ? (
+                  <>
+                    <strong>Envio em lote:</strong> o destinatário recebe <strong>1 e-mail</strong> e
+                    assina todos os PDFs juntos. Posicione assinatura/rúbrica em cada arquivo (marcas
+                    independentes).
+                  </>
+                ) : (
+                  <>
+                    Use <strong>Posicionar</strong> para marcar assinatura/rúbrica neste PDF. As marcas
+                    ficam visíveis ao destinatário ao abrir o link.
+                  </>
+                )}
               </p>
             )}
             <div className="space-y-1">
@@ -1152,12 +1287,13 @@ export default function SolicitacaoAssinaturaPanel({
                     {d.expandCampos && (
                       <div className="mt-2 rounded-md border bg-muted/20 p-2 space-y-2">
                         <p className="text-[11px] text-muted-foreground">
-                          Marcas temporárias no PDF: o destinatário vê ao abrir o documento e assina
-                          nesses pontos. Pode colocar várias assinaturas e rúbricas.
+                          Marcas por documento: posicione assinatura/rúbrica em cada PDF. O destinatário
+                          vê os pontos ao abrir e assina neles.
                         </p>
                         {d.camposUi.length === 0 ? (
                           <p className="text-xs text-amber-700 dark:text-amber-300">
-                            Nenhum campo ainda. Clique em Assinatura ou Rúbrica para marcar no PDF.
+                            Nenhum campo ainda. Clique em Assinatura ou Rúbrica (ou Posicionar no
+                            arquivo) para marcar no PDF.
                           </p>
                         ) : (
                           <ul className="space-y-1">
@@ -1166,7 +1302,15 @@ export default function SolicitacaoAssinaturaPanel({
                                 key={c.id}
                                 className="flex items-center gap-2 rounded border bg-background px-2 py-1 text-xs"
                               >
-                                <span className="flex-1 truncate">{labelCampo(c)}</span>
+                                <span className="flex-1 truncate">
+                                  {labelCampo(
+                                    c,
+                                    arquivos.length > 1
+                                      ? arquivos[c.documentoIndex ?? 0]?.name ??
+                                          `PDF ${(c.documentoIndex ?? 0) + 1}`
+                                      : undefined
+                                  )}
+                                </span>
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1307,6 +1451,12 @@ export default function SolicitacaoAssinaturaPanel({
           </CardHeader>
           <CardContent className="space-y-2 text-sm pt-0">
             <p>{resultado.message}</p>
+            {resultado.loteId != null && (
+              <p className="text-xs text-muted-foreground">
+                Lote PlugSign #{resultado.loteId} — um link de assinatura para todos os documentos
+                abaixo.
+              </p>
+            )}
             {(resultado.documentos?.length
               ? resultado.documentos
               : [
@@ -1348,7 +1498,8 @@ export default function SolicitacaoAssinaturaPanel({
                 <p className="text-xs text-muted-foreground break-all">
                   document_key: {doc.documentKey}
                 </p>
-                {(doc.destinatarios ?? []).map((dest, i) => (
+                {(resultado.loteId == null || di === 0) &&
+                  (doc.destinatarios ?? resultado.destinatarios ?? []).map((dest, i) => (
                   <div key={`${dest.email}-${i}`} className="rounded border px-2 py-1.5 text-xs space-y-0.5">
                     <p>{dest.email || `Destinatário ${i + 1}`}</p>
                     {dest.signingUrl ? (
@@ -1377,12 +1528,14 @@ export default function SolicitacaoAssinaturaPanel({
       <PdfViewerDialog
         open={placeOpen}
         onOpenChange={setPlaceOpen}
-        title={`Posicionar ${placeTipo.label}${placeDest?.nome ? ` — ${placeDest.nome}` : ''}`}
+        title={`Posicionar ${placeTipo.label}${placeDest?.nome ? ` — ${placeDest.nome}` : ''}${
+          pdfParaPosicionar?.name ? ` · ${pdfParaPosicionar.name}` : ''
+        }`}
         pdfBase64={pdfPreviewB64}
         canSign
         placeMode
         confirmLabel="Confirmar posição"
-        placeHint="Clique no PDF para marcar. Pode adicionar várias assinaturas e rúbricas."
+        placeHint="Clique no PDF para marcar. Cada arquivo tem posições próprias — troque o PDF abaixo se houver vários."
         placeFieldLabel={
           placeTipo.apiType === 'rubric'
             ? 'Rubrica'
@@ -1397,6 +1550,33 @@ export default function SolicitacaoAssinaturaPanel({
         onSign={confirmarPosicao}
         extraControls={
           <div className="flex flex-wrap items-center gap-1.5">
+            {arquivos.length > 1 && (
+              <Select
+                value={String(placePdfIndex)}
+                onValueChange={async (v) => {
+                  const idx = Number(v)
+                  const file = arquivos[idx]
+                  if (!file) return
+                  setPlacePdfIndex(idx)
+                  try {
+                    await carregarPdfBase64(file)
+                  } catch {
+                    toast.error('Não foi possível abrir este PDF.')
+                  }
+                }}
+              >
+                <SelectTrigger className="h-7 w-[180px] text-[10px]">
+                  <SelectValue placeholder="PDF" />
+                </SelectTrigger>
+                <SelectContent className="z-[300]">
+                  {arquivos.map((f, i) => (
+                    <SelectItem key={`${f.name}-${i}`} value={String(i)}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {destinatarios.length > 1 && (
               <Select
                 value={placeDestId ?? undefined}
@@ -1448,8 +1628,8 @@ export default function SolicitacaoAssinaturaPanel({
         markers={allPdfMarkers}
         placeHint={
           allPdfMarkers.length
-            ? `${allPdfMarkers.length} marca(s) posicionada(s) neste envio`
-            : undefined
+            ? `${allPdfMarkers.length} marca(s) neste PDF`
+            : 'Nenhuma marca neste PDF ainda'
         }
       />
 
