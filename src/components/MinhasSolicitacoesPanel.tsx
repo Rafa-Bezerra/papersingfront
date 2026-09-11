@@ -134,8 +134,8 @@ export default function MinhasSolicitacoesPanel() {
         toast.error(
           /Token not found/i.test(raw)
             ? 'Token PlugSign inválido. Confira PlugSign:Token no appsettings e reinicie a API.'
-            : /429|rate.?limit|limitou/i.test(raw)
-              ? 'A PlugSign limitou as consultas. Aguarde alguns segundos e atualize.'
+            : /1015|429|rate.?limit|limitou/i.test(raw)
+              ? 'A PlugSign limitou as consultas (1015). Aguarde 15–30 min e clique em Atualizar.'
               : raw
         )
       }
