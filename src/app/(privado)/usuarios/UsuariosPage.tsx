@@ -103,6 +103,7 @@ export default function PageUsuarios() {
       projetos: false,
       contratos: false,
       financeiro_totvs: false,
+      receitas: false,
       replicar_todas_unidades: false,
     }
   })
@@ -237,6 +238,7 @@ export default function PageUsuarios() {
         projetos: response.projetos,
         contratos: response.contratos,
         financeiro_totvs: response.financeiro_totvs,
+        receitas: response.receitas,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -274,6 +276,7 @@ export default function PageUsuarios() {
       projetos: false,
       contratos: false,
       financeiro_totvs: false,
+      receitas: false,
       replicar_todas_unidades: false,
     })
     setUpdateMode(false)
@@ -773,6 +776,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Projetos</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="receitas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Receitas</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

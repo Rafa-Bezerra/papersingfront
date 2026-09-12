@@ -843,7 +843,7 @@ ${html}
         <div className="p-6">
             <Card className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <CardTitle id="tour-ci-titulo" className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex flex-wrap justify-end items-end gap-3">
                         {/* Data de */}
                         <div className="flex flex-col">
@@ -932,7 +932,7 @@ ${html}
                         <SearchIcon className="mr-1 h-4 w-4" /> Buscar
                     </Button>
 
-                    <Button onClick={handleInserirComunicado} className="flex items-center">
+                    <Button id="tour-ci-novo" onClick={handleInserirComunicado} className="flex items-center">
                         <SquarePlus className="mr-1 h-4 w-4" /> Novo
                     </Button>
                 </CardContent>
@@ -1173,7 +1173,7 @@ ${html}
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="sm:max-w-4xl overflow-y-auto max-h-[90dvh]">
+                <DialogContent id="tour-ci-form" className="sm:max-w-4xl overflow-y-auto max-h-[90dvh]">
                     <div className="overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
@@ -1268,7 +1268,7 @@ ${html}
                                     name="anexo"
                                     rules={{ required: 'Anexo é obrigatório' }}
                                     render={({ field }) => (
-                                        <FormItem>
+                                        <FormItem id="tour-ci-corpo">
                                             <FormLabel>Corpo do documento</FormLabel>
                                             <FormControl>
                                                 <textarea
@@ -1301,7 +1301,7 @@ ${html}
                                     aprovado (ver ComunicadosController.Aprovar); não há mais botão manual
                                     "Criar Financeiro" nesse ponto do fluxo. */}
                                 {userFinanceiroTotvs && (
-                                    <Card>
+                                    <Card id="tour-ci-financeiro-rm">
                                         <CardHeader>
                                             <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
                                         </CardHeader>
@@ -1454,7 +1454,7 @@ ${html}
                                 />
 
                                 {/* Anexos */}
-                                <Card className="mb-6">
+                                <Card id="tour-ci-anexos" className="mb-6">
                                     <CardHeader>
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
@@ -1507,7 +1507,7 @@ ${html}
                                     </CardContent>
                                 </Card>
 
-                                <Button type="submit" disabled={isLoading}>{isLoading ? 'Salvando…' : 'Salvar'}</Button>
+                                <Button id="tour-ci-salvar" type="submit" disabled={isLoading}>{isLoading ? 'Salvando…' : 'Salvar'}</Button>
                             </form>
                         </Form>
                     </div>
@@ -1647,7 +1647,7 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     });
 
     return (
-        <div className="flex flex-col gap-2 border p-3 rounded-md">
+        <div id="tour-ci-aprovadores" className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
 
             {fields.map((field, index) => (
@@ -1770,7 +1770,7 @@ function ItensFinanceirosSection({
     const { fields, append, remove } = useFieldArray({ control, name: 'itensFinanceiros' });
 
     return (
-        <Card>
+        <Card id="tour-ci-itens">
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Rateio dos Itens</CardTitle>
                 <Button
