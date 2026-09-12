@@ -41,6 +41,7 @@ export const PERFIS_DISPARO = [
   { id: "financeiro", label: "Financeiro" },
   { id: "docusign", label: "PlugSing" },
   { id: "projetos", label: "Projetos" },
+  { id: "receitas", label: "Receitas" },
   { id: "contratos", label: "Contratos" },
   { id: "financeiro_totvs", label: "Financeiro TOTVS" },
 ] as const;

@@ -24,6 +24,7 @@ export const data = {
         { title: "Documentos", url: "/documentos" },
         { title: "PlugSing", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },
+        { title: "Receitas", url: "/receitas" },
         { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },

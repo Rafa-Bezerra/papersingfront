@@ -26,7 +26,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Truck
+  Truck,
+  CircleDollarSign
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -60,6 +61,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userFinanceiro, setUserFinanceiro] = useState(false)
   const [userDocusign, setUserDocusign] = useState(false)
   const [userProjetos, setUserProjetos] = useState(false)
+  const [userReceitas, setUserReceitas] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -91,6 +93,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserFinanceiro(user.financeiro);
         setUserDocusign(user.docusign);
         setUserProjetos(user.projetos);
+        setUserReceitas(user.receitas);
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -131,6 +134,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Documentos': <FileText className="w-5 h-5" />,
     'PlugSing': <FileText className="w-5 h-5" />,
     'Projetos': <FileText className="w-5 h-5" />,
+    'Receitas': <CircleDollarSign className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -250,6 +254,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
+                      // Receitas: só quem tem a flag (admin sempre vê).
+                      // Financeiro NÃO herda este módulo automaticamente.
+                      if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações
                       // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
                       if (!userAdmin && !userFinanceiro) {
@@ -279,7 +286,15 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       return (
                         <SidebarMenuItem
                           key={item.title}
-                          id={item.url === '/docusign' ? 'tour-menu-plugsign' : undefined}
+                          id={
+                            item.url === '/docusign'
+                              ? 'tour-menu-plugsign'
+                              : item.url === '/receitas'
+                                ? 'tour-menu-receitas'
+                                : item.url === '/comunicados'
+                                  ? 'tour-menu-pagamentos-ci'
+                                  : undefined
+                          }
                         >
                           <SidebarMenuButton
                             asChild

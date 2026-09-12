@@ -38,6 +38,7 @@ export interface LoginResponse {
   projetos: boolean;
   contratos: boolean;
   financeiro_totvs: boolean;
+  receitas: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -92,6 +93,7 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     financeiro_totvs: Boolean(
       apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false
     ),
+    receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
 
     pagamento_impostos: Boolean(
       apiData.pagamento_impostos ??
@@ -191,6 +193,7 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
     contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
     financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
+    receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
   };
 }
 

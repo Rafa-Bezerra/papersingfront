@@ -28,6 +28,7 @@ export type Usuario = {
     projetos: boolean,
     contratos: boolean,
     financeiro_totvs: boolean,
+    receitas: boolean,
     replicar_todas_unidades?: boolean,
 }
 

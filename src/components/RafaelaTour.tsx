@@ -35,16 +35,46 @@ function ladoDriver(lado?: string | null): 'left' | 'top' | 'right' | 'bottom' {
   return 'right'
 }
 
-/** Mesma regra do menu/ClientLayout: admin, financeiro ou flag docusign. */
-function usuarioPodePlugSign(): boolean {
+function lerUserData(): Record<string, unknown> | null {
   try {
     const raw = sessionStorage.getItem('userData')
-    if (!raw) return false
-    const u = JSON.parse(raw)
-    return Boolean(u?.admin || u?.financeiro || u?.docusign)
+    if (!raw) return null
+    return JSON.parse(raw) as Record<string, unknown>
   } catch {
-    return false
+    return null
   }
+}
+
+/** Mesma regra do menu: admin ou flag receitas. */
+function usuarioPodeReceitas(): boolean {
+  const u = lerUserData()
+  return Boolean(u?.admin || u?.receitas)
+}
+
+/** Mesma regra do menu: admin, financeiro ou flag docusign. */
+function usuarioPodePlugSign(): boolean {
+  const u = lerUserData()
+  return Boolean(u?.admin || u?.financeiro || u?.docusign)
+}
+
+/** Mesma regra do menu: admin, financeiro ou flag comunicados. */
+function usuarioPodePagamentosCi(): boolean {
+  const u = lerUserData()
+  return Boolean(u?.admin || u?.financeiro || u?.comunicados)
+}
+
+/** Campos de FLAN no formulário: só quem tem financeiro_totvs. */
+function usuarioPodeFinanceiroRm(): boolean {
+  const u = lerUserData()
+  return Boolean(u?.financeiro_totvs)
+}
+
+function passoEhReceitas(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  const rota = (passo.rota || '').trim().toLowerCase()
+  if (sel.includes('receitas')) return true
+  if (rota.includes('/receitas')) return true
+  return false
 }
 
 function passoEhPlugSign(passo: TourPasso): boolean {
@@ -55,13 +85,95 @@ function passoEhPlugSign(passo: TourPasso): boolean {
   return false
 }
 
+function passoEhPagamentosCi(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  const rota = (passo.rota || '').trim().toLowerCase()
+  if (sel.includes('pagamentos-ci') || sel.includes('tour-ci-')) return true
+  if (rota.includes('/comunicados')) return true
+  return false
+}
+
+function passoEhCiFinanceiroRm(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  return sel === '#tour-ci-financeiro-rm'
+}
+
+function passoEhGlpi(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  return sel.includes('suporte') || sel.includes('glpi')
+}
+
+function passoEhMenuGeral(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  return sel === '#tour-sidebar'
+}
+
+function listarModulosTour(): string[] {
+  const mods: string[] = []
+  if (usuarioPodeReceitas()) mods.push('Receitas')
+  if (usuarioPodePagamentosCi()) mods.push('Pagamentos CI')
+  if (usuarioPodePlugSign()) mods.push('PlugSign')
+  return mods
+}
+
+function juntarListaPt(itens: string[]): string {
+  if (itens.length === 0) return ''
+  if (itens.length === 1) return itens[0]
+  if (itens.length === 2) return `${itens[0]} e ${itens[1]}`
+  return `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`
+}
+
+/**
+ * Regras do tour:
+ * - sem Receitas, sem Pagamentos CI e sem PlugSign → só GLPI
+ * - cada módulo liberado entra no tour + GLPI
+ * - passo de financeiro RM no formulário da CI só com financeiro_totvs
+ * Menu lateral só entra quando há pelo menos um módulo.
+ */
 function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
   const podePlug = usuarioPodePlugSign()
+  const podeReceitas = usuarioPodeReceitas()
+  const podeCi = usuarioPodePagamentosCi()
+  const podeFinRm = usuarioPodeFinanceiroRm()
+  const temAlgumModulo = podePlug || podeReceitas || podeCi
+
   return passos.filter((p) => {
     if (!p.seletorCss || !p.seletorCss.trim()) return false
-    if (!podePlug && passoEhPlugSign(p)) return false
-    return true
+
+    if (passoEhGlpi(p)) return true
+    if (passoEhMenuGeral(p)) return temAlgumModulo
+    if (passoEhReceitas(p)) return podeReceitas
+    if (passoEhCiFinanceiroRm(p)) return podeCi && podeFinRm
+    if (passoEhPagamentosCi(p)) return podeCi
+    if (passoEhPlugSign(p)) return podePlug
+
+    return temAlgumModulo
   })
+}
+
+function mensagemIntroPorPerfil(): string {
+  const mods = listarModulosTour()
+  if (mods.length === 0) {
+    return 'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar o ícone de Suporte, para abrir chamado no GLPI quando precisar de ajuda.'
+  }
+  return `Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar ${juntarListaPt(mods)} e o suporte para abertura de chamado.`
+}
+
+function mensagemFimPorPerfil(): string {
+  const mods = listarModulosTour()
+  if (mods.length === 0) {
+    return 'Pronto!\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!'
+  }
+  let extras = ''
+  if (usuarioPodeReceitas()) {
+    extras +=
+      '\n\nReceitas aparece só para administrador ou quem tem a permissão Receitas em Usuários.'
+  }
+  if (usuarioPodePagamentosCi()) {
+    extras +=
+      '\n\nEm Pagamentos CI, ao concluir a aprovação o financeiro pode ser gerado automaticamente no RM.'
+  }
+  return `Pronto! Essas foram as novidades.${extras}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
 
 function normalizarPath(rota?: string | null): string {
@@ -76,22 +188,81 @@ function comBarraFinal(rota: string): string {
   return qs ? `${base}?${qs}` : base
 }
 
-async function esperarSeletor(seletor: string, timeoutMs = 10000): Promise<Element | null> {
+async function esperarSeletor(seletor: string, timeoutMs = 5000): Promise<Element | null> {
   const inicio = Date.now()
   while (Date.now() - inicio < timeoutMs) {
     const el = document.querySelector(seletor)
     if (el) return el
-    await new Promise((r) => setTimeout(r, 120))
+    await new Promise((r) => setTimeout(r, 100))
   }
   return document.querySelector(seletor)
+}
+
+async function ativarAbaReceitasSePreciso(seletor: string): Promise<void> {
+  // Ações só existem com a aba da unidade aberta.
+  if (seletor === '#tour-receitas-acoes' || seletor === '#tour-receitas-abas') {
+    const aba = document.querySelector('#tour-receitas-unidade')
+    if (aba instanceof HTMLElement) {
+      aba.click()
+      await new Promise((r) => setTimeout(r, 350))
+    }
+  }
+}
+
+const SELETORES_FORM_CI = new Set([
+  '#tour-ci-form',
+  '#tour-ci-corpo',
+  '#tour-ci-aprovadores',
+  '#tour-ci-itens',
+  '#tour-ci-financeiro-rm',
+  '#tour-ci-anexos',
+  '#tour-ci-salvar',
+])
+
+function fecharFormCiSeAberto(): void {
+  if (!document.querySelector('#tour-ci-form')) return
+  const closeBtn = document.querySelector(
+    '[data-radix-dialog-content]#tour-ci-form button[data-radix-dialog-close], #tour-ci-form button.absolute'
+  )
+  if (closeBtn instanceof HTMLElement) {
+    closeBtn.click()
+    return
+  }
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+}
+
+async function ativarFormCiSePreciso(seletor: string): Promise<void> {
+  if (!SELETORES_FORM_CI.has(seletor)) {
+    if (!seletor.startsWith('#tour-ci-') || seletor === '#tour-ci-titulo' || seletor === '#tour-ci-novo') {
+      fecharFormCiSeAberto()
+    }
+    return
+  }
+
+  if (document.querySelector('#tour-ci-form')) return
+
+  const btn = document.querySelector('#tour-ci-novo')
+  if (btn instanceof HTMLElement) {
+    btn.click()
+    await esperarSeletor('#tour-ci-form', 4000)
+    await new Promise((r) => setTimeout(r, 300))
+  }
+}
+
+function limparPopoversDriverExtras(): void {
+  const pops = Array.from(document.querySelectorAll('.driver-popover'))
+  // Driver às vezes deixa o balão anterior na tela ao trocar de passo/rota.
+  if (pops.length > 1) {
+    pops.slice(0, -1).forEach((el) => el.remove())
+  }
 }
 
 async function prepararPasso(
   passo: TourPasso,
   routerPush: (href: string) => void
-): Promise<void> {
+): Promise<boolean> {
   const seletor = (passo.seletorCss || '').trim()
-  if (!seletor) return
+  if (!seletor) return false
 
   const rota = (passo.rota || '').trim()
   if (rota) {
@@ -99,18 +270,33 @@ async function prepararPasso(
     const dest = normalizarPath(rota)
     if (atual !== dest) {
       routerPush(comBarraFinal(rota))
+      await new Promise((r) => setTimeout(r, 700))
     }
   }
 
-  const el = await esperarSeletor(seletor)
-  if (el instanceof HTMLElement) {
-    // Ativa abas do PlugSign (Radix TabsTrigger) antes do highlight
-    if (seletor.startsWith('#tour-plugsign-') && seletor !== '#tour-plugsign-guias') {
-      el.click()
-      await new Promise((r) => setTimeout(r, 180))
-    }
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+  await ativarAbaReceitasSePreciso(seletor)
+  await ativarFormCiSePreciso(seletor)
+
+  let el = await esperarSeletor(seletor)
+  if (!el && seletor === '#tour-receitas-acoes') {
+    // Fallback: destaca as abas se as ações ainda não montaram.
+    el = await esperarSeletor('#tour-receitas-abas', 2000)
   }
+
+  if (el instanceof HTMLElement) {
+    if (
+      (seletor.startsWith('#tour-plugsign-') && seletor !== '#tour-plugsign-guias') ||
+      seletor === '#tour-receitas-consulta' ||
+      seletor === '#tour-receitas-unidade'
+    ) {
+      el.click()
+      await new Promise((r) => setTimeout(r, 300))
+    }
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+    return true
+  }
+
+  return false
 }
 
 export default function RafaelaTour() {
@@ -124,6 +310,7 @@ export default function RafaelaTour() {
   const finalizandoRef = useRef(false)
   const passosRef = useRef<TourPasso[]>([])
   const tentouBuscarRef = useRef(false)
+  const navLockRef = useRef(false)
 
   const marcarVisualizado = useCallback(async (versao: string) => {
     try {
@@ -152,11 +339,28 @@ export default function RafaelaTour() {
     [marcarVisualizado, tour?.versao]
   )
 
-  const irParaEscolha = useCallback(() => {
+  /** Encerra os destaques e vai para a tela final (Entendido / ver de novo). */
+  const irParaFinal = useCallback(() => {
     finalizandoRef.current = true
-    driverRef.current?.destroy()
+    try {
+      driverRef.current?.destroy()
+    } catch {
+      /* silencioso */
+    }
     driverRef.current = null
     setAnimApontar(false)
+    // Fecha formulário da CI se o tour tiver aberto no meio do passo a passo.
+    try {
+      if (document.querySelector('#tour-ci-form')) {
+        const closeBtn = document.querySelector(
+          '#tour-ci-form button[data-radix-dialog-close], #tour-ci-form > button'
+        )
+        if (closeBtn instanceof HTMLElement) closeBtn.click()
+        else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      }
+    } catch {
+      /* silencioso */
+    }
     setFase('fim')
   }, [])
 
@@ -166,21 +370,41 @@ export default function RafaelaTour() {
       return
     }
 
+    // Evita dois drivers ao mesmo tempo (auto-start + clique em Próximo).
+    if (driverRef.current) {
+      finalizandoRef.current = true
+      try {
+        driverRef.current.destroy()
+      } catch {
+        /* silencioso */
+      }
+      driverRef.current = null
+      document.querySelectorAll('.driver-popover').forEach((el) => el.remove())
+      finalizandoRef.current = false
+    }
+
     const passos = filtrarPassosPorPermissao([...tour.passos]).sort(
       (a, b) => a.ordem - b.ordem
     )
 
     passosRef.current = passos
+    navLockRef.current = false
 
-    const steps: DriveStep[] = passos.map((p) => ({
-      element: p.seletorCss!.trim(),
-      popover: {
-        title: p.titulo || tour.titulo || 'Novidade',
-        description: p.mensagem.replace(/\n/g, '<br/>'),
-        side: ladoDriver(p.lado),
-        align: 'start',
-      },
-    }))
+    const steps: DriveStep[] = passos.map((p) => {
+      const sel = p.seletorCss!.trim()
+      return {
+        element: () =>
+          (document.querySelector(sel) as Element) ||
+          (document.querySelector('#tour-receitas-abas') as Element) ||
+          document.body,
+        popover: {
+          title: p.titulo || tour.titulo || 'Novidade',
+          description: p.mensagem.replace(/\n/g, '<br/>'),
+          side: ladoDriver(p.lado),
+          align: 'start',
+        },
+      }
+    })
 
     if (steps.length === 0) {
       setFase('fim')
@@ -193,16 +417,28 @@ export default function RafaelaTour() {
 
     const d = driver({
       showProgress: true,
-      animate: true,
+      animate: false,
       overlayOpacity: 0.55,
       stagePadding: 8,
       stageRadius: 10,
       allowClose: true,
+      smoothScroll: false,
       nextBtnText: 'Próximo',
       prevBtnText: 'Anterior',
       doneBtnText: 'Finalizar',
       progressText: '{{current}} de {{total}}',
       steps,
+      onHighlightStarted: () => {
+        limparPopoversDriverExtras()
+      },
+      onHighlighted: () => {
+        limparPopoversDriverExtras()
+        try {
+          d.refresh()
+        } catch {
+          /* silencioso */
+        }
+      },
       onDestroyStarted: () => {
         if (finalizandoRef.current) {
           d.destroy()
@@ -214,29 +450,61 @@ export default function RafaelaTour() {
       },
       onDestroyed: () => {
         driverRef.current = null
+        navLockRef.current = false
         setAnimApontar(false)
+        document.querySelectorAll('.driver-popover').forEach((el) => el.remove())
       },
       onNextClick: (_el, _step, { driver: drv }) => {
         void (async () => {
-          if (drv.isLastStep()) {
-            finalizandoRef.current = true
-            drv.destroy()
-            setFase('fim')
-            setAnimApontar(false)
-            return
+          if (navLockRef.current) return
+          navLockRef.current = true
+          try {
+            if (drv.isLastStep()) {
+              finalizandoRef.current = true
+              drv.destroy()
+              setFase('fim')
+              setAnimApontar(false)
+              return
+            }
+            const next = passosRef.current[(drv.getActiveIndex() ?? 0) + 1]
+            if (next) await prepararPasso(next, (href) => router.push(href))
+            limparPopoversDriverExtras()
+            drv.moveNext()
+            requestAnimationFrame(() => {
+              limparPopoversDriverExtras()
+              try {
+                drv.refresh()
+              } catch {
+                /* silencioso */
+              }
+            })
+          } finally {
+            navLockRef.current = false
           }
-          const next = passosRef.current[(drv.getActiveIndex() ?? 0) + 1]
-          if (next) await prepararPasso(next, (href) => router.push(href))
-          drv.moveNext()
         })()
       },
       onPrevClick: (_el, _step, { driver: drv }) => {
         void (async () => {
-          const idx = drv.getActiveIndex() ?? 0
-          if (idx <= 0) return
-          const prev = passosRef.current[idx - 1]
-          if (prev) await prepararPasso(prev, (href) => router.push(href))
-          drv.movePrevious()
+          if (navLockRef.current) return
+          navLockRef.current = true
+          try {
+            const idx = drv.getActiveIndex() ?? 0
+            if (idx <= 0) return
+            const prev = passosRef.current[idx - 1]
+            if (prev) await prepararPasso(prev, (href) => router.push(href))
+            limparPopoversDriverExtras()
+            drv.movePrevious()
+            requestAnimationFrame(() => {
+              limparPopoversDriverExtras()
+              try {
+                drv.refresh()
+              } catch {
+                /* silencioso */
+              }
+            })
+          } finally {
+            navLockRef.current = false
+          }
         })()
       },
       onCloseClick: (_el, _step, { driver: drv }) => {
@@ -252,6 +520,7 @@ export default function RafaelaTour() {
       try {
         await prepararPasso(passos[0], (href) => router.push(href))
         d.drive()
+        requestAnimationFrame(() => limparPopoversDriverExtras())
       } catch {
         setFase('fim')
         setAnimApontar(false)
@@ -308,12 +577,9 @@ export default function RafaelaTour() {
 
   const balãoTexto =
     fase === 'intro' || fase === 'auto-start'
-      ? tour.mensagemIntro ||
-        'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar o PlugSign, as guias de cada aba e o suporte para abertura de chamado.'
+      ? mensagemIntroPorPerfil()
       : fase === 'fim'
-        ? (tour.mensagemFim ||
-            'Pronto! Essas foram as novidades.\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!') +
-          '\n\nComo deseja continuar?'
+        ? mensagemFimPorPerfil() + '\n\nComo deseja continuar?'
         : 'Siga os destaques na tela. Use Próximo e Anterior no guia.'
 
   return (
@@ -331,7 +597,7 @@ export default function RafaelaTour() {
             <div className={`rafaela-balloon-actions ${fase === 'fim' ? 'stack' : ''}`}>
               {(fase === 'intro' || fase === 'auto-start') && (
                 <>
-                  <button type="button" className="rafaela-btn ghost" onClick={irParaEscolha}>
+                  <button type="button" className="rafaela-btn ghost" onClick={irParaFinal}>
                     Agora não
                   </button>
                   <button type="button" className="rafaela-btn primary" onClick={iniciarPassos}>
@@ -366,7 +632,7 @@ export default function RafaelaTour() {
               type="button"
               className="rafaela-close"
               aria-label="Fechar"
-              onClick={irParaEscolha}
+              onClick={irParaFinal}
             >
               <X className="h-4 w-4" />
             </button>
@@ -387,7 +653,7 @@ export default function RafaelaTour() {
           </div>
           {fase === 'passos' && (
             <div className="rafaela-mini-actions">
-              <button type="button" className="rafaela-btn ghost sm" onClick={irParaEscolha}>
+              <button type="button" className="rafaela-btn ghost sm" onClick={irParaFinal}>
                 <ChevronLeft className="h-3.5 w-3.5" /> Pular
               </button>
             </div>
@@ -400,7 +666,8 @@ export default function RafaelaTour() {
           position: fixed;
           right: 1rem;
           bottom: 1rem;
-          z-index: 10050;
+          /* Acima do overlay/popover do driver.js (1e9) para o Pular sempre receber clique */
+          z-index: 1000000001;
           pointer-events: none;
         }
         .rafaela-tour-panel {

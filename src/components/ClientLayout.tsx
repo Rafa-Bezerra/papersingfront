@@ -84,6 +84,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const isFinanceiro = Boolean(parsedUser?.financeiro);
             const canDocusign = Boolean(parsedUser?.docusign);
             const canProjetos = Boolean(parsedUser?.projetos);
+            const canReceitas = Boolean(parsedUser?.receitas);
 
             // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
             if (
@@ -113,6 +114,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
             // Bloqueia acesso direto a Projetos sem permissão (admin/financeiro/projetos).
             if (normalizedPath === "/projetos" && !isAdmin && !isFinanceiro && !canProjetos) {
+              setIsAuthorized(false);
+            }
+
+            // Receitas: só quem tem a flag (ou admin).
+            if (normalizedPath === "/receitas" && !isAdmin && !canReceitas) {
               setIsAuthorized(false);
             }
           } catch (parseError) {
