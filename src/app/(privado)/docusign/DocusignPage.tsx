@@ -755,6 +755,23 @@ export default function Page() {
     const [aba, setAba] = useState('documentos')
     const [fornecedorPrefill, setFornecedorPrefill] = useState<{ nome?: string; email?: string } | null>(null)
 
+    // Tour Raphaela: troca a aba controlada (Radix Tabs não muda só com .click()).
+    useEffect(() => {
+        const handler = (ev: Event) => {
+            const detail = (ev as CustomEvent<string>).detail
+            if (
+                detail === 'documentos' ||
+                detail === 'solicitacao' ||
+                detail === 'minhas-solicitacoes' ||
+                detail === 'fornecedor'
+            ) {
+                setAba(detail)
+            }
+        }
+        window.addEventListener('tour-plugsign-aba', handler)
+        return () => window.removeEventListener('tour-plugsign-aba', handler)
+    }, [])
+
     return (
         <div className="p-6">
             <Tabs value={aba} onValueChange={setAba} className="space-y-4">
@@ -792,10 +809,10 @@ export default function Page() {
 
                 <TabsContent value="documentos" className="mt-0 space-y-0">
             {/* Header */}
-            <Card className="mb-6">
+            <Card id="tour-plugsign-doc-painel" className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
-                        <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                        <CardTitle id="tour-plugsign-doc-titulo" className="text-2xl font-bold">{titulo}</CardTitle>
                         <a
                             href="https://app.plugsign.com.br/signin/?secure=true"
                             target="_blank"
@@ -807,8 +824,9 @@ export default function Page() {
                             PlugSing
                         </a>
                     </div>
-                    <div className="flex flex-wrap justify-end items-end gap-3">
+                    <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
                         <Button
+                            id="tour-plugsign-cert"
                             type="button"
                             variant={certStatus?.temCertificadoA1 ? "outline" : "default"}
                             onClick={() => setIsCertDialogOpen(true)}
