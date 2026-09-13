@@ -30,6 +30,7 @@ export type Usuario = {
     financeiro_totvs: boolean,
     receitas: boolean,
     replicar_todas_unidades?: boolean,
+    unidade?: string,
 }
 
 export type UnidadeResultado = {
@@ -41,6 +42,13 @@ export type UnidadeResultado = {
 
 export type CreateUsuarioResultado = {
     replicado: boolean,
+    resultados: UnidadeResultado[],
+}
+
+export type CopiarUsuarioResultado = {
+    codusuario: string,
+    nome: string,
+    unidadeOrigem: string,
     resultados: UnidadeResultado[],
 }
 

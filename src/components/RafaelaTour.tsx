@@ -173,6 +173,10 @@ function mensagemFimPorPerfil(): string {
     extras +=
       '\n\nEm Pagamentos CI, ao concluir a aprovação o financeiro pode ser gerado automaticamente no RM.'
   }
+  if (usuarioPodePlugSign()) {
+    extras +=
+      '\n\nNo PlugSign, as pessoas assinam pela PlugSign, mas todo o processo (envio, andamento e PDF) fica no PaperSign.'
+  }
   return `Pronto! Essas foram as novidades.${extras}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
 
@@ -203,10 +207,23 @@ async function ativarAbaReceitasSePreciso(seletor: string): Promise<void> {
   if (seletor === '#tour-receitas-acoes' || seletor === '#tour-receitas-abas') {
     const aba = document.querySelector('#tour-receitas-unidade')
     if (aba instanceof HTMLElement) {
-      aba.click()
+      clicarAbaRadix(aba)
       await new Promise((r) => setTimeout(r, 350))
     }
   }
+}
+
+/** Radix Tabs muda no mousedown (não no click). .click() sozinho não troca a aba. */
+function clicarAbaRadix(el: HTMLElement): void {
+  const opts: MouseEventInit = {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    view: window,
+  }
+  el.dispatchEvent(new MouseEvent('mousedown', opts))
+  el.dispatchEvent(new MouseEvent('mouseup', opts))
+  el.dispatchEvent(new MouseEvent('click', opts))
 }
 
 const SELETORES_FORM_CI = new Set([
@@ -249,6 +266,67 @@ async function ativarFormCiSePreciso(seletor: string): Promise<void> {
   }
 }
 
+/** Valor da aba PlugSign para cada seletor interno do tour. */
+function abaPlugSignPorSeletor(seletor: string): string | null {
+  if (!seletor.startsWith('#tour-plugsign-')) return null
+  if (
+    seletor === '#tour-plugsign-documentos' ||
+    seletor === '#tour-plugsign-doc-painel' ||
+    seletor === '#tour-plugsign-doc-titulo' ||
+    seletor === '#tour-plugsign-doc-acoes' ||
+    seletor === '#tour-plugsign-cert'
+  ) {
+    return 'documentos'
+  }
+  if (seletor === '#tour-plugsign-solicitacao' || seletor.startsWith('#tour-plugsign-solicitacao-')) {
+    return 'solicitacao'
+  }
+  if (seletor === '#tour-plugsign-minhas' || seletor === '#tour-plugsign-minhas-painel') {
+    return 'minhas-solicitacoes'
+  }
+  if (seletor === '#tour-plugsign-fornecedor' || seletor === '#tour-plugsign-fornecedor-painel') {
+    return 'fornecedor'
+  }
+  return null
+}
+
+/** Abre a aba correta do PlugSign (como o Novo da CI abre o formulário). */
+async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
+  const valorAba = abaPlugSignPorSeletor(seletor)
+  if (!valorAba) return
+
+  // Se o alvo já está na tela, a aba certa já está aberta.
+  if (document.querySelector(seletor)) return
+
+  // 1) Evento dedicado (Tabs controlado no React — mais confiável).
+  window.dispatchEvent(
+    new CustomEvent('tour-plugsign-aba', { detail: valorAba })
+  )
+
+  // 2) Fallback: mousedown no TabsTrigger (Radix não troca só com .click()).
+  const triggerId =
+    valorAba === 'documentos'
+      ? '#tour-plugsign-documentos'
+      : valorAba === 'solicitacao'
+        ? '#tour-plugsign-solicitacao'
+        : valorAba === 'minhas-solicitacoes'
+          ? '#tour-plugsign-minhas'
+          : '#tour-plugsign-fornecedor'
+
+  const tab = document.querySelector(triggerId)
+  if (tab instanceof HTMLElement) {
+    clicarAbaRadix(tab)
+  }
+
+  // Espera o conteúdo da aba montar (igual ao form da CI).
+  if (seletor !== triggerId) {
+    await esperarSeletor(seletor, 4000)
+  } else {
+    await new Promise((r) => setTimeout(r, 350))
+  }
+  await new Promise((r) => setTimeout(r, 200))
+}
+
 function limparPopoversDriverExtras(): void {
   const pops = Array.from(document.querySelectorAll('.driver-popover'))
   // Driver às vezes deixa o balão anterior na tela ao trocar de passo/rota.
@@ -276,6 +354,7 @@ async function prepararPasso(
 
   await ativarAbaReceitasSePreciso(seletor)
   await ativarFormCiSePreciso(seletor)
+  await ativarAbaPlugSignSePreciso(seletor)
 
   let el = await esperarSeletor(seletor)
   if (!el && seletor === '#tour-receitas-acoes') {
@@ -284,12 +363,8 @@ async function prepararPasso(
   }
 
   if (el instanceof HTMLElement) {
-    if (
-      (seletor.startsWith('#tour-plugsign-') && seletor !== '#tour-plugsign-guias') ||
-      seletor === '#tour-receitas-consulta' ||
-      seletor === '#tour-receitas-unidade'
-    ) {
-      el.click()
+    if (seletor === '#tour-receitas-consulta' || seletor === '#tour-receitas-unidade') {
+      clicarAbaRadix(el)
       await new Promise((r) => setTimeout(r, 300))
     }
     el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
@@ -393,10 +468,19 @@ export default function RafaelaTour() {
     const steps: DriveStep[] = passos.map((p) => {
       const sel = p.seletorCss!.trim()
       return {
-        element: () =>
-          (document.querySelector(sel) as Element) ||
-          (document.querySelector('#tour-receitas-abas') as Element) ||
-          document.body,
+        element: () => {
+          const alvo = document.querySelector(sel) as Element | null
+          if (alvo) return alvo
+          // Evita cair no body nos passos do PlugSign (popover flutuando sem destaque).
+          if (sel.startsWith('#tour-plugsign-')) {
+            const guias = document.querySelector('#tour-plugsign-guias')
+            if (guias) return guias
+          }
+          return (
+            (document.querySelector('#tour-receitas-abas') as Element) ||
+            document.body
+          )
+        },
         popover: {
           title: p.titulo || tour.titulo || 'Novidade',
           description: p.mensagem.replace(/\n/g, '<br/>'),
@@ -470,6 +554,15 @@ export default function RafaelaTour() {
             if (next) await prepararPasso(next, (href) => router.push(href))
             limparPopoversDriverExtras()
             drv.moveNext()
+            // Refresh depois do React montar a aba (PlugSign / Receitas).
+            window.setTimeout(() => {
+              limparPopoversDriverExtras()
+              try {
+                drv.refresh()
+              } catch {
+                /* silencioso */
+              }
+            }, 80)
             requestAnimationFrame(() => {
               limparPopoversDriverExtras()
               try {
@@ -494,6 +587,14 @@ export default function RafaelaTour() {
             if (prev) await prepararPasso(prev, (href) => router.push(href))
             limparPopoversDriverExtras()
             drv.movePrevious()
+            window.setTimeout(() => {
+              limparPopoversDriverExtras()
+              try {
+                drv.refresh()
+              } catch {
+                /* silencioso */
+              }
+            }, 80)
             requestAnimationFrame(() => {
               limparPopoversDriverExtras()
               try {

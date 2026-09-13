@@ -273,7 +273,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/projetos" && !userProjetos) return null;
                         if ([
                             "/alcadas",
-                            "/usuarios", 
+                            "/usuarios",
                             "/borderoaprovadores", 
                             '/restritoaprovadores',
                             '/impostosaprovadores',

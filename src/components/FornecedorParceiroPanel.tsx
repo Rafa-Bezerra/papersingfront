@@ -89,7 +89,7 @@ export default function FornecedorParceiroPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="tour-plugsign-fornecedor-painel" className="space-y-4">
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-4">
           <div className="min-w-0">

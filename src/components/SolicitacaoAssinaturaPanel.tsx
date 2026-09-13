@@ -757,7 +757,7 @@ export default function SolicitacaoAssinaturaPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="tour-plugsign-solicitacao-form" className="space-y-4">
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-4">
           <div className="min-w-0">
@@ -767,13 +767,19 @@ export default function SolicitacaoAssinaturaPanel({
               assina todos de uma vez. Andamento e PDFs assinados voltam ao PaperSign.
             </p>
           </div>
-          <Button type="button" onClick={handleEnviar} disabled={isPending} className="shrink-0">
+          <Button
+            id="tour-plugsign-solicitacao-enviar"
+            type="button"
+            onClick={handleEnviar}
+            disabled={isPending}
+            className="shrink-0"
+          >
             {isPending ? 'Enviando…' : 'Enviar solicitação'}
           </Button>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           {/* Documento — grade compacta */}
-          <div className="rounded-md border p-3 space-y-3">
+          <div id="tour-plugsign-solicitacao-docs" className="rounded-md border p-3 space-y-3">
             <p className="text-sm font-medium">Documento</p>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
@@ -913,7 +919,7 @@ export default function SolicitacaoAssinaturaPanel({
           </div>
 
           {/* Destinatários */}
-          <div className="rounded-md border p-3 space-y-3">
+          <div id="tour-plugsign-solicitacao-dest" className="rounded-md border p-3 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium">Destinatários</p>
@@ -1382,7 +1388,7 @@ export default function SolicitacaoAssinaturaPanel({
           </div>
 
           {/* Opções */}
-          <div className="rounded-md border p-3 space-y-3">
+          <div id="tour-plugsign-solicitacao-opcoes" className="rounded-md border p-3 space-y-3">
             <p className="text-sm font-medium">Opções</p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {TOGGLES.map((t) => (
