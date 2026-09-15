@@ -93,7 +93,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   };
 
   return (
-    <header className="h-16 bg-background border-b flex items-center px-4 sm:px-6">
+    <header id="tour-topnav" className="h-16 bg-background border-b flex items-center px-4 sm:px-6">
       <div className="flex items-center gap-2">
         {/* Botão de menu mobile */}
         <button
@@ -155,16 +155,16 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
 
       {/* Área de controles - sempre à direita */}
       <div className="ml-auto flex items-center space-x-2 sm:space-x-4">
-        {/* Suporte */}
+        {/* Suporte → GLPI */}
         <Button
           asChild
           variant="ghost"
           size="icon"
           className="hover:bg-muted"
-          aria-label="Suporte"
-          title="Suporte"
+          aria-label="Suporte — abrir chamado no GLPI"
+          title="Suporte (GLPI)"
         >
-          <a href={GLPI_SUPPORT_URL} target="_blank" rel="noreferrer">
+          <a id="tour-suporte" href={GLPI_SUPPORT_URL} target="_blank" rel="noreferrer">
             <Headset className="h-5 w-5 text-muted-foreground" />
           </a>
         </Button>

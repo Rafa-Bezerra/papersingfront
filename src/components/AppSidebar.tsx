@@ -26,7 +26,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Truck
+  Truck,
+  CircleDollarSign
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -60,6 +61,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userFinanceiro, setUserFinanceiro] = useState(false)
   const [userDocusign, setUserDocusign] = useState(false)
   const [userProjetos, setUserProjetos] = useState(false)
+  const [userReceitas, setUserReceitas] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -91,6 +93,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserFinanceiro(user.financeiro);
         setUserDocusign(user.docusign);
         setUserProjetos(user.projetos);
+        setUserReceitas(user.receitas);
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -131,6 +134,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Documentos': <FileText className="w-5 h-5" />,
     'PlugSing': <FileText className="w-5 h-5" />,
     'Projetos': <FileText className="w-5 h-5" />,
+    'Receitas': <CircleDollarSign className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -176,7 +180,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
       {/* Container do sidebar com botão de toggle */}
       <div className={`relative ${mobileOpen ? 'block' : 'hidden'} lg:block lg:h-full`}>
         {/* Sidebar para mobile e desktop */}
-        <div className={`sidebar-container relative transition-all duration-300 ease-in-out flex-shrink-0 h-full ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'
+        <div
+          id="tour-sidebar"
+          className={`sidebar-container relative transition-all duration-300 ease-in-out flex-shrink-0 h-full ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'
           } border-r bg-card ${mobileOpen ? 'fixed left-0 top-0 z-50 w-64' : ''}`}>
           <div className={`h-full flex flex-col transition-all duration-300 ${collapsed ? 'px-1 py-4' : 'px-4 py-4'
             }`}>
@@ -248,6 +254,9 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
+                      // Receitas: só quem tem a flag (admin sempre vê).
+                      // Financeiro NÃO herda este módulo automaticamente.
+                      if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações
                       // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
                       if (!userAdmin && !userFinanceiro) {
@@ -263,8 +272,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         if (item.url === "/docusign" && !userDocusign) return null;
                         if (item.url === "/projetos" && !userProjetos) return null;
                         if ([
-                            "/alcadas", 
-                            "/usuarios", 
+                            "/alcadas",
+                            "/usuarios",
                             "/borderoaprovadores", 
                             '/restritoaprovadores',
                             '/impostosaprovadores',
@@ -275,7 +284,18 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                           ].includes(item.url)) return null;
                       }
                       return (
-                        <SidebarMenuItem key={item.title}>
+                        <SidebarMenuItem
+                          key={item.title}
+                          id={
+                            item.url === '/docusign'
+                              ? 'tour-menu-plugsign'
+                              : item.url === '/receitas'
+                                ? 'tour-menu-receitas'
+                                : item.url === '/comunicados'
+                                  ? 'tour-menu-pagamentos-ci'
+                                  : undefined
+                          }
+                        >
                           <SidebarMenuButton
                             asChild
                             isActive={path === item.url || path.startsWith(item.url + '/')}

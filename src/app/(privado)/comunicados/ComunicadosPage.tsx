@@ -834,7 +834,7 @@ ${html}
         <div className="p-6">
             <Card className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                    <CardTitle id="tour-ci-titulo" className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex flex-wrap justify-end items-end gap-3">
                         {/* Data de */}
                         <div className="flex flex-col">
@@ -923,7 +923,7 @@ ${html}
                         <SearchIcon className="mr-1 h-4 w-4" /> Buscar
                     </Button>
 
-                    <Button onClick={handleInserirComunicado} className="flex items-center">
+                    <Button id="tour-ci-novo" onClick={handleInserirComunicado} className="flex items-center">
                         <SquarePlus className="mr-1 h-4 w-4" /> Novo
                     </Button>
                 </CardContent>
@@ -1135,7 +1135,7 @@ ${html}
 
             {/* FORM Comunicado */}
             <Dialog open={isFormComunicadoOpen} onOpenChange={setIsFormComunicadoOpen}>
-                <DialogContent className="sm:max-w-4xl overflow-y-auto max-h-[90dvh]">
+                <DialogContent id="tour-ci-form" className="sm:max-w-4xl overflow-y-auto max-h-[90dvh]">
                     <div className="overflow-y-auto pr-2">
                         <DialogHeader>
                             <DialogTitle className="text-lg font-semibold text-center">
@@ -1230,7 +1230,7 @@ ${html}
                                     name="anexo"
                                     rules={{ required: 'Anexo é obrigatório' }}
                                     render={({ field }) => (
-                                        <FormItem>
+                                        <FormItem id="tour-ci-corpo">
                                             <FormLabel>Corpo do documento</FormLabel>
                                             <FormControl>
                                                 <textarea
@@ -1263,7 +1263,7 @@ ${html}
                                     aprovado (ver ComunicadosController.Aprovar); não há mais botão manual
                                     "Criar Financeiro" nesse ponto do fluxo. */}
                                 {userFinanceiroTotvs && (
-                                    <Card>
+                                    <Card id="tour-ci-financeiro-rm">
                                         <CardHeader>
                                             <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
                                         </CardHeader>
@@ -1416,7 +1416,7 @@ ${html}
                                 />
 
                                 {/* Anexos */}
-                                <Card className="mb-6">
+                                <Card id="tour-ci-anexos" className="mb-6">
                                     <CardHeader>
                                         <CardTitle>Anexos</CardTitle>
                                     </CardHeader>
@@ -1469,7 +1469,7 @@ ${html}
                                     </CardContent>
                                 </Card>
 
-                                <Button type="submit" disabled={isLoading}>{isLoading ? 'Salvando…' : 'Salvar'}</Button>
+                                <Button id="tour-ci-salvar" type="submit" disabled={isLoading}>{isLoading ? 'Salvando…' : 'Salvar'}</Button>
                             </form>
                         </Form>
                     </div>
@@ -1609,7 +1609,7 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     });
 
     return (
-        <div className="flex flex-col gap-2 border p-3 rounded-md">
+        <div id="tour-ci-aprovadores" className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
 
             {fields.map((field, index) => (
@@ -1732,7 +1732,7 @@ function ItensFinanceirosSection({
     const { fields, append, remove } = useFieldArray({ control, name: 'itensFinanceiros' });
 
     return (
-        <Card>
+        <Card id="tour-ci-itens">
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Rateio dos Itens</CardTitle>
                 <Button
@@ -1832,73 +1832,73 @@ function ItemFinanceiroFields({
     return (
         <div className="border rounded-md p-3 flex flex-col gap-3 relative">
             {podeRemover && (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7"
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-2 right-2 h-7 w-7"
                     onClick={onRemover}
-                >
-                    <X className="w-4 h-4" />
-                </Button>
-            )}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        )}
             <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
 
-            {/* Setor */}
-            <FormField
-                control={control}
+                        {/* Setor */}
+                        <FormField
+                            control={control}
                 name={`itensFinanceiros.${itemIndex}.setor`}
-                render={({ field: f }) => (
-                    <FormItem>
-                        <FormLabel>Setor</FormLabel>
-                        <FormControl>
-                            <Input {...f} placeholder="Ex: Tecnologia da Informação" />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Setor</FormLabel>
+                                    <FormControl>
+                                        <Input {...f} placeholder="Ex: Tecnologia da Informação" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-            {/* Centro de Custo */}
-            <FormField
-                control={control}
+                        {/* Centro de Custo */}
+                        <FormField
+                            control={control}
                 name={`itensFinanceiros.${itemIndex}.ccusto`}
-                rules={{ required: 'Centro de custo obrigatório' }}
-                render={({ field: f }) => (
-                    <FormItem>
-                        <FormLabel>Centro de Custo</FormLabel>
-                        <FormControl>
+                            rules={{ required: 'Centro de custo obrigatório' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Centro de Custo</FormLabel>
+                                    <FormControl>
                             <Popover open={openCcustoIndex === itemIndex} onOpenChange={open => setOpenCcustoIndex(open ? itemIndex : null)} modal={false}>
-                                <PopoverTrigger asChild>
+                                            <PopoverTrigger asChild>
                                     <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(itemIndex)}>
-                                        {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
-                                        <ChevronsUpDown className="opacity-50 size-4" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                    <Command filter={(value, search) => {
-                                        const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
-                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                    }}>
-                                        <CommandInput placeholder="Buscar centro..." />
-                                        <CommandList>
-                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                            <CommandGroup>
-                                                {centrosDeCusto.map(c => (
-                                                    <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
-                                                        {c.ccusto} - {c.custo}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+                                                    {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar centro..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {centrosDeCusto.map(c => (
+                                                                <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
+                                                                    {c.ccusto} - {c.custo}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
             {/* Valor Total do item */}
             <FormField
@@ -1956,50 +1956,50 @@ function ItemFinanceiroFields({
                                 </Button>
                             )}
 
-                            {/* Conta Contábil */}
-                            <FormField
-                                control={control}
+                        {/* Conta Contábil */}
+                        <FormField
+                            control={control}
                                 name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codconta`}
-                                rules={{ required: 'Conta contábil obrigatória' }}
-                                render={({ field: f }) => (
-                                    <FormItem>
-                                        <FormLabel>Conta Contábil</FormLabel>
-                                        <FormControl>
+                            rules={{ required: 'Conta contábil obrigatória' }}
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Conta Contábil</FormLabel>
+                                    <FormControl>
                                             <Popover open={openCodcontaIndex === popoverKey} onOpenChange={open => setOpenCodcontaIndex(open ? popoverKey : null)} modal={false}>
-                                                <PopoverTrigger asChild>
+                                            <PopoverTrigger asChild>
                                                     <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(popoverKey)}>
-                                                        {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
-                                                        <ChevronsUpDown className="opacity-50 size-4" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                    <Command filter={(value, search) => {
-                                                        const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
-                                                        return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                    }}>
-                                                        <CommandInput placeholder="Buscar conta..." />
-                                                        <CommandList>
-                                                            <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                            <CommandGroup>
-                                                                {contasFinanceiras.map(x => (
+                                                    {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
+                                                    <ChevronsUpDown className="opacity-50 size-4" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
+                                                <Command filter={(value, search) => {
+                                                    const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
+                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
+                                                }}>
+                                                    <CommandInput placeholder="Buscar conta..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {contasFinanceiras.map(x => (
                                                                     <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
                                                                         f.onChange(x.codconta);
                                                                         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`, x.codconta);
                                                                         setOpenCodcontaIndex(null)
                                                                     }}>
-                                                                        {x.codconta} - {x.contabil}
-                                                                    </CommandItem>
-                                                                ))}
-                                                            </CommandGroup>
-                                                        </CommandList>
-                                                    </Command>
-                                                </PopoverContent>
-                                            </Popover>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                                                    {x.codconta} - {x.contabil}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                             {/* Toggle valor absoluto / percentual */}
                             <div className="flex items-center gap-2">
@@ -2022,20 +2022,20 @@ function ItemFinanceiroFields({
                             </div>
 
                             {modo === 'valor' ? (
-                                <FormField
-                                    control={control}
+                        <FormField
+                            control={control}
                                     name={`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`}
-                                    render={({ field: f }) => (
-                                        <FormItem>
-                                            <FormLabel>Valor (R$)</FormLabel>
-                                            <FormControl>
+                            render={({ field: f }) => (
+                                <FormItem>
+                                    <FormLabel>Valor (R$)</FormLabel>
+                                    <FormControl>
                                                 <Input type="number" step="0.01" min="0" {...f}
                                                     onChange={e => onChangeValorLinha(ri, parseFloat(e.target.value) || 0)} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                             ) : (
                                 <FormField
                                     control={control}
@@ -2078,7 +2078,7 @@ function ItemFinanceiroFields({
                                     )}
                                 />
                             )}
-                        </div>
+                    </div>
                     );
                 })}
 

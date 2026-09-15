@@ -23,7 +23,8 @@ Expand-Archive -Path $ZipPath -DestinationPath $staging -Force
 $keepWeb = Test-Path (Join-Path $TargetDir "web.config")
 Get-ChildItem $staging -Force | ForEach-Object {
     if ($_.Name -in @("_backup", "_staging_update", "papersignfront-dist.zip")) { return }
-    if ($_.Name -eq "web.config" -and $keepWeb) { return }
+    # Nunca sobrescrever web.config do IIS a partir do ZIP (evita 500).
+    if ($_.Name -eq "web.config") { return }
     $dest = Join-Path $TargetDir $_.Name
     if ($_.PSIsContainer) {
         if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -33,5 +34,19 @@ Get-ChildItem $staging -Force | ForEach-Object {
     }
 }
 Remove-Item $staging -Recurse -Force
+
+# Verificacao pos-apply
+$receitas = Join-Path $TargetDir "receitas\index.html"
+if (-not (Test-Path $receitas)) {
+    Write-Warning "ATENCAO: receitas\index.html NAO existe em $TargetDir apos o apply."
+    Write-Warning "Confira se o ZIP era o papersignfront-dist.zip gerado apos o build com Receitas."
+} else {
+    Write-Host "OK: receitas\index.html presente."
+}
+
 Write-Host "Front atualizado em $TargetDir"
-Write-Host "web.config do servidor foi preservado (se existia). Backup: $backup"
+if ($keepWeb) {
+    Write-Host "web.config do servidor preservado. Backup: $backup"
+} else {
+    Write-Host "Nenhum web.config previo. Backup: $backup"
+}
