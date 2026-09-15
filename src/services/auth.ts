@@ -38,6 +38,7 @@ export interface LoginResponse {
   projetos: boolean;
   contratos: boolean;
   financeiro_totvs: boolean;
+  receitas: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -60,46 +61,92 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
   console.log("RAW API:", apiData);
 
+  return normalizeLoginResponse(apiData);
+}
+
+function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse {
   const normalized: LoginResponse = {
-    sequencial: apiData.sequencial,
-    codusuario: apiData.codusuario,
-    email: apiData.email,
-    unidade: apiData.unidade,
-    nome: apiData.nome,
-    token: apiData.token,
+    sequencial: (apiData.sequencial ?? apiData.SEQUENCIAL) as number,
+    codusuario: String(apiData.codusuario ?? apiData.CODUSUARIO ?? ''),
+    email: String(apiData.email ?? apiData.EMAIL ?? ''),
+    unidade: String(apiData.unidade ?? apiData.UNIDADE ?? ''),
+    nome: String(apiData.nome ?? apiData.NOME ?? ''),
+    token: String(apiData.token ?? apiData.TOKEN ?? ''),
 
-    admin: apiData.admin,
-    documentos: apiData.documentos,
-    rdv: apiData.rdv,
-    bordero: apiData.bordero,
-    comunicados: apiData.comunicados,
-    administrativo: apiData.administrativo,
-    solicitante: apiData.solicitante,
-    ccusto: apiData.ccusto,
-    fiscal: apiData.fiscal,
-    restrito: apiData.restrito,
-    externo: apiData.externo,
+    admin: Boolean(apiData.admin ?? apiData.ADMIN),
+    documentos: Boolean(apiData.documentos ?? apiData.DOCUMENTOS),
+    rdv: Boolean(apiData.rdv ?? apiData.RDV),
+    bordero: Boolean(apiData.bordero ?? apiData.BORDERO),
+    comunicados: Boolean(apiData.comunicados ?? apiData.COMUNICADOS),
+    administrativo: Boolean(apiData.administrativo ?? apiData.ADMINISTRATIVO),
+    solicitante: Boolean(apiData.solicitante ?? apiData.SOLICITANTE),
+    ccusto: Boolean(apiData.ccusto ?? apiData.CCUSTO),
+    fiscal: Boolean(apiData.fiscal ?? apiData.FISCAL),
+    restrito: Boolean(apiData.restrito ?? apiData.RESTRITO),
+    externo: Boolean(apiData.externo ?? apiData.EXTERNO),
 
-    gestao_pessoas: apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false,
-    financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
-    docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
-    projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
-    contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
-    financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
+    gestao_pessoas: Boolean(apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false),
+    financeiro: Boolean(apiData.financeiro ?? apiData.FINANCEIRO ?? false),
+    docusign: Boolean(apiData.docusign ?? apiData.DOCUSIGN ?? false),
+    projetos: Boolean(apiData.projetos ?? apiData.PROJETOS ?? false),
+    contratos: Boolean(apiData.contratos ?? apiData.CONTRATOS ?? false),
+    financeiro_totvs: Boolean(
+      apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false
+    ),
+    receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
 
-    // 👇 aqui está o conserto
-    pagamento_impostos:
+    pagamento_impostos: Boolean(
       apiData.pagamento_impostos ??
-      apiData.PAGAMENTO_IMPOSTOS ??
-      apiData.pagamentO_IMPOSTOS,
+        apiData.PAGAMENTO_IMPOSTOS ??
+        apiData.pagamentO_IMPOSTOS
+    ),
 
-    pagamento_rh:
-      apiData.pagamento_rh ??
-      apiData.PAGAMENTO_RH ??
-      apiData.pagamentO_RH,
+    pagamento_rh: Boolean(
+      apiData.pagamento_rh ?? apiData.PAGAMENTO_RH ?? apiData.pagamentO_RH
+    ),
   };
 
   return normalized;
+}
+
+export type SamlStatus = {
+  enabled: boolean
+  requireMicrosoftLogin: boolean
+}
+
+export async function getSamlStatus(): Promise<SamlStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/api/Saml/status`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return { enabled: false, requireMicrosoftLogin: false };
+    const data = await res.json();
+    return {
+      enabled: Boolean(data?.enabled),
+      requireMicrosoftLogin: Boolean(data?.requireMicrosoftLogin),
+    };
+  } catch {
+    return { enabled: false, requireMicrosoftLogin: false };
+  }
+}
+
+export function startMicrosoftLogin(base: string) {
+  const url = `${API_BASE}/api/Saml/login?base=${encodeURIComponent(base)}`;
+  window.location.href = url;
+}
+
+export async function exchangeSamlCode(code: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/api/Saml/exchange`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ code }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `Erro ${res.status}`);
+  return normalizeLoginResponse(JSON.parse(text));
 }
 
 
@@ -146,6 +193,7 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
     contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
     financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
+    receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
   };
 }
 

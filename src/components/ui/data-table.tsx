@@ -28,6 +28,10 @@ interface DataTableProps<TData> {
   globalFilterAccessorKey?: (keyof TData)[];
   searchPlaceholder?: string;
   loading?: boolean;
+  /** Oculta a barra "Pesquisar..." interna (útil quando já há busca externa). */
+  hideSearch?: boolean;
+  /** Oculta a paginação (útil em prévias curtas dentro de modal). */
+  hidePagination?: boolean;
   /** Conteúdo extra à direita do texto da página, antes do botão Próxima (ex.: Baixar todos). */
   paginationExtra?: React.ReactNode;
 }
@@ -38,6 +42,8 @@ export function DataTable<TData>({
   globalFilterAccessorKey,
   searchPlaceholder = "Pesquisar...",
   loading,
+  hideSearch = false,
+  hidePagination = false,
   paginationExtra,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
@@ -51,7 +57,7 @@ export function DataTable<TData>({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    getPaginationRowModel: hidePagination ? undefined : getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: (row, columnId, filterValue) => {
       if (!globalFilterAccessorKey?.length) return true;
@@ -65,15 +71,16 @@ export function DataTable<TData>({
 
   return (
     <div>
-      {/* Search Bar */}
-      <div className="flex mb-4">
-        <Input
-          placeholder={searchPlaceholder}
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="flex-1"
-        />
-      </div>
+      {!hideSearch && (
+        <div className="flex mb-4">
+          <Input
+            placeholder={searchPlaceholder}
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="flex-1"
+          />
+        </div>
+      )}
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -131,31 +138,32 @@ export function DataTable<TData>({
           ))}
         </TableFooter>
       </Table>
-      {/* Pagination */}
-      <div className="flex items-center justify-between gap-2 pt-4">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage() || loading}
-        >
-          Anterior
-        </Button>
-        <span className="text-sm flex-1 text-center">
-          Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
-        </span>
-        <div className="flex items-center gap-2">
-          {paginationExtra}
+      {!hidePagination && (
+        <div className="flex items-center justify-between gap-2 pt-4">
           <Button
             size="sm"
             variant="outline"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage() || loading}
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage() || loading}
           >
-            Próxima
+            Anterior
           </Button>
+          <span className="text-sm flex-1 text-center">
+            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+          </span>
+          <div className="flex items-center gap-2">
+            {paginationExtra}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage() || loading}
+            >
+              Próxima
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

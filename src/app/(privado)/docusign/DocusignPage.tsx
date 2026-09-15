@@ -9,12 +9,13 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, Filter, SearchIcon, ShieldCheck, SquarePlus, Trash2, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, History, SearchIcon, ShieldCheck, SquarePlus, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
     Dialog,
     DialogContent,
@@ -78,6 +79,9 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover';
 import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
+import SolicitacaoAssinaturaPanel from '@/components/SolicitacaoAssinaturaPanel'
+import FornecedorParceiroPanel from '@/components/FornecedorParceiroPanel'
+import MinhasSolicitacoesPanel from '@/components/MinhasSolicitacoesPanel'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -748,13 +752,67 @@ export default function Page() {
         []
     )
 
+    const [aba, setAba] = useState('documentos')
+    const [fornecedorPrefill, setFornecedorPrefill] = useState<{ nome?: string; email?: string } | null>(null)
+
+    // Tour Raphaela: troca a aba controlada (Radix Tabs não muda só com .click()).
+    useEffect(() => {
+        const handler = (ev: Event) => {
+            const detail = (ev as CustomEvent<string>).detail
+            if (
+                detail === 'documentos' ||
+                detail === 'solicitacao' ||
+                detail === 'minhas-solicitacoes' ||
+                detail === 'fornecedor'
+            ) {
+                setAba(detail)
+            }
+        }
+        window.addEventListener('tour-plugsign-aba', handler)
+        return () => window.removeEventListener('tour-plugsign-aba', handler)
+    }, [])
+
     return (
         <div className="p-6">
+            <Tabs value={aba} onValueChange={setAba} className="space-y-4">
+                <TabsList id="tour-plugsign-guias" className="flex-wrap h-auto w-fit">
+                    <TabsTrigger id="tour-plugsign-documentos" value="documentos">
+                        <FileSignature className="w-4 h-4" /> Documentos
+                    </TabsTrigger>
+                    <TabsTrigger id="tour-plugsign-solicitacao" value="solicitacao">
+                        <SquarePlus className="w-4 h-4" /> Solicitação de assinatura
+                    </TabsTrigger>
+                    <TabsTrigger id="tour-plugsign-minhas" value="minhas-solicitacoes">
+                        <History className="w-4 h-4" /> Minhas solicitações
+                    </TabsTrigger>
+                    <TabsTrigger id="tour-plugsign-fornecedor" value="fornecedor">
+                        <UserPlus className="w-4 h-4" /> Fornecedor / parceiro
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="solicitacao" className="mt-0">
+                    <SolicitacaoAssinaturaPanel
+                        onCadastrarFornecedor={(draft) => {
+                            setFornecedorPrefill(draft ?? null)
+                            setAba('fornecedor')
+                        }}
+                    />
+                </TabsContent>
+
+                <TabsContent value="minhas-solicitacoes" className="mt-0">
+                    <MinhasSolicitacoesPanel />
+                </TabsContent>
+
+                <TabsContent value="fornecedor" className="mt-0">
+                    <FornecedorParceiroPanel prefill={fornecedorPrefill} />
+                </TabsContent>
+
+                <TabsContent value="documentos" className="mt-0 space-y-0">
             {/* Header */}
-            <Card className="mb-6">
+            <Card id="tour-plugsign-doc-painel" className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
-                        <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
+                        <CardTitle id="tour-plugsign-doc-titulo" className="text-2xl font-bold">{titulo}</CardTitle>
                         <a
                             href="https://app.plugsign.com.br/signin/?secure=true"
                             target="_blank"
@@ -766,8 +824,9 @@ export default function Page() {
                             PlugSing
                         </a>
                     </div>
-                    <div className="flex flex-wrap justify-end items-end gap-3">
+                    <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
                         <Button
+                            id="tour-plugsign-cert"
                             type="button"
                             variant={certStatus?.temCertificadoA1 ? "outline" : "default"}
                             onClick={() => setIsCertDialogOpen(true)}
@@ -1329,6 +1388,8 @@ export default function Page() {
                     Nenhum registro encontrado.
                 </p>
             )}
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }

@@ -11,16 +11,19 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyIcon, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { KeyIcon, Copy, ClipboardList, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -41,9 +44,11 @@ import {
   createElement as createUsuario,
   updateElement as updateUsuario,
   deleteElement as deleteUsuario,
-  resetPassword
+  resetPassword,
+  copiarUsuario
 } from '@/services/usuariosService'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -51,6 +56,16 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+
+const BASES_COPIA: { empresa: string; unidade: string }[] = [
+  { empresa: '48.851.242', unidade: 'WAY 112' },
+  { empresa: '63.929.367', unidade: 'WAY 153' },
+  { empresa: '58.492.120', unidade: 'WAY 262' },
+  { empresa: '36.128.741', unidade: 'WAY 306' },
+  { empresa: '64.017.857', unidade: 'WAY 364' },
+  { empresa: '57.190.446', unidade: 'MIGRA BR' },
+  { empresa: '57.582.342', unidade: 'WAY CSC' },
+]
 
 export default function PageUsuarios() {
   const titulo = 'Usuários'
@@ -69,8 +84,28 @@ export default function PageUsuarios() {
   const [updateMode, setUpdateMode] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [resetId, setResetId] = useState<number | null>(null)
+  const [copiaUsuario, setCopiaUsuario] = useState<Usuario | null>(null)
+  const [copiaEmpresas, setCopiaEmpresas] = useState<string[]>([])
+  const [copiaLoading, setCopiaLoading] = useState(false)
+  const [ehCsc, setEhCsc] = useState(false)
+  const [filtroUnidade, setFiltroUnidade] = useState<string>('todas')
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const loading = isPending
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('userData')
+      if (!raw) return
+      const u = JSON.parse(raw)
+      setEhCsc(String(u.unidade ?? u.UNIDADE ?? '').trim().toUpperCase() === 'WAY CSC')
+    } catch {
+      setEhCsc(false)
+    }
+  }, [])
+
+  const [aba, setAba] = useState(
+    () => (searchParams.get('tab') === 'auditoria' ? 'auditoria' : 'lista')
+  )
 
   const form = useForm<Usuario>({
     defaultValues: {
@@ -103,6 +138,7 @@ export default function PageUsuarios() {
       projetos: false,
       contratos: false,
       financeiro_totvs: false,
+      receitas: false,
       replicar_todas_unidades: false,
     }
   })
@@ -136,12 +172,14 @@ export default function PageUsuarios() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [query])
+  }, [query, filtroUnidade, ehCsc])
 
   async function handleSearch(q: string) {
     setError(null)
     try {
-      const dados = await getAllUsuarios()
+      const unidadeApi =
+        ehCsc && filtroUnidade !== 'todas' ? filtroUnidade : undefined
+      const dados = await getAllUsuarios(unidadeApi)
       const qNorm = stripDiacritics(q.toLowerCase().trim())
       const filtrados = qNorm
         ? dados.filter(
@@ -150,6 +188,7 @@ export default function PageUsuarios() {
             stripDiacritics((p.nome ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.codusuario ?? '').toLowerCase()).includes(qNorm) ||
             stripDiacritics((p.empresa ?? '').toLowerCase()).includes(qNorm) ||
+            stripDiacritics((p.unidade ?? '').toLowerCase()).includes(qNorm) ||
             String(p.sequencial ?? '').includes(qNorm)
           )
         )
@@ -237,6 +276,7 @@ export default function PageUsuarios() {
         projetos: response.projetos,
         contratos: response.contratos,
         financeiro_totvs: response.financeiro_totvs,
+        receitas: response.receitas,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -274,10 +314,49 @@ export default function PageUsuarios() {
       projetos: false,
       contratos: false,
       financeiro_totvs: false,
+      receitas: false,
       replicar_todas_unidades: false,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
+  }
+
+  function abrirCopiaUsuario(usuario: Usuario) {
+    setCopiaUsuario(usuario)
+    setCopiaEmpresas([])
+  }
+
+  function toggleCopiaEmpresa(empresa: string, checked: boolean) {
+    setCopiaEmpresas(prev =>
+      checked ? [...prev, empresa] : prev.filter(e => e !== empresa)
+    )
+  }
+
+  async function confirmarCopiaUsuario() {
+    if (!copiaUsuario) return
+    if (copiaEmpresas.length === 0) {
+      toast.error('Selecione ao menos uma base de destino.')
+      return
+    }
+    setCopiaLoading(true)
+    try {
+      const resultado = await copiarUsuario(copiaUsuario.sequencial, copiaEmpresas)
+      const criados = resultado.resultados.filter(r => r.status === 'criado')
+      const existentes = resultado.resultados.filter(r => r.status === 'ja_existe')
+      const erros = resultado.resultados.filter(r => r.status === 'erro')
+      let msg = `Cópia de ${resultado.nome}: criado em ${criados.length} base(s)`
+      if (criados.length) msg += ` (${criados.map(r => r.unidade).join(', ')})`
+      if (existentes.length) msg += ` — já existia em ${existentes.map(r => r.unidade).join(', ')}`
+      if (erros.length) msg += ` — falhou em ${erros.map(r => r.unidade).join(', ')}`
+      if (erros.length) toast.warning(msg)
+      else toast.success(msg)
+      setCopiaUsuario(null)
+      setCopiaEmpresas([])
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setCopiaLoading(false)
+    }
   }
 
   async function onSubmit(data: Usuario) {
@@ -332,12 +411,25 @@ export default function PageUsuarios() {
   }
 
   const colunas = useMemo<ColumnDef<Usuario>[]>(
-    () => [
-      { accessorKey: 'sequencial', header: 'SEQUENCIAL' },
-      { accessorKey: 'codusuario', header: 'CODUSUARIO' },
-      { accessorKey: 'nome', header: 'NOME' },
-      { accessorKey: 'empresa', header: 'EMPRESA' },
-      {
+    () => {
+      const cols: ColumnDef<Usuario>[] = [
+        { accessorKey: 'sequencial', header: 'SEQUENCIAL' },
+        { accessorKey: 'codusuario', header: 'CODUSUARIO' },
+        { accessorKey: 'nome', header: 'NOME' },
+      ]
+      if (ehCsc) {
+        cols.push({
+          id: 'unidade',
+          header: 'BASE',
+          accessorFn: row =>
+            row.unidade ||
+            BASES_COPIA.find(b => b.empresa === row.empresa)?.unidade ||
+            row.empresa,
+        })
+      } else {
+        cols.push({ accessorKey: 'empresa', header: 'EMPRESA' })
+      }
+      cols.push({
         id: 'actions',
         header: 'Ações',
         cell: ({ row }) => (
@@ -349,6 +441,16 @@ export default function PageUsuarios() {
             >
               Editar
             </Button>
+            {ehCsc && (
+              <Button
+                size="sm"
+                variant="outline"
+                title="Cópia de usuário para outras bases"
+                onClick={() => abrirCopiaUsuario(row.original)}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               size="sm"
               variant="destructive"
@@ -364,21 +466,39 @@ export default function PageUsuarios() {
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
-        )
-      }
-    ],
-    [handleUpdate, setDeleteId]
+        ),
+      })
+      return cols
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ehCsc]
   )
 
-  return (
-    <div className="p-6">
+  const conteudoLista = (
+    <>
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
         </CardHeader>
 
-        <CardContent className="flex flex-col gap-2 md:flex-row">
-          <div className="relative flex-1 w-full">
+        <CardContent className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end">
+          {ehCsc && (
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <Label className="text-xs text-muted-foreground">Base</Label>
+              <Select value={filtroUnidade} onValueChange={setFiltroUnidade}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {BASES_COPIA.map(b => (
+                    <SelectItem key={b.unidade} value={b.unidade}>{b.unidade}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="relative flex-1 w-full min-w-[200px]">
             <Input
               placeholder="Pesquise por nome ou ID"
               value={query}
@@ -407,6 +527,22 @@ export default function PageUsuarios() {
             <SquarePlus className="mr-1 h-4 w-4" />
             Novo
           </Button>
+
+          {ehCsc && (
+            <Button
+              variant="outline"
+              className="flex items-center"
+              disabled={results.length === 0}
+              title={results.length === 0 ? 'Busque um usuário e use o ícone Copiar na linha' : 'Escolha um usuário na lista e clique em Copiar'}
+              onClick={() => {
+                if (results.length === 1) abrirCopiaUsuario(results[0])
+                else toast.message('Na lista, clique no ícone Copiar do usuário que deseja replicar.')
+              }}
+            >
+              <Copy className="mr-1 h-4 w-4" />
+              Cópia de usuário
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -785,6 +921,22 @@ export default function PageUsuarios() {
                 />
                 <FormField
                   control={form.control}
+                  name="receitas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Receitas</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="contratos"
                   render={({ field }) => (
                     <FormItem>
@@ -844,6 +996,86 @@ export default function PageUsuarios() {
         </p>
       )}
 
+      {/* Cópia de usuário para outras bases */}
+      <Dialog
+        open={copiaUsuario !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCopiaUsuario(null)
+            setCopiaEmpresas([])
+          }
+        }}
+      >
+        <DialogContent className="max-w-md overflow-y-auto max-h-[90dvh]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-center">
+              Cópia de usuário
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm text-muted-foreground">
+              Cria o mesmo login nas bases selecionadas, com as mesmas permissões.
+              A senha atual é mantida.
+            </DialogDescription>
+          </DialogHeader>
+
+          {copiaUsuario && (
+            <div className="grid gap-4">
+              <div className="rounded-lg border p-3 text-sm space-y-1">
+                <p><span className="text-muted-foreground">Usuário:</span> {copiaUsuario.codusuario}</p>
+                <p><span className="text-muted-foreground">Nome:</span> {copiaUsuario.nome}</p>
+                <p>
+                  <span className="text-muted-foreground">Base atual:</span>{' '}
+                  {copiaUsuario.unidade
+                    || BASES_COPIA.find(b => b.empresa === copiaUsuario.empresa)?.unidade
+                    || copiaUsuario.empresa}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Bases de destino</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {BASES_COPIA.filter(b =>
+                    b.empresa !== copiaUsuario.empresa
+                    && b.unidade !== (copiaUsuario.unidade || '')
+                  ).map(base => (
+                    <label
+                      key={base.empresa}
+                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={copiaEmpresas.includes(base.empresa)}
+                        onCheckedChange={(v) => toggleCopiaEmpresa(base.empresa, v === true)}
+                      />
+                      {base.unidade}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={copiaLoading}
+                  onClick={() => {
+                    setCopiaUsuario(null)
+                    setCopiaEmpresas([])
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={copiaLoading || copiaEmpresas.length === 0}
+                  onClick={confirmarCopiaUsuario}
+                >
+                  {copiaLoading ? 'Copiando…' : 'Copiar permissões'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmação de exclusão (simples) */}
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -886,6 +1118,47 @@ export default function PageUsuarios() {
             </div>
           </div>
         </div>
+      )}
+    </>
+  )
+
+  return (
+    <div className="p-6">
+      {ehCsc ? (
+        <Tabs
+          value={aba}
+          onValueChange={(v) => {
+            setAba(v)
+            const sp = new URLSearchParams(Array.from(searchParams.entries()))
+            if (v === 'auditoria') sp.set('tab', 'auditoria')
+            else sp.delete('tab')
+            const qs = sp.toString()
+            router.replace(qs ? `?${qs}` : '?', { scroll: false })
+          }}
+          className="w-full"
+        >
+          <TabsList className="mb-4">
+            <TabsTrigger value="lista">Usuários</TabsTrigger>
+            <TabsTrigger value="auditoria" className="gap-1.5">
+              <ClipboardList className="h-4 w-4" />
+              Auditoria
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="lista" className="mt-0">
+            {conteudoLista}
+          </TabsContent>
+          <TabsContent value="auditoria" className="mt-0">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Auditoria de usuários</h2>
+              <p className="text-sm text-muted-foreground">
+                Quem criou, alterou permissões ou copiou usuários para outras bases.
+              </p>
+            </div>
+            <AuditoriaUsuariosPanel compact />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        conteudoLista
       )}
     </div>
   )

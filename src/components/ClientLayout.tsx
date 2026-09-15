@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
 import TopNav from "./TopNav";
+import RafaelaTour from "./RafaelaTour";
 import { data } from "@/lib/data";
 import { toast } from "sonner";
 
@@ -44,6 +45,7 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
           <div className="w-full">{children}</div>
         </main>
       </div>
+      <RafaelaTour />
     </div>
   );
 }
@@ -82,9 +84,16 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const isFinanceiro = Boolean(parsedUser?.financeiro);
             const canDocusign = Boolean(parsedUser?.docusign);
             const canProjetos = Boolean(parsedUser?.projetos);
+            const canReceitas = Boolean(parsedUser?.receitas);
 
-            // Bloqueia acesso direto a centros de custos sem permissão.
-            if (normalizedPath === "/centros-custos" && !isAdmin && !canCentrosCustos) {
+            // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
+            if (
+              (normalizedPath === "/centros-custos" ||
+                normalizedPath === "/cadastro-centro-custo" ||
+                normalizedPath === "/cadastro-conta-contabil") &&
+              !isAdmin &&
+              !canCentrosCustos
+            ) {
               setIsAuthorized(false);
             }
 
@@ -105,6 +114,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
             // Bloqueia acesso direto a Projetos sem permissão (admin/financeiro/projetos).
             if (normalizedPath === "/projetos" && !isAdmin && !isFinanceiro && !canProjetos) {
+              setIsAuthorized(false);
+            }
+
+            // Receitas: só quem tem a flag (ou admin).
+            if (normalizedPath === "/receitas" && !isAdmin && !canReceitas) {
               setIsAuthorized(false);
             }
           } catch (parseError) {
