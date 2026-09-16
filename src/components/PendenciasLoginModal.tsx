@@ -78,7 +78,8 @@ export default function PendenciasLoginModal() {
   const [totalExibidos, setTotalExibidos] = useState(0);
   const [porUnidade, setPorUnidade] = useState<{ unidade: string; total: number }[]>([]);
   const [porUnidadeTipo, setPorUnidadeTipo] = useState<PendenciaGestorResumoUnidadeTipo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [avaliado, setAvaliado] = useState(false);
   const [recarregando, setRecarregando] = useState(false);
   const [abrindoId, setAbrindoId] = useState<string | null>(null);
   const [filtroUnidade, setFiltroUnidade] = useState("");
@@ -101,9 +102,9 @@ export default function PendenciasLoginModal() {
   }, [open]);
 
   useEffect(() => {
-    if (loading || open || aguardandoAbrirRef.current) return;
+    if (!avaliado || loading || open || aguardandoAbrirRef.current) return;
     marcarResolvido();
-  }, [loading, open, marcarResolvido]);
+  }, [avaliado, loading, open, marcarResolvido]);
 
   const temFiltro = Boolean(filtroUnidade || filtroTipo);
 
@@ -162,7 +163,10 @@ export default function PendenciasLoginModal() {
       if (abrirPorLogin && !manterAberto) setOpen(false);
       marcarResolvido();
     } finally {
-      if (reqId === carregarReqRef.current) setLoading(false);
+      if (reqId === carregarReqRef.current) {
+        setLoading(false);
+        setAvaliado(true);
+      }
     }
   }, [marcarResolvido]);
 
@@ -250,7 +254,9 @@ export default function PendenciasLoginModal() {
 
   function verTodas() {
     markPendenciasModalDismissed();
+    aguardandoAbrirRef.current = false;
     setOpen(false);
+    marcarResolvido();
     router.push("/pendencias");
   }
 
