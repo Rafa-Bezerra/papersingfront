@@ -405,6 +405,7 @@ export default function RafaelaTour() {
   const tentouBuscarRef = useRef(false)
   const navLockRef = useRef(false)
   const introTimerRef = useRef<number | null>(null)
+  const tourIniciadoRef = useRef(false)
 
   const marcarVisualizado = useCallback(async (versao: string) => {
     try {
@@ -651,10 +652,8 @@ export default function RafaelaTour() {
   useEffect(() => {
     const liberar = () => setLiberadoAposPendencias(true)
     window.addEventListener('papersign-pendencias-modal-resolvido', liberar)
-    const fallback = window.setTimeout(liberar, 15000)
     return () => {
       window.removeEventListener('papersign-pendencias-modal-resolvido', liberar)
-      window.clearTimeout(fallback)
     }
   }, [])
 
@@ -687,8 +686,9 @@ export default function RafaelaTour() {
   }, [pathname])
 
   useEffect(() => {
-    if (!tour?.exibir || !liberadoAposPendencias || aberto) return
+    if (!tour?.exibir || !liberadoAposPendencias || tourIniciadoRef.current) return
 
+    tourIniciadoRef.current = true
     setAberto(true)
     setFase('intro')
 
@@ -703,7 +703,7 @@ export default function RafaelaTour() {
         introTimerRef.current = null
       }
     }
-  }, [tour, liberadoAposPendencias, aberto])
+  }, [tour, liberadoAposPendencias])
 
   useEffect(() => {
     if (fase !== 'auto-start' || !tour) return
