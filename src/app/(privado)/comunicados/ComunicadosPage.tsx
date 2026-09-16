@@ -135,15 +135,9 @@ export default function Page() {
     const [openTipoDocumento, setOpenTipoDocumento] = useState(false)
     const [financeiroComunicado, setFinanceiroComunicado] = useState<Comunicado | null>(null)
     const [isCriandoFinanceiro, setIsCriandoFinanceiro] = useState(false)
+    // Naturezas financeiras por item de rateio — vêm do que já foi preenchido na criação do
+    // comunicado (ItensFinanceirosSection); o modal "Criar financeiro" não pede isso de novo.
     const [naturezasFinanceirasSelecionadas, setNaturezasFinanceirasSelecionadas] = useState<string[]>([])
-    // Linhas de rateio achatadas (uma por conta contábil) do comunicado aberto no modal "Criar financeiro" —
-    // a ordem precisa bater com naturezasFinanceirasSelecionadas (indexadas em paralelo).
-    const linhasRateioFinanceiroComunicado = useMemo(
-        () => (financeiroComunicado?.itensFinanceiros ?? []).flatMap(item =>
-            item.rateio.map(r => ({ setor: item.setor, ccusto: item.ccusto, codconta: r.codconta, valor: r.valor }))
-        ),
-        [financeiroComunicado]
-    )
 
     const formFinanceiro = useForm<CriarFinanceiroPayload>({
         defaultValues: {
@@ -453,10 +447,6 @@ export default function Page() {
 
     async function handleCriarFinanceiro(data: CriarFinanceiroPayload) {
         if (!financeiroComunicado) return
-        if (naturezasFinanceirasSelecionadas.some(n => !n)) {
-            toast.error("Selecione a Natureza Financeira de todos os itens.")
-            return
-        }
         const id = financeiroComunicado.id
         setIsCriandoFinanceiro(true)
         try {
@@ -743,12 +733,13 @@ ${html}
                                 Aprovações
                             </Button>
 
-                            {/* O financeiro agora é criado automaticamente ao concluir a aprovação
-                                (ComunicadosController.Aprovar). Este botão só reaparece como retry manual
-                                quando essa tentativa automática falhou (erro_financeiro preenchido). */}
-                            {row.original.situacao === 'APROVADO' && !row.original.financeiro_gerado && !!row.original.erro_financeiro && userFinanceiroTotvs && (
-                                <Button size="sm" variant="outline" title={row.original.erro_financeiro} onClick={() => handleAbrirFinanceiro(row.original)}>
-                                    Tentar novamente (Financeiro)
+                            {/* O financeiro é criado automaticamente ao concluir a aprovação quando o criador
+                                já tinha preenchido os campos (ComunicadosController.Aprovar). Este botão cobre
+                                tanto o retry de uma tentativa automática que falhou (erro_financeiro preenchido)
+                                quanto a criação manual quando os campos nunca foram preenchidos na criação. */}
+                            {row.original.situacao === 'APROVADO' && !row.original.financeiro_gerado && userFinanceiroTotvs && (
+                                <Button size="sm" variant="outline" title={row.original.erro_financeiro ?? undefined} onClick={() => handleAbrirFinanceiro(row.original)}>
+                                    {row.original.erro_financeiro ? "Tentar novamente (Financeiro)" : "Criar Financeiro"}
                                 </Button>
                             )}
 
@@ -1116,35 +1107,6 @@ ${html}
                                         </FormItem>
                                     )}
                                 />
-
-                                <div className="border rounded-md p-3">
-                                    <span className="text-sm font-medium text-muted-foreground">Itens financeiros do comunicado</span>
-                                    <div className="mt-2 flex flex-col gap-3 text-sm">
-                                        {linhasRateioFinanceiroComunicado.map((item, i) => (
-                                            <div key={i} className="flex flex-col gap-1 border-b pb-2 last:border-b-0 last:pb-0">
-                                                <div className="flex justify-between">
-                                                    <span>{item.setor} — {item.ccusto} / {item.codconta}</span>
-                                                    <span>{item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <Input
-                                                    placeholder="Natureza Financeira (CODTBORCAMENTO)"
-                                                    value={naturezasFinanceirasSelecionadas[i] ?? ''}
-                                                    onChange={e => {
-                                                        const valor = e.target.value
-                                                        setNaturezasFinanceirasSelecionadas(prev => prev.map((v, idx) => idx === i ? valor : v))
-                                                    }}
-                                                />
-                                            </div>
-                                        ))}
-                                        <div className="flex justify-between font-semibold pt-1">
-                                            <span>Total</span>
-                                            <span>
-                                                {linhasRateioFinanceiroComunicado.reduce((acc, item) => acc + (item.valor ?? 0), 0)
-                                                    .toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
 
                                 <div className="flex justify-end gap-2">
                                     <Button type="button" variant="outline" onClick={() => setFinanceiroComunicado(null)}>
