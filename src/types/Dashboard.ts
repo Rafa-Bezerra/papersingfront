@@ -10,6 +10,8 @@ export interface DashboardStats {
     quantidade_fiscal: number;
     quantidade_externo: number;
     quantidade_documentos: number;
+    quantidade_projetos: number;
+    quantidade_plugsign: number;
 }
 
 export interface DashMovimentos {

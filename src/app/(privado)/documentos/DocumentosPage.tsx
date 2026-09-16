@@ -8,6 +8,7 @@ import React, {
     useTransition
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 import { ColumnDef } from '@tanstack/react-table'
 import { Bell, Check, ChevronsUpDown, Eye, Filter, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
@@ -165,6 +166,10 @@ export default function Page() {
     }
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("EM ANDAMENTO");
+        }
+
         if (dateFrom === "" && dateTo === "") {
             setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
@@ -266,6 +271,15 @@ export default function Page() {
         setIsModalAnexosOpen(true)
         atualizarListaAnexosModal(requisicao)
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (d) => d.id,
+        handleAnexos
+    );
 
     async function handleAprovar(id: number, aprovado: number) {
         setIsLoading(true)
@@ -754,7 +768,12 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable
+                        columns={colunas}
+                        data={results}
+                        loading={isLoading}
+                        getRowDataId={(d) => d.id}
+                    />
                 </CardContent>
             </Card>
 
