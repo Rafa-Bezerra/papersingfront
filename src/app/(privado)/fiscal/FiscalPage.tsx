@@ -10,6 +10,7 @@ import { saveAs } from "file-saver";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
+import { usePendenciaDeepLink } from "@/utils/pendenciaDeepLink";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -304,6 +305,15 @@ export default function Page() {
             setIsModalDocumentosOpen(true)
         }
     }
+
+    usePendenciaDeepLink(
+        results,
+        results.length > 0 && !isLoading,
+        searchParams,
+        router,
+        (r) => r.fiscal.idmov,
+        (item) => handleDocumento(item, "fiscal")
+    );
 
     async function handleAnexo(requisicao: FiscalDocumento, tipo: string) {
         setIsProcessing(true)
@@ -821,7 +831,12 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable
+                        columns={colunas}
+                        data={results}
+                        loading={isLoading}
+                        getRowDataId={(r) => r.fiscal.idmov}
+                    />
                 </CardContent>
             </Card>
 

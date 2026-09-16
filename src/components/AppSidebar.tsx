@@ -27,7 +27,8 @@ import {
   ChevronRight,
   Search,
   Truck,
-  CircleDollarSign
+  CircleDollarSign,
+  Inbox
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -125,6 +126,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   // Mapeamento de ícones para os itens do menu
   const iconMap: Record<string, JSX.Element> = {
     Inicio: <Home className="w-5 h-5" />,
+    'Pendências': <Inbox className="w-5 h-5" />,
     'Solicitação de compra': <ShoppingCart className="w-5 h-5" />,
     'Recebimento de materiais': <Package className="w-5 h-5" />,
     'Controle imobilizado': <Settings className="w-5 h-5" />,
@@ -287,13 +289,15 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                         <SidebarMenuItem
                           key={item.title}
                           id={
-                            item.url === '/docusign'
-                              ? 'tour-menu-plugsign'
-                              : item.url === '/receitas'
-                                ? 'tour-menu-receitas'
-                                : item.url === '/comunicados'
-                                  ? 'tour-menu-pagamentos-ci'
-                                  : undefined
+                            item.url === '/pendencias'
+                              ? 'tour-menu-pendencias'
+                              : item.url === '/docusign'
+                                ? 'tour-menu-plugsign'
+                                : item.url === '/receitas'
+                                  ? 'tour-menu-receitas'
+                                  : item.url === '/comunicados'
+                                    ? 'tour-menu-pagamentos-ci'
+                                    : undefined
                           }
                         >
                           <SidebarMenuButton

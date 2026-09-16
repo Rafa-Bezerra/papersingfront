@@ -8,6 +8,7 @@ import React, {
     useTransition
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 import { ColumnDef } from '@tanstack/react-table'
 import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
 
@@ -415,6 +416,15 @@ export default function Page() {
             setIsModalDocumentosOpen(true)
         }
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (r) => r.requisicao.idmov,
+        handleDocumento
+    );
 
     async function handleAssinar(data: Assinar) {
         setIsProcessing(true)
@@ -1110,7 +1120,12 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading || loading} />
+                    <DataTable
+                        columns={colunas}
+                        data={results}
+                        loading={isLoading || loading}
+                        getRowDataId={(r) => r.requisicao.idmov}
+                    />
                 </CardContent>
             </Card>
 

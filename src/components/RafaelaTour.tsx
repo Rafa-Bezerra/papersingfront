@@ -108,8 +108,16 @@ function passoEhMenuGeral(passo: TourPasso): boolean {
   return sel === '#tour-sidebar'
 }
 
+function passoEhPendencias(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  const rota = (passo.rota || '').trim().toLowerCase()
+  if (sel.includes('pendencias') || sel.includes('tour-pendencias')) return true
+  if (rota.includes('/pendencias')) return true
+  return false
+}
+
 function listarModulosTour(): string[] {
-  const mods: string[] = []
+  const mods: string[] = ['Pendências do gestor']
   if (usuarioPodeReceitas()) mods.push('Receitas')
   if (usuarioPodePagamentosCi()) mods.push('Pagamentos CI')
   if (usuarioPodePlugSign()) mods.push('PlugSign')
@@ -135,12 +143,13 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
   const podeReceitas = usuarioPodeReceitas()
   const podeCi = usuarioPodePagamentosCi()
   const podeFinRm = usuarioPodeFinanceiroRm()
-  const temAlgumModulo = podePlug || podeReceitas || podeCi
+  const temAlgumModulo = true
 
   return passos.filter((p) => {
     if (!p.seletorCss || !p.seletorCss.trim()) return false
 
     if (passoEhGlpi(p)) return true
+    if (passoEhPendencias(p)) return true
     if (passoEhMenuGeral(p)) return temAlgumModulo
     if (passoEhReceitas(p)) return podeReceitas
     if (passoEhCiFinanceiroRm(p)) return podeCi && podeFinRm
@@ -153,18 +162,20 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
 
 function mensagemIntroPorPerfil(): string {
   const mods = listarModulosTour()
-  if (mods.length === 0) {
-    return 'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar o ícone de Suporte, para abrir chamado no GLPI quando precisar de ajuda.'
+  const outros = mods.filter((m) => m !== 'Pendências do gestor')
+  if (outros.length === 0) {
+    return 'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar a nova Caixa de Pendências do gestor (todas as WAY em um só lugar) e o suporte para abertura de chamado no GLPI.'
   }
   return `Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar ${juntarListaPt(mods)} e o suporte para abertura de chamado.`
 }
 
 function mensagemFimPorPerfil(): string {
   const mods = listarModulosTour()
-  if (mods.length === 0) {
-    return 'Pronto!\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!'
+  if (mods.length <= 1) {
+    return 'Pronto!\n\nNa Caixa de Pendências você vê tudo que aguarda sua aprovação ou assinatura em qualquer WAY — e ao clicar em um item o sistema abre o documento na base correta.\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!'
   }
-  let extras = ''
+  let extras =
+    '\n\nNa Caixa de Pendências, movimentos, documentos, RDV, fiscal, projetos e PlugSign de todas as WAY aparecem juntos — clique no item para abrir na unidade certa.'
   if (usuarioPodeReceitas()) {
     extras +=
       '\n\nReceitas aparece só para administrador ou quem tem a permissão Receitas em Usuários.'
@@ -361,6 +372,12 @@ async function prepararPasso(
     // Fallback: destaca as abas se as ações ainda não montaram.
     el = await esperarSeletor('#tour-receitas-abas', 2000)
   }
+  if (!el && seletor === '#tour-pendencias-lista') {
+    el = await esperarSeletor('#tour-pendencias-titulo', 2000)
+  }
+  if (!el && seletor.startsWith('#tour-pendencias-')) {
+    el = await esperarSeletor('#tour-pendencias-titulo', 2000)
+  }
 
   if (el instanceof HTMLElement) {
     if (seletor === '#tour-receitas-consulta' || seletor === '#tour-receitas-unidade') {
@@ -381,11 +398,13 @@ export default function RafaelaTour() {
   const [fase, setFase] = useState<Fase>('idle')
   const [aberto, setAberto] = useState(false)
   const [animApontar, setAnimApontar] = useState(false)
+  const [liberadoAposPendencias, setLiberadoAposPendencias] = useState(false)
   const driverRef = useRef<ReturnType<typeof driver> | null>(null)
   const finalizandoRef = useRef(false)
   const passosRef = useRef<TourPasso[]>([])
   const tentouBuscarRef = useRef(false)
   const navLockRef = useRef(false)
+  const introTimerRef = useRef<number | null>(null)
 
   const marcarVisualizado = useCallback(async (versao: string) => {
     try {
@@ -630,6 +649,16 @@ export default function RafaelaTour() {
   }, [router, tour])
 
   useEffect(() => {
+    const liberar = () => setLiberadoAposPendencias(true)
+    window.addEventListener('papersign-pendencias-modal-resolvido', liberar)
+    const fallback = window.setTimeout(liberar, 15000)
+    return () => {
+      window.removeEventListener('papersign-pendencias-modal-resolvido', liberar)
+      window.clearTimeout(fallback)
+    }
+  }, [])
+
+  useEffect(() => {
     const token = sessionStorage.getItem('authToken')
     if (!token) {
       tentouBuscarRef.current = false
@@ -651,18 +680,30 @@ export default function RafaelaTour() {
         if (!data?.exibir || !data.versao) return
 
         setTour(data)
-        setAberto(true)
-        setFase('intro')
-
-        // Tempo para ler "Olá, sou a Raphaela..." antes de ir ao menu
-        window.setTimeout(() => {
-          setFase((f) => (f === 'intro' ? 'auto-start' : f))
-        }, 4500)
       } catch {
         tentouBuscarRef.current = false
       }
     })()
   }, [pathname])
+
+  useEffect(() => {
+    if (!tour?.exibir || !liberadoAposPendencias || aberto) return
+
+    setAberto(true)
+    setFase('intro')
+
+    if (introTimerRef.current) window.clearTimeout(introTimerRef.current)
+    introTimerRef.current = window.setTimeout(() => {
+      setFase((f) => (f === 'intro' ? 'auto-start' : f))
+    }, 4500)
+
+    return () => {
+      if (introTimerRef.current) {
+        window.clearTimeout(introTimerRef.current)
+        introTimerRef.current = null
+      }
+    }
+  }, [tour, liberadoAposPendencias, aberto])
 
   useEffect(() => {
     if (fase !== 'auto-start' || !tour) return

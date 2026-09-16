@@ -73,6 +73,7 @@ import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 
 
 export default function Page() {
@@ -166,6 +167,10 @@ export default function Page() {
     }
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("EM ANDAMENTO");
+        }
+
         if (dateFrom === "" && dateTo === "") {
             setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
@@ -275,6 +280,15 @@ export default function Page() {
         setIsModalAnexosOpen(true)
         atualizarListaAnexosModal(requisicao)
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (d) => d.id,
+        handleAnexos
+    );
 
     async function handleAprovar(id: number, aprovado: number) {
         setIsLoading(true)
@@ -768,7 +782,7 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading} getRowDataId={(d) => d.id} />
                 </CardContent>
             </Card>
 

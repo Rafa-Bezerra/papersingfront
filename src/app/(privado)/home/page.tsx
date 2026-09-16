@@ -2,12 +2,49 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, CheckCircle, CheckSquare, Package, Receipt, PenLine } from 'lucide-react';
+import {
+  FileText,
+  CheckCircle,
+  CheckSquare,
+  Package,
+  Receipt,
+  Inbox,
+  FileSignature,
+  FolderKanban,
+  ShieldAlert,
+  Users,
+  Percent,
+  Landmark,
+  MessageSquare,
+  Wallet,
+  Globe,
+  ChevronRight,
+} from 'lucide-react';
 import { DashboardCard } from '@/components/DashboardCard';
+import PendenciasGestorHomeCard from '@/components/PendenciasGestorHomeCard';
 import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import './home.css';
+
+function hrefResumoMovimento(status: string): string {
+  const map: Record<string, string> = {
+    'Em Andamento': 'em_andamento',
+    'Pendente': 'pendentes',
+    'Concluído a responder': 'concluido_a_responder',
+    'Concluído respondido': 'concluido_respondido',
+    'Concluído confirmado': 'concluido_confirmado',
+    'Concluído automático(pelo sistema)': 'concluido_automatico',
+    'Avaliado': 'avaliado',
+    'Agendado a responder': 'agendado_a_responder',
+    'Agendado respondido': 'agendado_respondido',
+    'Aguardando terceiros': 'aguardando_terceiros',
+    'Cancelado': 'cancelado',
+    'Despertado': 'despertado',
+  };
+  const slug = map[status];
+  return slug ? `/geral/?status=${slug}` : '/geral/';
+}
 
 export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -22,6 +59,8 @@ export default function HomePage() {
   const [userPagamentoImpostos, setPagamentoImpostos] = useState(false)
   const [userRestrito, setUserRestrito] = useState(false)
   const [userRdv, setUserRdv] = useState(false)
+  const [userProjetos, setUserProjetos] = useState(false)
+  const [userDocusign, setUserDocusign] = useState(false)
 
   useEffect(() => {
     const storedUser = sessionStorage.getItem("userData");
@@ -38,6 +77,8 @@ export default function HomePage() {
         setPagamentoRh(user.pagamento_rh);
         setPagamentoImpostos(user.pagamento_impostos);
         setUserRdv(user.rdv);
+        setUserProjetos(Boolean(user.projetos || user.financeiro));
+        setUserDocusign(Boolean(user.docusign || user.financeiro));
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
       }
@@ -97,84 +138,99 @@ export default function HomePage() {
 
       {/* Seção Pendentes do Gestor - em destaque */}
       {stats && (<section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
-          <p className="text-xs text-muted-foreground">
-            Documentos aguardando sua aprovação por tipo
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
+            <p className="text-xs text-muted-foreground">
+              Todas as WAY — movimentos, documentos, projetos, PlugSign, RDV, fiscal e C.I.
+            </p>
+          </div>
+          <Link
+            href="/pendencias"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            <Inbox className="h-4 w-4" />
+            Página completa
+          </Link>
         </div>
+
+        <PendenciasGestorHomeCard />
+
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
+          Unidade atual
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <DashboardCard
             title="Movimentos"
             count={stats.quantidade_movimentos}
             icon={Package}
-            color="red"
+            color="orange"
             description="Movimentações em andamento"
             href="/geral?status=pendentes"
           />
           {(userRestrito || userAdmin) && (<DashboardCard
             title="Gestão de Pessoas"
             count={stats.quantidade_restritos}
-            icon={PenLine}
-            color="purple"
+            icon={ShieldAlert}
+            color="rose"
             description="Movimentos restritos"
             href="/gestao-pessoas?status=pendentes"
           />)}
           {(userPagamentoRh || userAdmin) && (<DashboardCard
             title="Pag. RH"
             count={stats.quantidade_pagamentos_rh}
-            icon={PenLine}
-            color="purple"
+            icon={Users}
+            color="pink"
             description="Pagamentos RH"
             href="/pagamentos-rh?filtro=pendentes"
           />)}
           {(userPagamentoImpostos || userAdmin) && (<DashboardCard
             title="Pag. Impostos"
             count={stats.quantidade_pagamentos_impostos}
-            icon={PenLine}
-            color="purple"
+            icon={Percent}
+            color="lime"
             description="Pagamentos Impostos"
             href="/pagamentos-impostos?filtro=pendentes"
           />)}
           {(userBordero || userAdmin) && (<DashboardCard
             title="Borderô"
             count={stats.quantidade_bordero}
-            icon={PenLine}
-            color="purple"
+            icon={Landmark}
+            color="slate"
             description="Autorização de Borderôs"
             href="/bordero?filtro=pendentes"
           />)}
           {(userComunicados || userAdmin) && (<DashboardCard
             title="C.I."
             count={stats.quantidade_comunicados}
-            icon={Receipt}
-            color="yellow"
+            icon={MessageSquare}
+            color="amber"
             description="Pagamentos CI"
             href="/comunicados"
           />)}
           {(userRdv || userAdmin) && (<DashboardCard
             title="RDV"
             count={stats.quantidade_rdv}
-            icon={PenLine}
-            color="purple"
+            icon={Wallet}
+            color="violet"
             description="Assinatura de RDVs"
             href="/aprovacaordv"
           />)}
           {(userFiscal || userAdmin) && (<DashboardCard
             title="Fiscal"
             count={stats.quantidade_fiscal}
-            icon={PenLine}
-            color="purple"
+            icon={Receipt}
+            color="cyan"
             description="Assinatura de Fiscal"
             href="/fiscal?filtro=pendentes"
           />)}
           {(userExterno || userAdmin) && (<DashboardCard
-            title="RDV"
+            title="Doc. Externos"
             count={stats.quantidade_externo}
-            icon={PenLine}
-            color="purple"
-            description="Assinatura de Externos"
-            href="/documentos-externos"
+            icon={Globe}
+            color="sky"
+            description="Assinatura de documentos externos"
+            href="/documentos-externos?filtro=pendentes"
           />)}
           {(userDocumentos || userAdmin) && (<DashboardCard
             title="Pendentes Documentos"
@@ -182,7 +238,23 @@ export default function HomePage() {
             icon={FileText}
             color="blue"
             description="Documentos para assinatura"
-            href="/documentos"
+            href="/documentos?filtro=pendentes"
+          />)}
+          {(userProjetos || userAdmin) && (<DashboardCard
+            title="Projetos"
+            count={stats.quantidade_projetos ?? 0}
+            icon={FolderKanban}
+            color="indigo"
+            description="Projetos para assinatura"
+            href="/projetos?filtro=pendentes"
+          />)}
+          {(userDocusign || userAdmin) && (<DashboardCard
+            title="PlugSign"
+            count={stats.quantidade_plugsign ?? 0}
+            icon={FileSignature}
+            color="teal"
+            description="Documentos PlugSign pendentes"
+            href="/docusign?filtro=pendentes"
           />)}
         </div>
       </section>)}
@@ -289,18 +361,22 @@ export default function HomePage() {
           <CardContent>
             <div className="space-y-2 sm:space-y-3">
               {stats.movimentos.map((mov, index) => (
-                <div
+                <Link
                   key={index}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                  href={hrefResumoMovimento(mov.status_movimento)}
+                  className="group flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted hover:shadow-sm"
                 >
                   <span className="text-sm font-medium">
                     {mov.status_movimento}
                   </span>
 
-                  <span className="text-sm text-muted-foreground">
-                    {mov.quantidade ?? 0}
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {mov.quantidade ?? 0}
+                    </span>
+                    <ChevronRight className="h-4 w-4 opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>
