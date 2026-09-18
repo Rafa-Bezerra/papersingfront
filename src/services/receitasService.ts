@@ -50,6 +50,18 @@ export type ReceitasUploadLogItem = {
   valorTotal: number;
 };
 
+export type ReceitasHistoricoItem = {
+  id: number;
+  tipo: "UPLOAD" | "PROCESSAMENTO";
+  unidadeCodigo: string;
+  usuario: string;
+  dataHora: string;
+  nomeArquivo?: string | null;
+  qtdeLinhas: number;
+  valorTotal: number;
+  valorFlan?: number | null;
+};
+
 export type ReceitasUploadResultado = {
   inseridos: number;
   ignorados: number;
@@ -108,6 +120,14 @@ export async function getConsultaCsc(): Promise<ReceitasPendentesResumo[]> {
 
 export async function getUploadsReceitas(codigo: string): Promise<ReceitasUploadLogItem[]> {
   const res = await fetch(`${API_BASE}/api/Receitas/${encodeURIComponent(codigo)}/uploads`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function getHistoricoReceitas(codigo: string): Promise<ReceitasHistoricoItem[]> {
+  const res = await fetch(`${API_BASE}/api/Receitas/${encodeURIComponent(codigo)}/historico`, {
     headers: headers(),
   });
   if (!res.ok) throw new Error(await readError(res));
