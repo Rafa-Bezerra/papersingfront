@@ -11,7 +11,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyIcon, Copy, ClipboardList, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { KeyIcon, Copy, ClipboardList, SearchIcon, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
+import UnificacaoUsuarioPanel from '@/components/UnificacaoUsuarioPanel'
 import { empresaPermiteProjetos } from '@/utils/projetosModulo'
 import {
   Dialog,
@@ -108,9 +109,12 @@ export default function PageUsuarios() {
     }
   }, [])
 
-  const [aba, setAba] = useState(
-    () => (searchParams.get('tab') === 'auditoria' ? 'auditoria' : 'lista')
-  )
+  const [aba, setAba] = useState(() => {
+    const t = searchParams.get('tab')
+    if (t === 'auditoria') return 'auditoria'
+    if (t === 'unificacao') return 'unificacao'
+    return 'lista'
+  })
 
   const form = useForm<Usuario>({
     defaultValues: {
@@ -1142,6 +1146,7 @@ export default function PageUsuarios() {
             setAba(v)
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (v === 'auditoria') sp.set('tab', 'auditoria')
+            else if (v === 'unificacao') sp.set('tab', 'unificacao')
             else sp.delete('tab')
             const qs = sp.toString()
             router.replace(qs ? `?${qs}` : '?', { scroll: false })
@@ -1154,6 +1159,10 @@ export default function PageUsuarios() {
               <ClipboardList className="h-4 w-4" />
               Auditoria
             </TabsTrigger>
+            <TabsTrigger value="unificacao" className="gap-1.5">
+              <UserRound className="h-4 w-4" />
+              Unificação
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="lista" className="mt-0">
             {conteudoLista}
@@ -1162,10 +1171,19 @@ export default function PageUsuarios() {
             <div className="mb-4">
               <h2 className="text-xl font-semibold">Auditoria de usuários</h2>
               <p className="text-sm text-muted-foreground">
-                Quem criou, alterou permissões ou copiou usuários para outras bases.
+                Quem criou, alterou, copiou ou unificou usuários (chapa → nominal).
               </p>
             </div>
             <AuditoriaUsuariosPanel compact />
+          </TabsContent>
+          <TabsContent value="unificacao" className="mt-0">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Unificação de usuário</h2>
+              <p className="text-sm text-muted-foreground">
+                Migra login chapa para nominal em alçadas, RDV, assinaturas e demais referências (CSC).
+              </p>
+            </div>
+            <UnificacaoUsuarioPanel />
           </TabsContent>
         </Tabs>
       ) : (

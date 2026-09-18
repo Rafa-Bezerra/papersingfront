@@ -22,7 +22,7 @@ import {
   getConsultaCsc,
   getPendentes,
   getUnidadesReceitas,
-  getUploadsReceitas,
+  getHistoricoReceitas,
   processarLote,
   uploadPlanilha,
   type ReceitasLoteResultado,
@@ -30,7 +30,7 @@ import {
   type ReceitasPendentesResumo,
   type ReceitasUnidadeInfo,
   type ReceitasUnidadesResponse,
-  type ReceitasUploadLogItem,
+  type ReceitasHistoricoItem,
 } from '@/services/receitasService'
 
 function formatDataCurta(v: string | null | undefined): string {
@@ -134,14 +134,18 @@ function formatDataHora(v: string | Date | null | undefined): string {
   return d.toLocaleString('pt-BR')
 }
 
+function labelTipoHistorico(tipo: ReceitasHistoricoItem['tipo']): string {
+  return tipo === 'UPLOAD' ? 'Upload planilha' : 'Processamento lote'
+}
+
 function PainelCscBase({ unidade }: { unidade: ReceitasUnidadeInfo }) {
   const [loading, setLoading] = useState(false)
-  const [uploads, setUploads] = useState<ReceitasUploadLogItem[]>([])
+  const [historico, setHistorico] = useState<ReceitasHistoricoItem[]>([])
 
   async function carregar() {
     setLoading(true)
     try {
-      setUploads(await getUploadsReceitas(unidade.codigo))
+      setHistorico(await getHistoricoReceitas(unidade.codigo))
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -160,6 +164,10 @@ function PainelCscBase({ unidade }: { unidade: ReceitasUnidadeInfo }) {
     )
   }
 
+  const vazioMsg = unidade.permiteUpload
+    ? 'Nenhum upload ou processamento registrado nesta base.'
+    : 'Nenhum processamento de lote registrado nesta base.'
+
   return (
     <div className="space-y-4">
       <div id="tour-receitas-acoes" className="flex flex-wrap items-center gap-2">
@@ -171,7 +179,7 @@ function PainelCscBase({ unidade }: { unidade: ReceitasUnidadeInfo }) {
 
       {!unidade.permiteUpload && (
         <p className="text-sm text-muted-foreground">
-          Nesta base o envio de planilha não é usado.
+          Nesta base não há upload de planilha — o histórico mostra quem processou cada lote e o valor.
         </p>
       )}
 
@@ -180,21 +188,48 @@ function PainelCscBase({ unidade }: { unidade: ReceitasUnidadeInfo }) {
           <thead className="bg-muted/50 text-left">
             <tr>
               <th className="px-3 py-2 font-medium">Quando</th>
+              <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Usuário</th>
+              <th className="px-3 py-2 font-medium text-right">Qtd</th>
+              <th className="px-3 py-2 font-medium text-right">Valor</th>
+              <th className="px-3 py-2 font-medium">Arquivo</th>
             </tr>
           </thead>
           <tbody>
-            {uploads.length === 0 ? (
+            {historico.length === 0 ? (
               <tr className="border-t">
-                <td colSpan={2} className="px-3 py-3 text-muted-foreground">
-                  Nenhum upload registrado nesta base.
+                <td colSpan={6} className="px-3 py-3 text-muted-foreground">
+                  {vazioMsg}
                 </td>
               </tr>
             ) : (
-              uploads.map((u) => (
-                <tr key={u.id} className="border-t">
-                  <td className="px-3 py-2">{formatDataHora(u.dataUpload)}</td>
-                  <td className="px-3 py-2 font-medium">{u.usuario}</td>
+              historico.map((h) => (
+                <tr key={`${h.tipo}-${h.id}`} className="border-t">
+                  <td className="px-3 py-2 whitespace-nowrap">{formatDataHora(h.dataHora)}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={
+                        h.tipo === 'UPLOAD'
+                          ? 'rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-800'
+                          : 'rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800'
+                      }
+                    >
+                      {labelTipoHistorico(h.tipo)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 font-medium">{h.usuario || '—'}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{h.qtdeLinhas}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">
+                    {formatMoney(h.valorTotal)}
+                    {h.tipo === 'PROCESSAMENTO' && h.valorFlan != null && h.valorFlan !== h.valorTotal && (
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        FLAN: {formatMoney(h.valorFlan)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">
+                    {h.nomeArquivo || '—'}
+                  </td>
                 </tr>
               ))
             )}

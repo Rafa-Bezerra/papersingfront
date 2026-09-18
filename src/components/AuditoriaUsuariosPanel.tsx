@@ -40,6 +40,10 @@ function labelAcao(acao: string) {
       return 'Alteração'
     case 'COPIA':
       return 'Cópia'
+    case 'COPIA_ATUALIZA':
+      return 'Cópia (atualização)'
+    case 'UNIFICACAO':
+      return 'Unificação'
     default:
       return acao
   }
