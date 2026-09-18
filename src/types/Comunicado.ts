@@ -2,6 +2,7 @@
 // valor total do item — o campo não editado é sempre recalculado a partir do que foi digitado.
 export type ComunicadoRateioConta = {
     id?: number,
+    ccusto: string,
     codconta: string,
     modo: 'valor' | 'percentual',
     percentual: number,

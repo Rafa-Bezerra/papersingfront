@@ -48,6 +48,7 @@ export type Fornecedor = {
     codcfo: string;
     usuario: string;
     nome: string;
+    cnpj?: string;
 };
 export type AssinarRdv = {
     idrdv: number
