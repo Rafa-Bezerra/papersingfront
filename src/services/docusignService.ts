@@ -461,6 +461,7 @@ export type EquipePlugSignMembro = {
     primeiroNome?: string;
     ultimoNome?: string;
     email: string;
+    tipo?: "team" | "customer";
 };
 
 export async function listarEquipePlugSign(q?: string): Promise<EquipePlugSignMembro[]> {
@@ -585,11 +586,16 @@ export type FornecedorParceiroPayload = {
 
 export type FornecedorParceiroResult = {
     message: string;
-    plugSign: { email: string; name: string; lastName: string; id: number };
+    plugSign?: {
+        id: number;
+        email: string;
+        name: string;
+        lastName: string;
+        tipo?: string;
+    } | null;
     paperSign?: {
         id: number;
         usuario: string;
-        senhaTemporaria: string;
         aviso: string;
     } | null;
 };

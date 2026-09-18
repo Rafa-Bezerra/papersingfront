@@ -57,7 +57,8 @@ import {
   SelectValue
 } from '@/components/ui/select'
 
-const BASES_COPIA: { empresa: string; unidade: string }[] = [
+/** Rótulos empresa → unidade (listagem/filtro CSC). */
+const BASES_LABEL: { empresa: string; unidade: string }[] = [
   { empresa: '48.851.242', unidade: 'WAY 112' },
   { empresa: '63.929.367', unidade: 'WAY 153' },
   { empresa: '58.492.120', unidade: 'WAY 262' },
@@ -66,6 +67,9 @@ const BASES_COPIA: { empresa: string; unidade: string }[] = [
   { empresa: '57.190.446', unidade: 'MIGRA BR' },
   { empresa: '57.582.342', unidade: 'WAY CSC' },
 ]
+
+/** Destinos da cópia — bases operacionais + MIGRA (CSC fica de fora: é a origem da cópia). */
+const BASES_COPIA = BASES_LABEL.filter(b => b.unidade !== 'WAY CSC')
 
 export default function PageUsuarios() {
   const titulo = 'Usuários'
@@ -342,16 +346,20 @@ export default function PageUsuarios() {
     try {
       const resultado = await copiarUsuario(copiaUsuario.sequencial, copiaEmpresas)
       const criados = resultado.resultados.filter(r => r.status === 'criado')
+      const atualizados = resultado.resultados.filter(r => r.status === 'atualizado')
       const existentes = resultado.resultados.filter(r => r.status === 'ja_existe')
       const erros = resultado.resultados.filter(r => r.status === 'erro')
-      let msg = `Cópia de ${resultado.nome}: criado em ${criados.length} base(s)`
-      if (criados.length) msg += ` (${criados.map(r => r.unidade).join(', ')})`
-      if (existentes.length) msg += ` — já existia em ${existentes.map(r => r.unidade).join(', ')}`
+      let msg = `Cópia de ${resultado.nome}:`
+      if (criados.length) msg += ` criado em ${criados.map(r => r.unidade).join(', ')}`
+      if (atualizados.length) msg += ` — permissões atualizadas em ${atualizados.map(r => r.unidade).join(', ')}`
+      if (existentes.length) msg += ` — origem/já ok: ${existentes.map(r => r.unidade).join(', ')}`
       if (erros.length) msg += ` — falhou em ${erros.map(r => r.unidade).join(', ')}`
+      if (!criados.length && !atualizados.length && !erros.length) msg += ' nada a criar'
       if (erros.length) toast.warning(msg)
       else toast.success(msg)
       setCopiaUsuario(null)
       setCopiaEmpresas([])
+      await handleSearchClick()
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -423,7 +431,7 @@ export default function PageUsuarios() {
           header: 'BASE',
           accessorFn: row =>
             row.unidade ||
-            BASES_COPIA.find(b => b.empresa === row.empresa)?.unidade ||
+            BASES_LABEL.find(b => b.empresa === row.empresa)?.unidade ||
             row.empresa,
         })
       } else {
@@ -491,7 +499,7 @@ export default function PageUsuarios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
-                  {BASES_COPIA.map(b => (
+                  {BASES_LABEL.map(b => (
                     <SelectItem key={b.unidade} value={b.unidade}>{b.unidade}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1012,8 +1020,8 @@ export default function PageUsuarios() {
               Cópia de usuário
             </DialogTitle>
             <DialogDescription className="text-center text-sm text-muted-foreground">
-              Cria o mesmo login nas bases selecionadas, com as mesmas permissões.
-              A senha atual é mantida.
+              Se o login ainda não existir na base, cria com as mesmas permissões.
+              Se já existir, alinha as permissões com a origem. A senha atual é mantida.
             </DialogDescription>
           </DialogHeader>
 
@@ -1025,7 +1033,7 @@ export default function PageUsuarios() {
                 <p>
                   <span className="text-muted-foreground">Base atual:</span>{' '}
                   {copiaUsuario.unidade
-                    || BASES_COPIA.find(b => b.empresa === copiaUsuario.empresa)?.unidade
+                    || BASES_LABEL.find(b => b.empresa === copiaUsuario.empresa)?.unidade
                     || copiaUsuario.empresa}
                 </p>
               </div>

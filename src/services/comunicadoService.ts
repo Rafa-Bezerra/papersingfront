@@ -88,10 +88,35 @@ export async function getDocumento(id: number): Promise<string> {
     const res = await fetch(`${API_BASE}/api/${caminho}/anexo/${id}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     if (!res.ok) {
       const msg = await res.text();
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+      throw new Error(`Erro ${res.status} ao abrir o documento: ${msg}`);
     }
-    const data = await res.text();
-    return data;
+    const contentType = res.headers.get("content-type") ?? "";
+    const raw = contentType.includes("application/json")
+      ? String(await res.json())
+      : await res.text();
+
+    let s = (raw ?? "").trim();
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+        try { s = JSON.parse(s) as string } catch { s = s.slice(1, -1) }
+    }
+    // Remove BOM / aspas soltas no início (resposta truncada ou text/plain com lixo).
+    s = s.replace(/^\uFEFF/, "").replace(/^"+|"+$/g, "").replace(/^data:.*;base64,/, "").trim();
+
+    if (!s) {
+        throw new Error("Documento sem PDF (resposta vazia da API).");
+    }
+
+    try {
+        const head = atob(s.slice(0, Math.min(s.length, 64)));
+        if (!head.startsWith("%PDF")) {
+            throw new Error(`PDF inválido (cabeçalho: ${JSON.stringify(head.slice(0, 8))}).`);
+        }
+    } catch (e) {
+        if (e instanceof Error && e.message.startsWith("PDF inválido")) throw e;
+        throw new Error("PDF inválido (base64 corrompido).");
+    }
+
+    return s;
 }
 
 export async function getAnexo(caminho_anexo: string): Promise<string> {

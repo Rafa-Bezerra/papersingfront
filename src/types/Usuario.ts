@@ -35,7 +35,7 @@ export type Usuario = {
 
 export type UnidadeResultado = {
     unidade: string,
-    status: 'criado' | 'ja_existe' | 'erro',
+    status: 'criado' | 'atualizado' | 'ja_existe' | 'erro',
     sequencial?: number,
     mensagem?: string,
 }

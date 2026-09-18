@@ -6,6 +6,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
 import TopNav from "./TopNav";
 import RafaelaTour from "./RafaelaTour";
+import PendenciasLoginModal from "./PendenciasLoginModal";
+import GestorUnidadeBanner from "./GestorUnidadeBanner";
 import { data } from "@/lib/data";
 import { toast } from "sonner";
 
@@ -41,11 +43,13 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* TopNav triggers mobile menu */}
         <TopNav onMenuClick={handleMobileToggle} />
+        <GestorUnidadeBanner />
         <main className="flex-1 min-h-0 overflow-y-auto bg-background p-2 sm:p-4 lg:p-6">
           <div className="w-full">{children}</div>
         </main>
       </div>
       <RafaelaTour />
+      <PendenciasLoginModal />
     </div>
   );
 }
@@ -64,6 +68,15 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   useEffect(() => {
     const checkAuthentication = () => {
       try {
+        // Cutover login único Microsoft: força novo login uma vez após o deploy.
+        const cutoverKey = "papersign-auth-cutover";
+        const cutoverValue = "ms-sso-v1";
+        if (localStorage.getItem(cutoverKey) !== cutoverValue) {
+          sessionStorage.removeItem("authToken");
+          sessionStorage.removeItem("userData");
+          localStorage.setItem(cutoverKey, cutoverValue);
+        }
+
         const token = sessionStorage.getItem("authToken");
         const userData = sessionStorage.getItem("userData");
 

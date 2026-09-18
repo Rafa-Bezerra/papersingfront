@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, History, SearchIcon, ShieldCheck, SquarePlus, Trash2, UserPlus, X } from 'lucide-react'
+import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, History, Printer, SearchIcon, ShieldCheck, SquarePlus, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { base64ParaImpressao, resolverAnexoDocumento } from '@/utils/documentoAnexo'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -84,6 +85,7 @@ import FornecedorParceiroPanel from '@/components/FornecedorParceiroPanel'
 import MinhasSolicitacoesPanel from '@/components/MinhasSolicitacoesPanel'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 
 
 export default function Page() {
@@ -277,6 +279,10 @@ export default function Page() {
     }
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("EM ANDAMENTO");
+        }
+
         if (dateFrom === "" && dateTo === "") {
             setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
@@ -376,6 +382,15 @@ export default function Page() {
         setIsModalAnexosOpen(true)
         atualizarListaAnexosModal(requisicao)
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (d) => d.id,
+        handleAnexos
+    );
 
     async function handleAprovar(id: number, aprovado: number) {
         setIsLoading(true)
@@ -493,39 +508,56 @@ export default function Page() {
         setAnexosSubmit(prev => prev.filter((_, i) => i !== index))
     }
 
+    async function carregarPdfAnexo(anexo: DocumentoAnexo): Promise<string> {
+        let arquivo: string
+        if (anexo.anexo.startsWith('data:') || anexo.anexo.startsWith('/anexos/') === false && anexo.anexo.length > 500) {
+            arquivo = normalizarPdfDataUrl(anexo.anexo)
+        } else if (anexo.anexo.startsWith('/anexos/')) {
+            arquivo = await getAnexo(anexo.anexo)
+        } else {
+            arquivo = normalizarPdfDataUrl(anexo.anexo)
+        }
+        if (!base64PdfEhValido(arquivo)) {
+            throw new Error(
+                'O arquivo não é um PDF válido. Se já tentou assinar antes, exclua o anexo e envie o PDF de novo.'
+            )
+        }
+        return arquivo
+    }
+
     async function handleVisualizarAnexo(anexo: DocumentoAnexo) {
         setIsLoading(true)
         try {
-            let arquivo: string;
-            if (anexo.anexo.startsWith('data:') || anexo.anexo.startsWith('/anexos/') === false && anexo.anexo.length > 500) {
-                arquivo = normalizarPdfDataUrl(anexo.anexo);
-            } else if (anexo.anexo.startsWith('/anexos/')) {
-                arquivo = await getAnexo(anexo.anexo);
-            } else {
-                arquivo = normalizarPdfDataUrl(anexo.anexo);
-            }
-            if (!base64PdfEhValido(arquivo)) {
-                throw new Error(
-                    "O arquivo não é um PDF válido. Se já tentou assinar antes, exclua o anexo e envie o PDF de novo."
-                );
-            }
-            setAnexoSelecionado(anexo);
-            setAnexoPdfBase64ParaAssinatura(arquivo);
+            const arquivo = await carregarPdfAnexo(anexo)
+            setAnexoSelecionado(anexo)
+            setAnexoPdfBase64ParaAssinatura(arquivo)
             setIsModalVisualizarAnexoOpen(true)
         } catch (err) {
-            console.error(err);
-            const msg = err instanceof Error ? err.message : "Não foi possível carregar o anexo.";
-            toast.error(msg);
+            console.error(err)
+            const msg = err instanceof Error ? err.message : 'Não foi possível carregar o anexo.'
+            toast.error(msg)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleImprimirAnexoDireto(anexo: DocumentoAnexo) {
+        setIsLoading(true)
+        try {
+            const arquivo = await carregarPdfAnexo(anexo)
+            imprimirPdfBase64(base64ParaImpressao(arquivo))
+        } catch (err) {
+            console.error(err)
+            const msg = err instanceof Error ? err.message : 'Não foi possível imprimir o documento.'
+            toast.error(msg)
         } finally {
             setIsLoading(false)
         }
     }
 
     function handleImprimirAnexo() {
-        if (!anexoPdfBase64ParaAssinatura) return;
-        let base64 = anexoPdfBase64ParaAssinatura.trim();
-        if (base64.startsWith("data:")) base64 = base64.split(",")[1];
-        imprimirPdfBase64(base64);
+        if (!anexoPdfBase64ParaAssinatura) return
+        imprimirPdfBase64(base64ParaImpressao(anexoPdfBase64ParaAssinatura))
     }
 
     async function handleAssinarAnexo(data: DocumentoAnexoAssinar) {
@@ -621,18 +653,40 @@ export default function Page() {
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
                     const podeExcluir = usuarioCriador && todasPendentes;
 
-                    const anexoPrincipal = row.original.anexos?.filter(a => a.documento_principal === true)[0];
+                    const anexoDocumento = resolverAnexoDocumento(row.original.anexos)
 
                     return (
-                        <div className="flex gap-2">
-                            {anexoPrincipal && (<Button size="sm" variant="outline" onClick={() => {
-                                setRequisicaoSelecionada(row.original)
-                                handleVisualizarAnexo(anexoPrincipal)
-                            }}>
-                                Documento {anexoPrincipal.documento_assinado == 1 && (
-                                    <Check className="w-4 h-4 text-green-500" />
-                                )}
-                            </Button>)}
+                        <div className="flex flex-wrap gap-2">
+                            {anexoDocumento && (
+                                <>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setRequisicaoSelecionada(row.original)
+                                            handleVisualizarAnexo(anexoDocumento)
+                                        }}
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                        Documento
+                                        {anexoDocumento.documento_assinado == 1 && (
+                                            <Check className="w-4 h-4 text-green-500" />
+                                        )}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        title="Imprimir documento"
+                                        onClick={() => {
+                                            setRequisicaoSelecionada(row.original)
+                                            handleImprimirAnexoDireto(anexoDocumento)
+                                        }}
+                                    >
+                                        <Printer className="w-4 h-4" />
+                                        Imprimir
+                                    </Button>
+                                </>
+                            )}
 
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
                                 Anexos {(row.original.anexos?.length ?? 0) > 0 ? `(${row.original.anexos.length})` : ''}
@@ -735,15 +789,25 @@ export default function Page() {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleVisualizarAnexo(row.original)}
                         >
-                            Visualizar {row.original.documento_assinado == 1 && (
+                            <Eye className="w-4 h-4" />
+                            Visualizar
+                            {row.original.documento_assinado == 1 && (
                                 <Check className="w-4 h-4 text-green-500" />
                             )}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleImprimirAnexoDireto(row.original)}
+                        >
+                            <Printer className="w-4 h-4" />
+                            Imprimir
                         </Button>
                     </div>
                 )
@@ -947,7 +1011,7 @@ export default function Page() {
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} />
+                    <DataTable columns={colunas} data={results} loading={isLoading} getRowDataId={(d) => d.id} />
                 </CardContent>
             </Card>
 

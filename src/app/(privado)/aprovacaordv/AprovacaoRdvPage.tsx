@@ -5,6 +5,8 @@ import React, {
     useMemo,
     useState,
 } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
     Dialog,
@@ -34,6 +36,8 @@ import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 
 export default function Page() {
     const titulo = 'Aprovação de RDV';
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [isLoading, setIsLoading] = useState(false)
@@ -57,6 +61,10 @@ export default function Page() {
     const [anexoParaImpressao, setAnexoParaImpressao] = useState<string | null>(null)
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("Em Andamento");
+        }
+
         const storedUser = sessionStorage.getItem("userData");
         // console.log("storedUser: " + storedUser);
         if (storedUser) {
@@ -197,6 +205,15 @@ export default function Page() {
             setIsModalVisualizarDocumentoOpen(true)
         }
     }
+
+    usePendenciaDeepLink(
+        results,
+        results.length > 0 && !isLoading,
+        searchParams,
+        router,
+        (r) => r.id,
+        handleDocumento
+    );
 
     function handleImprimirDocumento() {
         if (!arquivoParaImpressao) return;
@@ -431,7 +448,12 @@ export default function Page() {
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
                     {userCodusuario && (
-                        <DataTable columns={colunas} data={results} loading={isLoading} />
+                        <DataTable
+                            columns={colunas}
+                            data={results}
+                            loading={isLoading}
+                            getRowDataId={(r) => r.id}
+                        />
                     )}
                 </CardContent>
             </Card>

@@ -612,7 +612,7 @@ export default function SolicitacaoAssinaturaPanel({
       if (!hit) pendentes.push(d.nome.trim() || d.email.trim() || 'Destinatário')
     }
     if (pendentes.length > 0) {
-      toast.error('Destinatário fora da equipe PlugSign', {
+      toast.error('Destinatário não cadastrado na PlugSign', {
         description: `${pendentes.join(', ')}. Cadastre em Fornecedor / parceiro antes de enviar.`,
         action: onCadastrarFornecedor
           ? {
@@ -924,12 +924,12 @@ export default function SolicitacaoAssinaturaPanel({
               <div>
                 <p className="text-sm font-medium">Destinatários</p>
                 <p className="text-xs text-muted-foreground">
-                  Cadeia 1→2→3… Digite o nome para buscar na equipe PlugSign. Se não achar, cadastre em
-                  Fornecedor / parceiro.
+                  Cadeia 1→2→3… Digite o nome para buscar na equipe ou clientes PlugSign. Se não achar,
+                  cadastre em Fornecedor / parceiro.
                   {equipeLoading
-                    ? ' Carregando equipe…'
+                    ? ' Carregando destinatários…'
                     : !equipeErro
-                      ? ` ${equipe.length} na equipe.`
+                      ? ` ${equipe.length} disponíveis.`
                       : null}
                 </p>
                 {equipeErro && (
@@ -989,7 +989,7 @@ export default function SolicitacaoAssinaturaPanel({
                   onCadastrarFornecedor?.({ nome: d.nome, email: d.email })
                   toast.message('Cadastre o fornecedor/parceiro', {
                     description:
-                      'Depois volte em Solicitação de assinatura e selecione o nome na equipe.',
+                      'Depois volte em Solicitação de assinatura e selecione o nome na lista PlugSign.',
                   })
                 }
                 return (
@@ -1054,7 +1054,7 @@ export default function SolicitacaoAssinaturaPanel({
                                     void validarDestPorId(d.id)
                                   }, 180)
                                 }}
-                                placeholder="Buscar na equipe PlugSign…"
+                                placeholder="Buscar na PlugSign…"
                                 disabled={isPending}
                                 className="h-8 pr-8"
                               />
@@ -1076,12 +1076,12 @@ export default function SolicitacaoAssinaturaPanel({
                                 <CommandList>
                                   <CommandEmpty>
                                     {equipeLoading
-                                      ? 'Carregando equipe PlugSign…'
+                                      ? 'Carregando destinatários PlugSign…'
                                       : equipeErro
                                         ? 'Não foi possível carregar a equipe. Veja o aviso acima.'
                                         : termoNome.length < 2
                                           ? 'Digite ao menos 2 letras para buscar.'
-                                          : 'Nenhum na equipe. Cadastre em Fornecedor / parceiro.'}
+                                          : 'Nenhum na PlugSign. Cadastre em Fornecedor / parceiro.'}
                                   </CommandEmpty>
                                   <CommandGroup heading="Equipe PlugSign">
                                     {sugestoesNome.map((m) => (
@@ -1104,7 +1104,7 @@ export default function SolicitacaoAssinaturaPanel({
                                 <div className="border-t p-2 space-y-1">
                                   {sugestoesNome.length === 0 ? (
                                     <p className="text-[11px] text-muted-foreground px-0.5">
-                                      Nenhum na equipe. Cadastre como fornecedor/parceiro.
+                                      Nenhum na PlugSign. Cadastre como fornecedor/parceiro.
                                     </p>
                                   ) : (
                                     <p className="text-[11px] text-muted-foreground px-0.5">
@@ -1211,14 +1211,14 @@ export default function SolicitacaoAssinaturaPanel({
                     {d.daEquipe === true && (
                       <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
-                        Encontrado na equipe PlugSign
+                        Encontrado na PlugSign
                       </p>
                     )}
                     {d.daEquipe === false && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="flex-1">
-                          Não está na equipe PlugSign. Cadastre em Fornecedor / parceiro e selecione de novo.
+                          Não está cadastrado na PlugSign. Cadastre em Fornecedor / parceiro e selecione de novo.
                         </span>
                         <Button
                           type="button"
@@ -1242,9 +1242,9 @@ export default function SolicitacaoAssinaturaPanel({
                               const hit = membroNaEquipe(list, d.nome, d.email)
                               if (hit) {
                                 selecionarDaEquipe(d.id, hit)
-                                toast.success('Encontrado na equipe após atualizar.')
+                                toast.success('Encontrado na PlugSign após atualizar.')
                               } else {
-                                toast.message('Ainda não aparece na equipe.', {
+                                toast.message('Ainda não aparece na PlugSign.', {
                                   description: 'Confira se o cadastro na PlugSign concluiu e tente de novo.',
                                 })
                               }
