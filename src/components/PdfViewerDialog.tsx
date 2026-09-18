@@ -234,6 +234,10 @@ export default function PdfViewerDialog({
     placeOwnerLabel,
 }: Props) {
     const iframeRef = useRef<HTMLIFrameElement>(null)
+    const pdfBase64Ref = useRef<string | null>(pdfBase64)
+    const openRef = useRef(open)
+    pdfBase64Ref.current = pdfBase64
+    openRef.current = open
 
     const [viewport, setViewport] = useState<PdfViewport | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
@@ -245,6 +249,7 @@ export default function PdfViewerDialog({
     const [isPreviewLocked, setIsPreviewLocked] = useState(false)
     const [iframeKey, setIframeKey] = useState(0)
     const [iframeLoaded, setIframeLoaded] = useState(false)
+    const [pdfError, setPdfError] = useState<string | null>(null)
 
     // Tamanho da caixa em px (a scale=1, sem zoom)
     const [boxPxW, setBoxPxW] = useState(initialBoxW ?? DEFAULT_BOX_PX_W)
@@ -284,7 +289,13 @@ export default function PdfViewerDialog({
         const handler = (event: MessageEvent) => {
             if (event.source !== iframeRef.current?.contentWindow) return
             if (event.data?.totalPages) setTotalPages(event.data.totalPages)
+            if (event.data?.pdfError) setPdfError(String(event.data.pdfError))
+            if (event.data?.pdfViewerReady) {
+                setIframeLoaded(true)
+                postPdfToIframe()
+            }
             if (event.data?.pdfViewport) {
+                setPdfError(null)
                 const scale = event.data.pdfViewport.scale
                 setViewport({ width: event.data.pdfViewport.width, height: event.data.pdfViewport.height, scale })
                 setZoom(prev => prev === 1.5 ? scale : prev)
@@ -294,10 +305,17 @@ export default function PdfViewerDialog({
         return () => window.removeEventListener('message', handler)
     }, [])
 
-    useEffect(() => { resetViewState() }, [pdfBase64])
+    useEffect(() => { resetViewState(); setPdfError(null) }, [pdfBase64])
 
     useEffect(() => {
-        if (!open) { resetViewState(); setIframeLoaded(false); return }
+        if (!open) {
+            resetViewState()
+            setIframeLoaded(false)
+            setPdfError(null)
+            return
+        }
+        // Remonta o iframe e zera o loaded ANTES — evita postMessage no iframe antigo/morto.
+        setIframeLoaded(false)
         setIframeKey(k => k + 1)
         if (initialBoxW != null) setBoxPxW(initialBoxW)
         if (initialBoxH != null) setBoxPxH(initialBoxH)
@@ -309,23 +327,64 @@ export default function PdfViewerDialog({
         if (initialBoxH != null) setBoxPxH(initialBoxH)
     }, [open, initialBoxW, initialBoxH])
 
-    function postPdfToIframe() {
-        if (!open || !pdfBase64) return
-        let raw = pdfBase64.trim()
-        if (raw.startsWith('"') && raw.endsWith('"')) {
+    function normalizePdfBase64(rawInput: string | null | undefined): string | null {
+        if (!rawInput) return null
+        let raw = rawInput.trim().replace(/^\uFEFF/, "")
+        if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
             try { raw = JSON.parse(raw) as string } catch { raw = raw.slice(1, -1) }
         }
-        const clean = raw.replace(/^data:.*;base64,/, '').trim()
-        if (!clean.startsWith('JVBERi')) { console.error('PDF inválido'); return }
-        iframeRef.current?.contentWindow?.postMessage({ pdfBase64: clean }, '*')
+        // Aspas residuais (ex.: JSON mal cortado) + data-URL.
+        const clean = raw.replace(/^"+|"+$/g, "").replace(/^data:.*;base64,/, "").trim()
+        if (!clean) return null
+
+        // Aceita JVBERi... ou valida via atob (%PDF), para não rejeitar base64 com prefixo estranho.
+        if (clean.startsWith('JVBERi')) return clean
+        try {
+            const head = atob(clean.slice(0, Math.min(clean.length, 64)))
+            if (head.startsWith('%PDF')) return clean
+        } catch {
+            /* ignore */
+        }
+        return null
+    }
+
+    function postPdfToIframe() {
+        if (!openRef.current) return
+        const raw = pdfBase64Ref.current
+        // Ainda carregando: não mostra erro definitivo.
+        if (!raw || !String(raw).trim()) return
+
+        const clean = normalizePdfBase64(raw)
+        if (!clean) {
+            const preview = String(raw).trim().slice(0, 24)
+            setPdfError(`PDF inválido ou vazio. (início: ${JSON.stringify(preview)})`)
+            console.error('PDF inválido', preview)
+            return
+        }
+        const win = iframeRef.current?.contentWindow
+        if (!win) return
+        setPdfError(null)
+        win.postMessage({ pdfBase64: clean }, '*')
     }
 
     useEffect(() => {
         if (!open || !pdfBase64 || !iframeLoaded) return
-        const timer = setTimeout(() => postPdfToIframe(), 100)
-        return () => clearTimeout(timer)
+        const timer = setTimeout(() => postPdfToIframe(), 50)
+        // Reenvia algumas vezes: o listener do iframe pode subir depois do onLoad.
+        const retry1 = setTimeout(() => postPdfToIframe(), 250)
+        const retry2 = setTimeout(() => postPdfToIframe(), 700)
+        return () => {
+            clearTimeout(timer)
+            clearTimeout(retry1)
+            clearTimeout(retry2)
+        }
     }, [open, pdfBase64, iframeLoaded])
 
+    function handleIframeLoad() {
+        setIframeLoaded(true)
+        // Envia imediatamente no onLoad (mais confiável que só o effect).
+        setTimeout(() => postPdfToIframe(), 0)
+    }
     function resetViewState() {
         setViewport(null); setCurrentPage(1); setTotalPages(null); setZoom(1.5)
         setCoords(null); setSignatureCoords(null); setPreviewCoords(null); setIsPreviewLocked(false)
@@ -472,14 +531,23 @@ export default function PdfViewerDialog({
 
                 {/* Área de rolagem */}
                 <div className="relative w-full flex-1 overflow-auto flex items-start bg-gray-50" data-pdf-scroll="true">
-                    <div className="relative mx-auto shrink-0" style={pdfStyle}>
+                    {pdfError ? (
+                        <div className="m-auto p-6 text-center text-sm text-red-600 max-w-md">
+                            <p className="font-medium">Não foi possível exibir o documento.</p>
+                            <p className="mt-1 text-muted-foreground">{pdfError}</p>
+                            <Button type="button" variant="outline" className="mt-3" onClick={() => postPdfToIframe()}>
+                                Tentar novamente
+                            </Button>
+                        </div>
+                    ) : null}
+                    <div className={`relative mx-auto shrink-0 ${pdfError ? 'hidden' : ''}`} style={pdfStyle}>
                         <iframe
                             key={iframeKey}
                             ref={iframeRef}
                             src="/pdf-viewer.html"
                             className="relative border-none cursor-default"
                             style={pdfStyle}
-                            onLoad={() => setIframeLoaded(true)}
+                            onLoad={handleIframeLoad}
                         />
 
                         {/* Overlay de interação (clique e hover) */}
@@ -647,6 +715,7 @@ export default function PdfViewerDialog({
         </Dialog>
     )
 }
+
 
 
 

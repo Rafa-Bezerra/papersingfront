@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8" />
@@ -12,6 +12,7 @@
             height: 100%;
             overflow: hidden;
             background: #fff;
+            font-family: system-ui, sans-serif;
         }
 
         #pdfContainer,
@@ -27,18 +28,51 @@
         canvas {
             display: block;
         }
+
+        #errorBox {
+            display: none;
+            margin: 24px;
+            padding: 16px;
+            color: #b91c1c;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 420px;
+        }
     </style>
 </head>
 
 <body>
+    <div id="errorBox"></div>
     <div id="pdfContainer"></div>
 
-    <!-- PDF.js -->
+    <!-- PDF.js (CDN; disableWorker evita falha quando o worker externo não carrega) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>
         let currentPdf = null;
         let currentPage = 1;
         let currentScale = 1.5;
+        let loadingTask = null;
+
+        function showError(msg) {
+            const box = document.getElementById('errorBox');
+            const container = document.getElementById('pdfContainer');
+            if (box) {
+                box.style.display = 'block';
+                box.textContent = msg || 'Falha ao carregar o PDF.';
+            }
+            if (container) container.innerHTML = '';
+            window.parent.postMessage({ pdfError: msg || 'Falha ao carregar o PDF.' }, '*');
+        }
+
+        function clearError() {
+            const box = document.getElementById('errorBox');
+            if (box) {
+                box.style.display = 'none';
+                box.textContent = '';
+            }
+        }
 
         function base64ToUint8Array(base64) {
             const raw = atob(base64);
@@ -71,8 +105,6 @@
                 const devicePixelRatio = window.devicePixelRatio || 1;
                 const outputScale = devicePixelRatio;
 
-                const viewport = page.getViewport({ scale: 1 });
-
                 const scaledViewport = page.getViewport({ scale });
 
                 const canvas = document.createElement('canvas');
@@ -81,7 +113,6 @@
                 canvas.width = Math.floor(scaledViewport.width * outputScale);
                 canvas.height = Math.floor(scaledViewport.height * outputScale);
 
-                // Ajustar CSS para manter tamanho visual correto
                 canvas.style.width = Math.floor(scaledViewport.width) + 'px';
                 canvas.style.height = Math.floor(scaledViewport.height) + 'px';
                 container.appendChild(canvas);
@@ -98,30 +129,69 @@
                 page.render(renderContext).promise.then(() => {
                 }).catch(err => {
                     console.error('Erro ao renderizar página:', err);
+                    showError('Erro ao renderizar a página do PDF.');
                 });
+            }).catch(err => {
+                console.error('Erro ao obter página:', err);
+                showError('Erro ao abrir a página do PDF.');
             });
         }
 
-        // Ouve mensagens do parent (PDF + navegação)
+        function loadPdf(pdfBase64) {
+            if (typeof pdfjsLib === 'undefined') {
+                showError('Biblioteca PDF.js não carregou (rede/CDN).');
+                return;
+            }
+
+            clearError();
+            try {
+                if (loadingTask && loadingTask.destroy) {
+                    try { loadingTask.destroy(); } catch (_) { /* ignore */ }
+                }
+            } catch (_) { /* ignore */ }
+
+            let pdfData;
+            try {
+                pdfData = base64ToUint8Array(pdfBase64);
+            } catch (err) {
+                console.error(err);
+                showError('Base64 do PDF inválido.');
+                return;
+            }
+
+            loadingTask = pdfjsLib.getDocument({
+                data: pdfData,
+                disableWorker: true,
+                isEvalSupported: false,
+            });
+
+            loadingTask.promise.then(pdf => {
+                currentPdf = pdf;
+                currentPage = 1;
+                window.parent.postMessage({ totalPages: pdf.numPages }, "*");
+                pdf.getPage(1).then(page => {
+                    const naturalViewport = page.getViewport({ scale: 1 });
+                    const containerWidth = document.getElementById('pdfContainer').clientWidth;
+                    currentScale = containerWidth > 0
+                        ? containerWidth / naturalViewport.width
+                        : 1.5;
+                    renderPage(currentPage, currentScale);
+                }).catch(err => {
+                    console.error(err);
+                    showError('Não foi possível ler a primeira página.');
+                });
+            }).catch(err => {
+                console.error('Erro ao carregar PDF:', err);
+                showError((err && err.message) ? err.message : 'Erro ao carregar PDF.');
+            });
+        }
+
         window.addEventListener('message', (event) => {
-            const { pdfBase64, page, zoom, zoomIn, zoomOut, zoomReset } = event.data;
+            const data = event.data || {};
+            const { pdfBase64, page, zoom, zoomIn, zoomOut, zoomReset } = data;
 
             if (pdfBase64) {
-                const pdfData = base64ToUint8Array(pdfBase64);
-                pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
-                    currentPdf = pdf;
-                    currentPage = 1;
-                    window.parent.postMessage({ totalPages: pdf.numPages }, "*");
-                    // Calcula o zoom para preencher a largura do container
-                    pdf.getPage(1).then(page => {
-                        const naturalViewport = page.getViewport({ scale: 1 });
-                        const containerWidth = document.getElementById('pdfContainer').clientWidth;
-                        currentScale = containerWidth > 0
-                            ? containerWidth / naturalViewport.width
-                            : 1.5;
-                        renderPage(currentPage, currentScale);
-                    });
-                }).catch(err => console.error('Erro ao carregar PDF:', err));
+                loadPdf(pdfBase64);
             }
 
             if (page && currentPdf) {
@@ -129,27 +199,29 @@
                 renderPage(currentPage, currentScale);
             }
 
-            // Controles de zoom
             if (zoom !== undefined && currentPdf) {
-                currentScale = Math.max(0.5, Math.min(5, zoom)); // Limite entre 0.5x e 5x
+                currentScale = Math.max(0.5, Math.min(5, zoom));
                 renderPage(currentPage, currentScale);
             }
 
             if (zoomIn && currentPdf) {
-                currentScale = Math.min(5, currentScale + 0.25); // Incrementa 0.25x
+                currentScale = Math.min(5, currentScale + 0.25);
                 renderPage(currentPage, currentScale);
             }
 
             if (zoomOut && currentPdf) {
-                currentScale = Math.max(0.5, currentScale - 0.25); // Decrementa 0.25x
+                currentScale = Math.max(0.5, currentScale - 0.25);
                 renderPage(currentPage, currentScale);
             }
 
             if (zoomReset && currentPdf) {
-                currentScale = 1.5; // Reset para zoom padrão
+                currentScale = 1.5;
                 renderPage(currentPage, currentScale);
             }
         });
+
+        // Sinaliza ao parent que o viewer está pronto para receber o PDF.
+        window.parent.postMessage({ pdfViewerReady: true }, '*');
     </script>
 </body>
 

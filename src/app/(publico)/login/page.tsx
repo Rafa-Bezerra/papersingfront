@@ -27,6 +27,7 @@ import {
   SamlStatus,
   startMicrosoftLogin
 } from '@/services/auth'
+import { notifyPapersignLogin } from '@/utils/pendenciaNavigation'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -91,6 +92,7 @@ function LoginPageInner() {
 
       sessionStorage.setItem('authToken', usuario.token)
       sessionStorage.setItem('userData', JSON.stringify(usuario))
+      notifyPapersignLogin()
       router.push('/home/')
     } catch (error) {
       const message =
@@ -133,14 +135,32 @@ function LoginPageInner() {
                 PaperSign
               </span>
             </CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
-              {soMicrosoft
-                ? 'Acesso apenas com Microsoft. Conta desligada ou senha alterada no AD exige novo login aqui.'
-                : 'Faça login na sua conta para continuar'}
-            </CardDescription>
+            {!soMicrosoft && (
+              <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
+                Faça login na sua conta para continuar
+              </CardDescription>
+            )}
           </CardHeader>
 
           <CardContent className="px-8 pb-8">
+            {soMicrosoft && (
+              <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm leading-relaxed text-slate-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-slate-200">
+                <p className="font-semibold text-slate-800 dark:text-white">Olá!</p>
+                <p className="mt-2">
+                  O PaperSign agora usa <strong>login único</strong>: a mesma senha do
+                  seu computador / Microsoft é a senha de acesso ao sistema.
+                </p>
+                <p className="mt-2">
+                  Se a TI alterar sua senha ou sua conta for desligada, o acesso ao
+                  PaperSign acompanha automaticamente — basta entrar de novo com a
+                  senha atual.
+                </p>
+                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  Selecione a base e clique em Entrar.
+                </p>
+              </div>
+            )}
+
             <Form {...form}>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {!soMicrosoft && (
@@ -233,54 +253,63 @@ function LoginPageInner() {
                   )}
                 />
 
-                {!soMicrosoft && (
+                {soMicrosoft ? (
                   <Button
-                    type="submit"
-                    disabled={isSubmitting}
+                    type="button"
+                    disabled={ssoBusy || !baseSelecionada}
+                    onClick={onMicrosoft}
                     className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Entrando...
-                      </div>
-                    ) : (
-                      'Entrar'
-                    )}
+                    {ssoBusy
+                      ? 'Redirecionando...'
+                      : !baseSelecionada
+                        ? 'Selecione a base para entrar'
+                        : 'Entrar'}
                   </Button>
-                )}
-
-                {saml.enabled && (
+                ) : (
                   <>
-                    {!soMicrosoft && (
-                      <div className="relative py-1">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-slate-200 dark:border-slate-600" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white/80 dark:bg-slate-800/80 px-2 text-slate-500">
-                            ou
-                          </span>
-                        </div>
-                      </div>
-                    )}
                     <Button
-                      type="button"
-                      variant={soMicrosoft ? 'default' : 'outline'}
-                      disabled={ssoBusy || !baseSelecionada}
-                      onClick={onMicrosoft}
-                      className={
-                        soMicrosoft
-                          ? 'w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg'
-                          : 'w-full h-12 rounded-lg border-slate-300'
-                      }
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {ssoBusy
-                        ? 'Redirecionando...'
-                        : !baseSelecionada
-                          ? 'Selecione a base para Microsoft'
-                          : 'Entrar com Microsoft'}
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Entrando...
+                        </div>
+                      ) : (
+                        'Entrar'
+                      )}
                     </Button>
+
+                    {saml.enabled && (
+                      <>
+                        <div className="relative py-1">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-slate-200 dark:border-slate-600" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-white/80 dark:bg-slate-800/80 px-2 text-slate-500">
+                              ou
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={ssoBusy || !baseSelecionada}
+                          onClick={onMicrosoft}
+                          className="w-full h-12 rounded-lg border-slate-300"
+                        >
+                          {ssoBusy
+                            ? 'Redirecionando...'
+                            : !baseSelecionada
+                              ? 'Selecione a base para Microsoft'
+                              : 'Entrar com Microsoft'}
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </form>

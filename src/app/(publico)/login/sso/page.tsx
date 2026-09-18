@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { exchangeSamlCode } from '@/services/auth'
+import { notifyPapersignLogin } from '@/utils/pendenciaNavigation'
 import { Suspense } from 'react'
 
 function SsoCallbackInner() {
@@ -24,6 +25,7 @@ function SsoCallbackInner() {
         if (cancelled) return
         sessionStorage.setItem('authToken', usuario.token)
         sessionStorage.setItem('userData', JSON.stringify(usuario))
+        notifyPapersignLogin()
         router.replace('/home/')
       } catch (e) {
         if (cancelled) return

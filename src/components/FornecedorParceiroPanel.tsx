@@ -95,7 +95,8 @@ export default function FornecedorParceiroPanel({
           <div className="min-w-0">
             <CardTitle className="text-2xl font-bold">Fornecedor / parceiro</CardTitle>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Cria conta na PlugSign (e-mail de acesso) e espelha no painel externo PaperSign.
+              Cria cliente na PlugSign (conta externa read-only). A PlugSign envia o e-mail de acesso —
+              não usa vaga de colaborador da equipe.
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -208,17 +209,14 @@ export default function FornecedorParceiroPanel({
           </CardHeader>
           <CardContent className="space-y-2 text-sm pt-0">
             <p>{resultado.message}</p>
-            <p className="text-muted-foreground text-xs">
-              PlugSign: {resultado.plugSign?.name} {resultado.plugSign?.lastName} —{' '}
-              {resultado.plugSign?.email}
-            </p>
+            {resultado.plugSign && (
+              <p className="text-muted-foreground text-xs">
+                PlugSign (cliente): {resultado.plugSign.name} {resultado.plugSign.lastName} —{' '}
+                {resultado.plugSign.email}
+              </p>
+            )}
             {resultado.paperSign && (
-              <div className="rounded-md border p-2.5 space-y-1 text-xs">
-                <p className="font-medium text-sm">Painel externo PaperSign</p>
-                <p>Usuário: {resultado.paperSign.usuario}</p>
-                <p>Senha temporária: {resultado.paperSign.senhaTemporaria}</p>
-                <p className="text-muted-foreground">{resultado.paperSign.aviso}</p>
-              </div>
+              <p className="text-muted-foreground text-xs">{resultado.paperSign.aviso}</p>
             )}
           </CardContent>
         </Card>

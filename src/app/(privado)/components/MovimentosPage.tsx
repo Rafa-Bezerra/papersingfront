@@ -16,6 +16,7 @@ import React, {
     useTransition
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 import { ColumnDef } from '@tanstack/react-table'
 import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
 
@@ -156,12 +157,21 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     }
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("Em Andamento");
+            const broadFrom = new Date();
+            broadFrom.setFullYear(broadFrom.getFullYear() - 2);
+            setDateFrom(broadFrom.toISOString().substring(0, 10));
+        }
+
         if (dateFrom === "" && dateTo === "") {
             const today = new Date();
             const fiveDaysAgo = new Date();
             fiveDaysAgo.setDate(today.getDate() - 5);
 
-            setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
+            if (!isPendentesFromUrl(searchParams)) {
+                setDateFrom(fiveDaysAgo.toISOString().substring(0, 10));
+            }
             setDateTo(today.toISOString().substring(0, 10));
         }
 
@@ -324,6 +334,15 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             setIsProcessing(false)
         }
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (r) => r.requisicao.idmov,
+        handleDocumento
+    );
 
     async function handleAssinar(data: Assinar) {
         setIsProcessing(true)
@@ -1037,7 +1056,12 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             {/* Main */}
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading || loading} />
+                    <DataTable
+                        columns={colunas}
+                        data={results}
+                        loading={isLoading || loading}
+                        getRowDataId={(r) => r.requisicao.idmov}
+                    />
                 </CardContent>
             </Card>
 

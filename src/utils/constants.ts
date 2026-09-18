@@ -19,10 +19,19 @@ function resolveApiBase(): string {
 
 export const API_BASE = resolveApiBase();
 
-export const headers = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-})
+export const headers = () => {
+  const h: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
+  };
+  try {
+    const gestorUnidade = sessionStorage.getItem("papersign-gestor-unidade");
+    if (gestorUnidade) h["X-Gestor-Unidade"] = gestorUnidade;
+  } catch {
+    /* ignore */
+  }
+  return h;
+};
 
 export const headersExterno = () => ({
   "Content-Type": "application/json",
@@ -31,6 +40,9 @@ export const headersExterno = () => ({
 
 /** Timeout padrão das chamadas de API (ms). */
 export const API_TIMEOUT_MS = 30_000;
+
+/** Timeout para agregação de pendências do gestor (várias unidades no SQL). */
+export const PENDENCIAS_TIMEOUT_MS = 90_000;
 
 /** Timeout para assinatura (comprovante PlugSign pode levar alguns minutos). */
 export const ASSINATURA_TIMEOUT_MS = 300_000;

@@ -15,6 +15,7 @@ export const data = {
       title: "Módulos",
       items: [
         { title: "Inicio", url: "/home" },
+        { title: "Pendências", url: "/pendencias" },
         { title: "Solicitação de compra", url: "/solicitacoes" },
         { title: "Recebimento de materiais", url: "/requisicoes" },
         { title: "Controle imobilizado", url: "/controle" },

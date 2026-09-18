@@ -75,7 +75,7 @@ export default function CadastroCentroCustoPanel({ onSuccess }: Props) {
   }
 
   const rm = lookup?.rm?.[0]
-  const podeGravar = Boolean(rm) && (!lookup?.papersign || lookup.papersign.ativo?.toUpperCase() !== 'Y')
+  const podeGravar = Boolean(rm)
 
   return (
     <Card>
@@ -83,6 +83,7 @@ export default function CadastroCentroCustoPanel({ onSuccess }: Props) {
         <CardTitle className="text-base">Centro de custo (do RM)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Só grava no PaperSign se o código existir no RM (Corpore) da sua unidade.
+          Ao salvar, também libera o centro de custo em Alçadas.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

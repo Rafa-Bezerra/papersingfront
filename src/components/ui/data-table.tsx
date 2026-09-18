@@ -34,6 +34,8 @@ interface DataTableProps<TData> {
   hidePagination?: boolean;
   /** Conteúdo extra à direita do texto da página, antes do botão Próxima (ex.: Baixar todos). */
   paginationExtra?: React.ReactNode;
+  /** Atributo data-pendencia-id na linha (deep link do gestor de pendências). */
+  getRowDataId?: (row: TData) => string | number | null | undefined;
 }
 
 export function DataTable<TData>({
@@ -45,6 +47,7 @@ export function DataTable<TData>({
   hideSearch = false,
   hidePagination = false,
   paginationExtra,
+  getRowDataId,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -112,7 +115,10 @@ export function DataTable<TData>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow
+              key={row.id}
+              data-pendencia-id={getRowDataId?.(row.original) ?? undefined}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}

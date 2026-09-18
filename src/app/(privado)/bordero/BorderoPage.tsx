@@ -43,6 +43,7 @@ import {
 import { Label } from '@radix-ui/react-label';
 import { toast } from 'sonner';
 import { notificarAprovador } from '@/services/requisicoesService';
+import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink';
 
 export default function Page() {
     const titulo = 'Borderôs'
@@ -105,6 +106,10 @@ export default function Page() {
     }
 
     useEffect(() => {
+        if (isPendentesFromUrl(searchParams)) {
+            setSituacaoFiltrada("AGUARDANDO APROVAÇÃO");
+        }
+
         if (dateFrom === "" && dateTo === "") {
             setDateFrom(new Date(new Date().setDate(new Date().getDate() - 15)).toISOString().substring(0, 10));
             setDateTo(new Date().toISOString().substring(0, 10));
@@ -204,6 +209,15 @@ export default function Page() {
             setIsLoading(false)
         }
     }
+
+    usePendenciaDeepLink(
+        results,
+        searched && !isLoading,
+        searchParams,
+        router,
+        (b) => b.id_bordero,
+        handleItens
+    );
 
     async function handleAprovar(id: number, aprovado: number) {
         setIsLoading(true)
