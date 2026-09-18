@@ -9,6 +9,7 @@ export interface PendenciaGestorItem {
   rota: string;
   filtro?: string | null;
   detalhe?: string | null;
+  codigoAtendimento?: number | null;
 }
 
 export interface PendenciaGestorResumoUnidade {

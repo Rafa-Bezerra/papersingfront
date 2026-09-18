@@ -60,6 +60,7 @@ export default function HomePage() {
   const [userRestrito, setUserRestrito] = useState(false)
   const [userRdv, setUserRdv] = useState(false)
   const [userProjetos, setUserProjetos] = useState(false)
+  const [userUnidade, setUserUnidade] = useState("")
   const [userDocusign, setUserDocusign] = useState(false)
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function HomePage() {
         setPagamentoImpostos(user.pagamento_impostos);
         setUserRdv(user.rdv);
         setUserProjetos(Boolean(user.projetos || user.financeiro));
+        setUserUnidade(String(user.unidade ?? ""));
         setUserDocusign(Boolean(user.docusign || user.financeiro));
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -142,7 +144,7 @@ export default function HomePage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
             <p className="text-xs text-muted-foreground">
-              Todas as WAY — movimentos, documentos, projetos, PlugSign, RDV, fiscal e C.I.
+              Todas as WAY — movimentos, documentos, projetos, WaySign, RDV, fiscal e C.I.
             </p>
           </div>
           <Link
@@ -240,7 +242,7 @@ export default function HomePage() {
             description="Documentos para assinatura"
             href="/documentos?filtro=pendentes"
           />)}
-          {(userProjetos || userAdmin) && (<DashboardCard
+          {(userProjetos || userAdmin) && userUnidade.trim().toUpperCase() === "WAY CSC" && (<DashboardCard
             title="Projetos"
             count={stats.quantidade_projetos ?? 0}
             icon={FolderKanban}
@@ -249,11 +251,11 @@ export default function HomePage() {
             href="/projetos?filtro=pendentes"
           />)}
           {(userDocusign || userAdmin) && (<DashboardCard
-            title="PlugSign"
+            title="WaySign"
             count={stats.quantidade_plugsign ?? 0}
             icon={FileSignature}
             color="teal"
-            description="Documentos PlugSign pendentes"
+            description="Documentos WaySign pendentes"
             href="/docusign?filtro=pendentes"
           />)}
         </div>

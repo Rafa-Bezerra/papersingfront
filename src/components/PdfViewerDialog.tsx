@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ZoomIn, ZoomOut, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
     Dialog,
     DialogContent,
@@ -67,6 +68,11 @@ interface Props {
     placeFieldLabel?: string
     /** Destinatário atual do posicionamento. */
     placeOwnerLabel?: string
+    /** z-index do overlay e do painel (ex.: acima do modal de pendências). */
+    layerClassName?: string
+    /** Renderiza o painel sem Dialog (ex.: dentro do modal de pendências). */
+    embedded?: boolean
+    panelClassName?: string
 }
 
 const FIELD_THEMES: Record<string, { accent: string; soft: string; ring: string }> = {
@@ -232,6 +238,9 @@ export default function PdfViewerDialog({
     markers,
     placeFieldLabel,
     placeOwnerLabel,
+    layerClassName,
+    embedded = false,
+    panelClassName,
 }: Props) {
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const pdfBase64Ref = useRef<string | null>(pdfBase64)
@@ -305,7 +314,13 @@ export default function PdfViewerDialog({
         return () => window.removeEventListener('message', handler)
     }, [])
 
-    useEffect(() => { resetViewState(); setPdfError(null) }, [pdfBase64])
+    useEffect(() => {
+        if (!pdfBase64) return
+        resetViewState()
+        setPdfError(null)
+        setIframeLoaded(false)
+        setIframeKey((k) => k + 1)
+    }, [pdfBase64])
 
     useEffect(() => {
         if (!open) {
@@ -518,16 +533,18 @@ export default function PdfViewerDialog({
     const { boxW, boxH } = currentBoxNorm()
     const markersOnPage = (markers ?? []).filter((m) => m.page === currentPage)
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                scrollBody={false}
-                className="w-[95vw] sm:w-[60vw] h-[90dvh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0"
-            >
+    const panelBody = (
+        <>
+                {embedded ? (
+                    <div className="shrink-0 border-b bg-background px-4 py-2 text-center text-sm font-semibold">
+                        {title}
+                    </div>
+                ) : (
                 <DialogHeader className="p-4 shrink-0 sticky top-0 z-10 bg-background border-b">
                     <DialogTitle className="text-lg font-semibold text-center">{title}</DialogTitle>
                     <DialogDescription className="sr-only">Visualização do PDF</DialogDescription>
                 </DialogHeader>
+                )}
 
                 {/* Área de rolagem */}
                 <div className="relative w-full flex-1 overflow-auto flex items-start bg-gray-50" data-pdf-scroll="true">
@@ -711,6 +728,33 @@ export default function PdfViewerDialog({
                         </div>
                     )}
                 </div>
+        </>
+    )
+
+    if (embedded) {
+        return (
+            <div
+                className={cn(
+                    "flex min-h-0 flex-1 flex-col overflow-hidden",
+                    panelClassName
+                )}
+            >
+                {panelBody}
+            </div>
+        )
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent
+                scrollBody={false}
+                overlayClassName={layerClassName}
+                className={cn(
+                    "w-[95vw] sm:w-[60vw] h-[90dvh] max-w-none sm:max-w-none max-h-none flex flex-col overflow-hidden p-0",
+                    layerClassName
+                )}
+            >
+                {panelBody}
             </DialogContent>
         </Dialog>
     )

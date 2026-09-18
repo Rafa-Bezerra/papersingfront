@@ -97,6 +97,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const isFinanceiro = Boolean(parsedUser?.financeiro);
             const canDocusign = Boolean(parsedUser?.docusign);
             const canProjetos = Boolean(parsedUser?.projetos);
+            const unidadeProjetos =
+              String(parsedUser?.unidade ?? "").trim().toUpperCase() === "WAY CSC";
             const canReceitas = Boolean(parsedUser?.receitas);
 
             // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
@@ -125,8 +127,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               setIsAuthorized(false);
             }
 
-            // Bloqueia acesso direto a Projetos sem permissão (admin/financeiro/projetos).
-            if (normalizedPath === "/projetos" && !isAdmin && !isFinanceiro && !canProjetos) {
+            // Projetos: somente base WAY CSC.
+            if (normalizedPath === "/projetos" && !unidadeProjetos) {
+              setIsAuthorized(false);
+            } else if (normalizedPath === "/projetos" && !isAdmin && !isFinanceiro && !canProjetos) {
               setIsAuthorized(false);
             }
 

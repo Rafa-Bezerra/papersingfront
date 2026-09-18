@@ -29,6 +29,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { podeExcluirDocumentoCriador, resolverAnexoDocumento, usuarioParticipaDocumento } from '@/utils/documentoAnexo'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -177,8 +178,8 @@ export default function Page() {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserName(user.nome.toUpperCase());
-            setCodusuario(user.codusuario.toUpperCase());
+            setUserName(String(user.nome ?? user.NOME ?? '').toUpperCase());
+            setCodusuario(String(user.codusuario ?? user.CODUSUARIO ?? '').toUpperCase());
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -221,17 +222,20 @@ export default function Page() {
 
                 const matchQuery = qNorm === "" || nomeNorm.includes(qNorm) || String(d.id ?? '').includes(qNorm)
                 const matchSituacao = filtroSituacaoNorm === "" || situacaoNorm === filtroSituacaoNorm
-                const usuarioAprovador = d.aprovadores.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                );
-                const isCriador = stripDiacritics(String(d.usuario_criacao ?? '').toLowerCase().trim())
-                    === stripDiacritics(userCodusuario.toLowerCase().trim())
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
                 // Regra: pendências ("EM ANDAMENTO") sempre aparecem, independente do período.
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                return matchQuery && matchSituacao && (usuarioAprovador || isCriador) && matchSolicitante && matchDateFrom && matchDateTo
+                const participa = usuarioParticipaDocumento({
+                    usuario_criacao: d.usuario_criacao,
+                    usuario_nome: d.usuario_nome,
+                    userCodusuario,
+                    userName,
+                    aprovadores: d.aprovadores,
+                    anexos: d.anexos,
+                })
+                return matchQuery && matchSituacao && participa && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)
@@ -404,7 +408,7 @@ export default function Page() {
             if (anexo.anexo.startsWith('data:') || anexo.anexo.startsWith('/anexos/') === false && anexo.anexo.length > 500) {
                 arquivo = normalizarPdfDataUrl(anexo.anexo);
             } else if (anexo.anexo.startsWith('/anexos/')) {
-                arquivo = await getAnexo(anexo.anexo);
+                arquivo = await getAnexo(anexo.anexo, anexo.id);
             } else {
                 arquivo = normalizarPdfDataUrl(anexo.anexo);
             }
@@ -499,7 +503,6 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
-                    const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
                     const nivelUsuario = row.original.aprovadores.find(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     )?.ordem ?? 1;
@@ -509,14 +512,18 @@ export default function Page() {
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
-
                     const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
                     const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
-                    const podeExcluir = usuarioCriador && todasPendentes;
+                    const podeExcluir = podeExcluirDocumentoCriador({
+                        usuario_criacao: row.original.usuario_criacao,
+                        usuario_nome: row.original.usuario_nome,
+                        userCodusuario,
+                        userName,
+                        aprovadores: row.original.aprovadores,
+                    });
 
-                    const anexoPrincipal = row.original.anexos?.filter(a => a.documento_principal === true)[0];
+                    const anexoPrincipal = resolverAnexoDocumento(row.original.anexos);
 
                     return (
                         <div className="flex gap-2">
@@ -569,7 +576,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName]
+        [userName, userCodusuario]
     )
 
     async function handleNotificarAprovador(usuario: string) {

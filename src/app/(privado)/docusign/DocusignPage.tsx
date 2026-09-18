@@ -31,7 +31,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { base64ParaImpressao, resolverAnexoDocumento } from '@/utils/documentoAnexo'
+import { base64ParaImpressao, podeExcluirDocumentoCriador, resolverAnexoDocumento, usuarioParticipaDocumento } from '@/utils/documentoAnexo'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -46,6 +46,8 @@ import {
     DocumentoAprovacao,
     getAll,
     getAnexo,
+    getAnexosDocumento,
+    resgatarDocumentoPlugSign,
     base64PdfEhValido,
     normalizarPdfDataUrl,
     getCertificadoStatus,
@@ -89,7 +91,7 @@ import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepL
 
 
 export default function Page() {
-    const titulo = 'PlugSing'
+    const titulo = 'WaySign'
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -290,8 +292,8 @@ export default function Page() {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserName(user.nome.toUpperCase());
-            setCodusuario(user.codusuario.toUpperCase());
+            setUserName(String(user.nome ?? user.NOME ?? '').toUpperCase());
+            setCodusuario(String(user.codusuario ?? user.CODUSUARIO ?? '').toUpperCase());
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -334,15 +336,20 @@ export default function Page() {
 
                 const matchQuery = qNorm === "" || nomeNorm.includes(qNorm) || String(d.id ?? '').includes(qNorm)
                 const matchSituacao = filtroSituacaoNorm === "" || situacaoNorm === filtroSituacaoNorm
-                const usuarioAprovador = d.aprovadores.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                );
                 const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
                 // Regra: pendências ("EM ANDAMENTO") sempre aparecem, independente do período.
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                return matchQuery && matchSituacao && (usuarioAprovador || d.usuario_criacao == userCodusuario) && matchSolicitante && matchDateFrom && matchDateTo
+                const participa = usuarioParticipaDocumento({
+                    usuario_criacao: d.usuario_criacao,
+                    usuario_nome: d.usuario_nome,
+                    userCodusuario,
+                    userName,
+                    aprovadores: d.aprovadores,
+                    anexos: d.anexos,
+                })
+                return matchQuery && matchSituacao && participa && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)
@@ -360,6 +367,94 @@ export default function Page() {
     function atualizarListaAnexosModal(doc: Documento) {
         setRequisicaoSelecionada(doc)
         setSelectedAnexosResult(doc.anexos ?? [])
+    }
+
+    function aplicarAnexosNoDocumento(doc: Documento, anexos: DocumentoAnexo[]): Documento {
+        const atualizado = { ...doc, anexos };
+        setResults((prev) => prev.map((d) => (d.id === doc.id ? atualizado : d)));
+        if (requisicaoSelecionada?.id === doc.id) {
+            setRequisicaoSelecionada(atualizado);
+        }
+        return atualizado;
+    }
+
+    async function refreshDocumentoAnexos(doc: Documento): Promise<Documento> {
+        if ((doc.anexos?.length ?? 0) > 0) return doc;
+        let anexos = await getAnexosDocumento(doc.id);
+        if (anexos.length === 0) {
+            try {
+                const resgatado = await resgatarDocumentoPlugSign(doc.id);
+                if (resgatado) anexos = [resgatado];
+            } catch (err) {
+                console.warn("Resgate PlugSign:", err);
+            }
+        }
+        return aplicarAnexosNoDocumento(doc, anexos);
+    }
+
+    async function handleResgatarPlugSign() {
+        if (!requisicaoSelecionada) return;
+        setIsLoading(true);
+        try {
+            const resgatado = await resgatarDocumentoPlugSign(requisicaoSelecionada.id);
+            if (!resgatado) {
+                toast.error("PDF assinado não encontrado na PlugSign para este documento.");
+                return;
+            }
+            const anexos = [...(requisicaoSelecionada.anexos ?? []), resgatado];
+            const atualizado = aplicarAnexosNoDocumento(requisicaoSelecionada, anexos);
+            atualizarListaAnexosModal(atualizado);
+            toast.success("Documento resgatado da PlugSign.");
+        } catch (err) {
+            console.error(err);
+            const msg = err instanceof Error ? err.message : "Não foi possível resgatar o documento na PlugSign.";
+            toast.error(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function resolverAnexoPrincipal(doc: Documento): Promise<DocumentoAnexo | null> {
+        const atualizado = await refreshDocumentoAnexos(doc);
+        return resolverAnexoDocumento(atualizado.anexos) ?? null;
+    }
+
+    async function abrirDocumentoPrincipal(doc: Documento) {
+        setRequisicaoSelecionada(doc);
+        setIsLoading(true);
+        try {
+            const anexo = await resolverAnexoPrincipal(doc);
+            if (!anexo) {
+                toast.error("PDF não encontrado na PlugSign. Abra Anexos e use Resgatar PDF da PlugSign.");
+                return;
+            }
+            await handleVisualizarAnexo(anexo);
+        } catch (err) {
+            console.error(err);
+            const msg = err instanceof Error ? err.message : "Não foi possível abrir o documento.";
+            toast.error(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function imprimirDocumentoPrincipal(doc: Documento) {
+        setRequisicaoSelecionada(doc);
+        setIsLoading(true);
+        try {
+            const anexo = await resolverAnexoPrincipal(doc);
+            if (!anexo) {
+                toast.error("Este documento não possui PDF anexado para impressão.");
+                return;
+            }
+            await handleImprimirAnexoDireto(anexo);
+        } catch (err) {
+            console.error(err);
+            const msg = err instanceof Error ? err.message : "Não foi possível imprimir o documento.";
+            toast.error(msg);
+        } finally {
+            setIsLoading(false);
+        }
     }
 
     async function handleSearchClick() {
@@ -381,6 +476,17 @@ export default function Page() {
     async function handleAnexos(requisicao: Documento) {
         setIsModalAnexosOpen(true)
         atualizarListaAnexosModal(requisicao)
+        setIsLoading(true)
+        try {
+            const atualizado = await refreshDocumentoAnexos(requisicao)
+            atualizarListaAnexosModal(atualizado)
+        } catch (err) {
+            console.error(err)
+            const msg = err instanceof Error ? err.message : "Não foi possível carregar os anexos."
+            toast.error(msg)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     usePendenciaDeepLink(
@@ -389,7 +495,7 @@ export default function Page() {
         searchParams,
         router,
         (d) => d.id,
-        handleAnexos
+        abrirDocumentoPrincipal
     );
 
     async function handleAprovar(id: number, aprovado: number) {
@@ -636,7 +742,6 @@ export default function Page() {
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
-                    const usuarioCriador = row.original.usuario_criacao.toLowerCase().trim() === userCodusuario.toLowerCase().trim();
                     const nivelUsuario = row.original.aprovadores.find(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     )?.ordem ?? 1;
@@ -646,47 +751,41 @@ export default function Page() {
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
-
                     const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
                     const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
-                    const podeExcluir = usuarioCriador && todasPendentes;
+                    const podeExcluir = podeExcluirDocumentoCriador({
+                        usuario_criacao: row.original.usuario_criacao,
+                        usuario_nome: row.original.usuario_nome,
+                        userCodusuario,
+                        userName,
+                        aprovadores: row.original.aprovadores,
+                    });
 
                     const anexoDocumento = resolverAnexoDocumento(row.original.anexos)
 
                     return (
                         <div className="flex flex-wrap gap-2">
-                            {anexoDocumento && (
-                                <>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            setRequisicaoSelecionada(row.original)
-                                            handleVisualizarAnexo(anexoDocumento)
-                                        }}
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                        Documento
-                                        {anexoDocumento.documento_assinado == 1 && (
-                                            <Check className="w-4 h-4 text-green-500" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        title="Imprimir documento"
-                                        onClick={() => {
-                                            setRequisicaoSelecionada(row.original)
-                                            handleImprimirAnexoDireto(anexoDocumento)
-                                        }}
-                                    >
-                                        <Printer className="w-4 h-4" />
-                                        Imprimir
-                                    </Button>
-                                </>
-                            )}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => abrirDocumentoPrincipal(row.original)}
+                            >
+                                <Eye className="w-4 h-4" />
+                                Documento
+                                {anexoDocumento?.documento_assinado == 1 && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                title="Imprimir documento"
+                                onClick={() => imprimirDocumentoPrincipal(row.original)}
+                            >
+                                <Printer className="w-4 h-4" />
+                                Imprimir
+                            </Button>
 
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
                                 Anexos {(row.original.anexos?.length ?? 0) > 0 ? `(${row.original.anexos.length})` : ''}
@@ -728,7 +827,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName]
+        [userName, userCodusuario]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -882,10 +981,10 @@ export default function Page() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
-                            title="Abrir PlugSing"
+                            title="Abrir WaySign"
                         >
                             <ExternalLink className="h-4 w-4" />
-                            PlugSing
+                            WaySign
                         </a>
                     </div>
                     <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
@@ -1020,7 +1119,7 @@ export default function Page() {
                 <Dialog open={isModalAprovacoesOpen} onOpenChange={setIsModalAprovacoesOpen}>
                     <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Aprovações documento n° ${requisicaoSelecionada.id}`}</DialogTitle>
                             <Button onClick={handleInserirAprovador} className="flex items-center">
                                 <SquarePlus className="mr-1 h-4 w-4" /> Novo aprovador
                             </Button>
@@ -1037,9 +1136,19 @@ export default function Page() {
                 <Dialog open={isModalAnexosOpen} onOpenChange={setIsModalAnexosOpen}>
                     <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
                         <DialogHeader>
-                            <DialogTitle className="text-lg font-semibold text-center">{`Anexos movimentação n° ${requisicaoSelecionada.id}`}</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Anexos documento n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>
                         <div className="w-full">
+                            {selectedAnexosResult.length === 0 && !isLoading && (
+                                <div className="mb-4 space-y-3 text-center">
+                                    <p className="text-sm text-muted-foreground">
+                                        O PDF deste documento está na PlugSign. Clique abaixo para buscar o arquivo assinado.
+                                    </p>
+                                    <Button type="button" onClick={handleResgatarPlugSign}>
+                                        Resgatar PDF da PlugSign
+                                    </Button>
+                                </div>
+                            )}
                             <DataTable
                                 columns={colunasAnexos}
                                 data={selectedAnexosResult}
@@ -1127,9 +1236,18 @@ export default function Page() {
                                         <Button
                                             size="icon"
                                             variant="outline"
+                                            title="Visualizar"
                                             onClick={() => handleVisualizarAnexo(item)}
                                         >
                                             <Eye className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            title="Imprimir"
+                                            onClick={() => handleImprimirAnexoDireto(item)}
+                                        >
+                                            <Printer className="w-4 h-4" />
                                         </Button>
                                     </div>
                                 </div>
@@ -1362,7 +1480,7 @@ export default function Page() {
                             </div>
                         ) : temCertificado ? (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-                                Certificado A1 ativo. Suas assinaturas no PlugSing usarão validade ICP-Brasil (PlugSign).
+                                Certificado A1 ativo. Suas assinaturas no WaySign usarão validade ICP-Brasil (PlugSign).
                             </div>
                         ) : exibirFormularioCertificado ? (
                             <div className="grid gap-3">
