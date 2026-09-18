@@ -3,7 +3,7 @@
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from "@/components/ui/button";
-import { Pagamento, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoGerarDocumento, gerarDocumento, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento, criarFinanceiro, CriarFinanceiroPagamentoPayload } from "@/services/pagamentosService";
+import { Pagamento, PagamentoAglutinadoItem, PagamentoAprovador, PagamentoGetAll, PagamentoAprovadoresGetAll, getAll, getAllAprovadores, PagamentoAprovar, aprovarPagamento, PagamentoAprovarLote, aprovarLotePagamento, PagamentoGerarDocumento, gerarDocumento, PagamentoGerarDocumentoLote, gerarDocumentoLote, getDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, assinarDocumento, criarFinanceiro, CriarFinanceiroPagamentoPayload } from "@/services/pagamentosService";
 import { notificarAprovador } from '@/services/requisicoesService';
 import { getAllTiposDocumento, TipoDocumento } from '@/services/comunicadoService';
 import { getAllFornecedores } from '@/services/fornecedoresRestritosService';
@@ -39,6 +39,12 @@ import { Bell, Check, ChevronsUpDown, Filter, Loader2, Plus, SearchIcon, X } fro
 import { DataTable } from '@/components/ui/data-table'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { Form } from '@/components/ui/form';
+import { ItensFinanceirosSection } from '@/components/financeiro/ItensFinanceirosSection';
+import { ComunicadoItemFinanceiro } from '@/types/Comunicado';
+import { achatarItensFinanceiros } from '@/utils/comunicadoRateio';
+import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService';
 
 interface Props {
     titulo: string;
@@ -64,10 +70,19 @@ export default function Page({ titulo, grupo }: Props) {
     const [filtroDashboard, setFiltroDashboard] = useState<string>("")
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Pagamento[]>([])
+    // Tipos de documento vistos na última busca (antes do filtro de tipo abaixo) — só para
+    // popular as opções do dropdown com o que realmente existe no período/status buscados.
+    const [tiposDocumentoDisponiveis, setTiposDocumentoDisponiveis] = useState<string[]>([])
+    const [filtroTiposDocumento, setFiltroTiposDocumento] = useState<string[]>([])
+    const [filtroFornecedor, setFiltroFornecedor] = useState<string>("")
+    const [filtroValorMin, setFiltroValorMin] = useState<string>("")
+    const [filtroValorMax, setFiltroValorMax] = useState<string>("")
     const [selectedResult, setSelectedResult] = useState<Pagamento | null>(null)
     const [resultsAprovadores, setResultsAprovadores] = useState<PagamentoAprovador[]>([])
     const [error, setError] = useState<string | null>(null)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
+    const [isModalAglutinadosOpen, setIsModalAglutinadosOpen] = useState(false)
+    const [aglutinadosSelecionados, setAglutinadosSelecionados] = useState<Pagamento | null>(null)
     const [documentoParaAssinatura, setDocumentoParaAssinatura] = useState<string>("")
     const [documentoSelecionado, setDocumentoSelecionado] = useState<string>("")
     const [isModalDocumentoOpen, setIsModalDocumentoOpen] = useState(false)
@@ -83,9 +98,24 @@ export default function Page({ titulo, grupo }: Props) {
     const [openTipoDocumento, setOpenTipoDocumento] = useState(false)
     const financeiroInicial = {
         codcfo: '', cod_tipo_documento: '', data_vencimento: '', data_emissao: '',
-        numero_documento: '', valor: '', codigo_natureza_financeira: '', cod_ccusto: '',
+        numero_documento: '',
     }
     const [formFinanceiro, setFormFinanceiro] = useState(financeiroInicial)
+
+    // Rateio por item do lançamento avulso (mesmo padrão da tela /comunicados — ver
+    // ItensFinanceirosSection compartilhado em @/components/financeiro).
+    const itemFinanceiroInicial = (valorTotal = 0): ComunicadoItemFinanceiro => ({
+        setor: '', ccusto: '', valor_total: valorTotal,
+        rateio: [{ ccusto: '', codconta: '', modo: 'valor', percentual: 100, valor: valorTotal, codigo_natureza_financeira: '' }],
+    })
+    const formItensFinanceiro = useForm<{ itensFinanceiros: ComunicadoItemFinanceiro[] }>({
+        defaultValues: { itensFinanceiros: [itemFinanceiroInicial()] }
+    })
+    const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
+    const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
+    const [openCcustoIndex, setOpenCcustoIndex] = useState<number | null>(null)
+    const [openCcustoRateioIndex, setOpenCcustoRateioIndex] = useState<string | null>(null)
+    const [openCodcontaIndex, setOpenCodcontaIndex] = useState<string | null>(null)
 
     useEffect(() => {
         if (searchParams.get("filtro") === "pendentes") {
@@ -131,7 +161,7 @@ export default function Page({ titulo, grupo }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado, filtroDashboard])
+    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado, filtroDashboard, filtroTiposDocumento, filtroFornecedor, filtroValorMin, filtroValorMax])
 
     function clearQuery() {
         setQuery('')
@@ -176,7 +206,12 @@ export default function Page({ titulo, grupo }: Props) {
             };
             const dados = await getAll(data, controller.signal)
 
+            setTiposDocumentoDisponiveis(Array.from(new Set(dados.map(d => d.tipo_documento).filter(Boolean))).sort())
+
             const qNorm = stripDiacritics(q.toLowerCase().trim())
+            const fornecedorNorm = stripDiacritics(filtroFornecedor.toLowerCase().trim())
+            const valorMin = filtroValorMin.trim() === "" ? null : Number(filtroValorMin)
+            const valorMax = filtroValorMax.trim() === "" ? null : Number(filtroValorMax)
 
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.tipo_documento ?? '').toLowerCase())
@@ -186,7 +221,12 @@ export default function Page({ titulo, grupo }: Props) {
                 // Modo "Pendentes" (botão da home): só itens na vez do usuário —
                 // pode_aprovar vem do backend com a mesma hierarquia de NIVEL do contador.
                 const matchMinhaVez = filtroDashboard !== "Pendentes" || !!d.pode_aprovar
+                const matchTipoDocumento = filtroTiposDocumento.length === 0 || filtroTiposDocumento.includes(d.tipo_documento)
+                const matchFornecedor = fornecedorNorm === "" || stripDiacritics((d.nome_fantasia ?? '').toLowerCase()).includes(fornecedorNorm)
+                const matchValorMin = valorMin === null || Number.isNaN(valorMin) || d.valor_original >= valorMin
+                const matchValorMax = valorMax === null || Number.isNaN(valorMax) || d.valor_original <= valorMax
                 return matchQuery && matchSituacao && matchStatus && matchMinhaVez
+                    && matchTipoDocumento && matchFornecedor && matchValorMin && matchValorMax
             })
             setResults(filtrados)
         } catch (err) {
@@ -200,8 +240,16 @@ export default function Page({ titulo, grupo }: Props) {
         }
     }
 
-    function handleAbrirFinanceiro() {
-        setFormFinanceiro(financeiroInicial)
+    // "Criar Financeiro" agora é por linha (coluna Ações), só disponível quando a linha já está
+    // com Situação = APROVADA — pré-preenche vencimento/n° documento e o valor do 1° item com os
+    // dados da linha; fornecedor/tipo/rateio continuam de escolha manual (não vêm da listagem).
+    function handleAbrirFinanceiro(data: Pagamento) {
+        setFormFinanceiro({
+            ...financeiroInicial,
+            data_vencimento: data.data_vencimento ? data.data_vencimento.slice(0, 10) : '',
+            numero_documento: data.numero_documento ?? '',
+        })
+        formItensFinanceiro.reset({ itensFinanceiros: [itemFinanceiroInicial(data.valor_liquido ?? 0)] })
         setIsFinanceiroDialogOpen(true)
         if (fornecedores.length === 0) {
             getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
@@ -209,14 +257,26 @@ export default function Page({ titulo, grupo }: Props) {
         if (tiposDocumento.length === 0) {
             getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
         }
+        if (centrosDeCusto.length === 0) {
+            getAllCentrosDeCusto().then(setCentrosDeCusto).catch((err) => toast.error((err as Error).message))
+        }
+        if (contasFinanceiras.length === 0) {
+            getAllContasFinanceiras("TODAS").then(setContasFinanceiras).catch((err) => toast.error((err as Error).message))
+        }
     }
 
     async function handleCriarFinanceiro() {
         if (!formFinanceiro.codcfo) { toast.error('Selecione o fornecedor/credor.'); return }
         if (!formFinanceiro.cod_tipo_documento) { toast.error('Selecione o tipo de documento.'); return }
         if (!formFinanceiro.data_vencimento) { toast.error('Informe a data de vencimento.'); return }
-        if (!formFinanceiro.valor || Number(formFinanceiro.valor) <= 0) { toast.error('Informe um valor válido.'); return }
-        if (!formFinanceiro.codigo_natureza_financeira) { toast.error('Informe a natureza financeira.'); return }
+
+        const itensNested = formItensFinanceiro.getValues('itensFinanceiros') ?? []
+        const itensFlat = achatarItensFinanceiros(itensNested)
+        if (itensFlat.length === 0) { toast.error('Informe ao menos um item financeiro.'); return }
+        if (itensFlat.some(i => !i.ccusto)) { toast.error('Selecione o centro de custo em todas as linhas de rateio.'); return }
+        if (itensFlat.some(i => !i.codconta)) { toast.error('Selecione a conta contábil em todas as linhas de rateio.'); return }
+        if (itensFlat.some(i => !i.codigo_natureza_financeira)) { toast.error('Informe a natureza financeira em todas as linhas de rateio.'); return }
+        if (itensFlat.some(i => !i.valor || i.valor <= 0)) { toast.error('Cada linha de rateio precisa de um valor maior que zero.'); return }
 
         setIsCriandoFinanceiro(true)
         try {
@@ -227,14 +287,13 @@ export default function Page({ titulo, grupo }: Props) {
                 data_vencimento: formFinanceiro.data_vencimento,
                 data_emissao: formFinanceiro.data_emissao || undefined,
                 numero_documento: formFinanceiro.numero_documento || undefined,
-                valor: Number(formFinanceiro.valor),
-                codigo_natureza_financeira: formFinanceiro.codigo_natureza_financeira,
-                cod_ccusto: formFinanceiro.cod_ccusto || undefined,
+                itensFinanceiros: itensFlat,
             }
             const resultado = await criarFinanceiro(payload)
             toast.success(resultado.message ?? 'Financeiro criado com sucesso.')
             setIsFinanceiroDialogOpen(false)
             setFormFinanceiro(financeiroInicial)
+            formItensFinanceiro.reset({ itensFinanceiros: [itemFinanceiroInicial()] })
             await handleSearch(query)
         } catch (err) {
             toast.error((err as Error).message)
@@ -298,6 +357,32 @@ export default function Page({ titulo, grupo }: Props) {
         } catch (err) {
             setError((err as Error).message)
             setResults([])
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    function handleVerItensAglutinados(data: Pagamento) {
+        setAglutinadosSelecionados(data)
+        setIsModalAglutinadosOpen(true)
+    }
+
+    async function handleAprovarLote(data: Pagamento, aprovar: boolean) {
+        const ids = data.itens_aglutinados?.map(i => i.idlan) ?? []
+        if (ids.length === 0) return
+        setIsLoading(true)
+        setError(null)
+        try {
+            const payload: PagamentoAprovarLote = { ids, grupo, aprovar }
+            const resultado = await aprovarLotePagamento(payload)
+            if (resultado.falhas.length > 0) {
+                toast.error(`${resultado.sucesso.length} de ${ids.length} lançamento(s) processado(s). Falhas: ${resultado.falhas.map(f => `#${f.id}`).join(', ')}.`)
+            } else {
+                toast.success(`${resultado.sucesso.length} lançamento(s) ${aprovar ? 'aprovado(s)' : 'reprovado(s)'}.`)
+            }
+            await handleSearchClick();
+        } catch (err) {
+            setError((err as Error).message)
         } finally {
             setIsLoading(false)
         }
@@ -494,6 +579,115 @@ export default function Page({ titulo, grupo }: Props) {
         }
     }
 
+    // Gera 1 documento de "Autorização de Pagamento" resumindo todos os lançamentos de um grupo
+    // aglutinado (mesmo TIPO_DOCUMENTO + NUMERODOCUMENTO — ver AglutinarPagamentos no backend) e
+    // grava a mesma cópia para cada IDLAN do grupo (gerar_documento_lote), assim cada lançamento
+    // mantém seu próprio registro de documento/assinatura, igual ao fluxo de um lançamento avulso.
+    async function handleGerarDocumentoAglutinado(data: Pagamento) {
+        const itens = data.itens_aglutinados ?? []
+        if (itens.length === 0) return
+        setIsLoading(true);
+
+        const linhasItens = itens.map(i => `
+                  <tr>
+                    <td>${i.idlan}</td>
+                    <td>${i.nome_fantasia}</td>
+                    <td>${safeDateLabel(i.data_vencimento)}</td>
+                    <td class="right">${toMoney(i.valor_original)}</td>
+                  </tr>`).join('');
+
+        const html = `
+          <html>
+            <head>
+              <title>Autorização de Pagamento — Aglutinado</title>
+              <style>
+                body { font-family: Arial, Helvetica, sans-serif; padding: 20px; color: #000; }
+                .container { width: 100%; border: 1px solid #000; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000; padding: 10px; }
+                .titulo { text-align: center; font-weight: bold; font-size: 18px; flex: 1; }
+                .info-topo { font-size: 12px; text-align: right; }
+                .linha { border-bottom: 1px solid #000; padding: 6px 10px; font-size: 13px; }
+                table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                td, th { border: 1px solid #000; padding: 6px; }
+                .label { font-weight: bold; width: 180px; }
+                .valor-final { font-size: 18px; font-weight: bold; text-align: right; padding-right: 20px; }
+                .right { text-align: right; }
+                @media print { body { margin: 0; } }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <div><img src="/way.jpg" style="width: 120px;" /></div>
+                  <div class="titulo">Autorização de Pagamento Financeiro — Aglutinado</div>
+                  <div class="info-topo">
+                    <div><strong>Data/Hora Emissão:</strong></div>
+                    <div>${new Date().toLocaleString("pt-BR")}</div>
+                  </div>
+                </div>
+
+                <div class="linha">
+                  <strong>Documento:</strong> ${data.numero_documento}
+                  &nbsp;&nbsp;&nbsp;
+                  <strong>Tipo:</strong> ${data.tipo_documento}
+                  &nbsp;&nbsp;&nbsp;
+                  <strong>Lançamentos:</strong> ${itens.length}
+                </div>
+
+                <table style="margin-top:10px;">
+                  <tr>
+                    <th>ID</th>
+                    <th>Fornecedor</th>
+                    <th>Vencimento</th>
+                    <th>Valor</th>
+                  </tr>
+                  ${linhasItens}
+                </table>
+                <br/>
+
+                <table>
+                  <tr>
+                    <td class="label"><strong>Valor Total a Ser Pago</strong></td>
+                    <td class="valor-final">${toMoney(data.valor_liquido)}</td>
+                  </tr>
+                </table>
+                <br/><br/>
+
+                <table style="margin-top:30px;">
+                  <tr>
+                    <td colspan="3" style="text-align:center; font-weight:bold;">APROVAÇÃO</td>
+                  </tr>
+                  <tr>
+                    <td style="text-align:center; font-weight:bold;">FINANCEIRO</td>
+                    <td style="text-align:center; font-weight:bold;">CONTROLADORIA</td>
+                    <td style="text-align:center; font-weight:bold;">DIRETORIA</td>
+                  </tr>
+                  <tr>
+                    <td style="height:100px;"></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                </table>
+              </div>
+            </body>
+          </html>
+        `;
+        const base64pdf = await htmlToPdfBase64(html);
+        const payload: PagamentoGerarDocumentoLote = {
+            ids: itens.map(i => i.idlan),
+            arquivo: base64pdf,
+            grupo: grupo
+        }
+        try {
+            await gerarDocumentoLote(payload);
+            await handleSearchClick();
+        } catch (err) {
+            setError((err as Error).message)
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     async function handleDocumento(data: Pagamento) {
         setIsLoading(true)
         try {
@@ -524,21 +718,53 @@ export default function Page({ titulo, grupo }: Props) {
     async function confirmarAssinatura(signData: PdfSignData) {
         setIsLoading(true)
         try {
-            const dadosAssinatura: PagamentoAssinarDocumento = {
-                idlan: selectedResult!.idlan,
-                caminho: selectedResult!.caminho_anexo,
-                grupo: grupo,
-                arquivo: documentoParaAssinatura!,
-                pagina: signData.page,
-                posX: signData.posX,
-                posY: signData.posY,
-                largura: signData.largura,
-                altura: signData.altura,
-                dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
-            };
-            await assinarDocumento(dadosAssinatura);
+            const itensAglutinados = selectedResult!.itens_aglutinados ?? []
+            if (itensAglutinados.length > 0) {
+                // Grupo aglutinado: assina a mesma posição/página em cada cópia do documento
+                // (uma por IDLAN, gravadas por handleGerarDocumentoAglutinado), pulando quem o
+                // usuário já assinou.
+                const pendentes = itensAglutinados.filter(i => !i.documento_assinado)
+                const falhas: string[] = []
+                for (const item of pendentes) {
+                    try {
+                        await assinarDocumento({
+                            idlan: item.idlan,
+                            caminho: item.caminho_anexo,
+                            grupo: grupo,
+                            arquivo: documentoParaAssinatura!,
+                            pagina: signData.page,
+                            posX: signData.posX,
+                            posY: signData.posY,
+                            largura: signData.largura,
+                            altura: signData.altura,
+                            dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
+                        });
+                    } catch (err) {
+                        falhas.push(`#${item.idlan}: ${(err as Error).message}`)
+                    }
+                }
+                if (falhas.length > 0) {
+                    toast.error(`Falha ao assinar ${falhas.length} de ${pendentes.length} lançamento(s): ${falhas.join('; ')}`)
+                } else {
+                    toast.success("Documento aglutinado assinado com sucesso!");
+                }
+            } else {
+                const dadosAssinatura: PagamentoAssinarDocumento = {
+                    idlan: selectedResult!.idlan,
+                    caminho: selectedResult!.caminho_anexo,
+                    grupo: grupo,
+                    arquivo: documentoParaAssinatura!,
+                    pagina: signData.page,
+                    posX: signData.posX,
+                    posY: signData.posY,
+                    largura: signData.largura,
+                    altura: signData.altura,
+                    dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
+                };
+                await assinarDocumento(dadosAssinatura);
+                toast.success("Pagamento assinado com sucesso!");
+            }
             handleSearchClick()
-            toast.success("Pagamento assinado com sucesso!");
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -551,7 +777,19 @@ export default function Page({ titulo, grupo }: Props) {
         () => [
             { accessorKey: 'idlan', header: 'ID' },
             { accessorKey: 'nome_fantasia', header: 'Fantasia' },
-            { accessorKey: 'numero_documento', header: 'N° Documento' },
+            {
+                accessorKey: 'numero_documento', header: 'N° Documento',
+                cell: ({ row }) => (
+                    <span>
+                        {row.original.numero_documento}
+                        {!!row.original.itens_aglutinados?.length && (
+                            <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
+                                Aglutinado ({row.original.itens_aglutinados.length})
+                            </span>
+                        )}
+                    </span>
+                ),
+            },
             { accessorKey: 'tipo_documento', header: 'Tipo Documento' },
             { accessorKey: 'historico', header: 'Histórico', accessorFn: (row) => row.historico.length > 50 ? row.historico.slice(0, 50) + '...' : row.historico },
             { accessorKey: 'usuario_criacao', header: 'Usuário Criação' },
@@ -572,6 +810,55 @@ export default function Page({ titulo, grupo }: Props) {
                     const status_liberado = ['EM ABERTO'].includes(row.original.status_lancamento);
                     const podeAprovar = row.original.pode_aprovar && status_liberado && row.original.documento_assinado;
                     const podeReprovar = row.original.pode_reprovar && status_liberado;
+                    const aglutinado = !!row.original.itens_aglutinados?.length;
+                    // "Criar Financeiro" só depois que o registro já está Aprovado.
+                    const podeCriarFinanceiro = userFinanceiroTotvs && row.original.status_aprovacao === 'APROVADA';
+
+                    if (aglutinado) {
+                        return (
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleVerItensAglutinados(row.original)}>
+                                    Itens ({row.original.itens_aglutinados!.length})
+                                </Button>
+                                {!row.original.possui_documento && (
+                                    <Button size="sm" variant="outline" onClick={() => handleGerarDocumentoAglutinado(row.original)}>
+                                        Gerar Documento
+                                    </Button>
+                                )}
+                                {row.original.possui_documento && (
+                                    <Button size="sm" variant="outline" onClick={() => handleDocumento(row.original)}>
+                                        Documento {row.original.documento_assinado && (
+                                            <Check className="w-4 h-4 text-green-500" />
+                                        )}
+                                    </Button>
+                                )}
+                                {podeAprovar && (
+                                    <Button
+                                        size="sm"
+                                        className="bg-green-500 hover:bg-green-600 text-white"
+                                        onClick={() => handleAprovarLote(row.original, true)}
+                                    >
+                                        Aprovar tudo
+                                    </Button>
+                                )}
+                                {podeReprovar && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleAprovarLote(row.original, false)}
+                                    >
+                                        Reprovar tudo
+                                    </Button>
+                                )}
+                                {podeCriarFinanceiro && (
+                                    <Button size="sm" variant="outline" onClick={() => handleAbrirFinanceiro(row.original)}>
+                                        <Plus className="mr-1 h-4 w-4" /> Criar Financeiro
+                                    </Button>
+                                )}
+                            </div>
+                        );
+                    }
+
                     return (
                         <div className="flex gap-2">
                             {!row.original.possui_documento && (<Button size="sm" variant="outline" onClick={() => handleGerarDocumento(row.original)}>
@@ -585,6 +872,12 @@ export default function Page({ titulo, grupo }: Props) {
                             <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
                                 Aprovações
                             </Button>
+
+                            {podeCriarFinanceiro && (
+                                <Button size="sm" variant="outline" onClick={() => handleAbrirFinanceiro(row.original)}>
+                                    <Plus className="mr-1 h-4 w-4" /> Criar Financeiro
+                                </Button>
+                            )}
 
                             {podeAprovar && (
                                 <Button
@@ -610,7 +903,7 @@ export default function Page({ titulo, grupo }: Props) {
                 }
             }
         ],
-        [userName]
+        [userName, userFinanceiroTotvs]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -651,6 +944,17 @@ export default function Page({ titulo, grupo }: Props) {
         [handleNotificarAprovador]
     )
 
+    const colunasAglutinados = useMemo<ColumnDef<PagamentoAglutinadoItem>[]>(
+        () => [
+            { accessorKey: 'idlan', header: 'ID' },
+            { accessorKey: 'nome_fantasia', header: 'Fantasia' },
+            { accessorKey: 'data_vencimento', header: 'Data Vencimento', accessorFn: (row) => safeDateLabel(row.data_vencimento) },
+            { accessorKey: 'valor_original', header: 'Valor Original', accessorFn: (row) => toMoney(row.valor_original) },
+            { accessorKey: 'status_aprovacao', header: 'Situação' },
+        ],
+        []
+    )
+
     return (
         <div className="p-6">
             {/* Cabeçalho */}
@@ -659,11 +963,6 @@ export default function Page({ titulo, grupo }: Props) {
                 <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-3">
                         <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
-                        {userFinanceiroTotvs && (
-                            <Button size="sm" variant="outline" onClick={handleAbrirFinanceiro}>
-                                <Plus className="mr-1 h-4 w-4" /> Criar Financeiro
-                            </Button>
-                        )}
                     </div>
                     <div className="flex flex-wrap justify-end items-end gap-4">
                         {/* Data de */}
@@ -689,6 +988,77 @@ export default function Page({ titulo, grupo }: Props) {
                                 className="w-40"
                             />
                         </div>
+
+                        {/* Fornecedor / Nome fantasia */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="filtroFornecedor">Fornecedor</Label>
+                            <Input
+                                id="filtroFornecedor"
+                                placeholder="Nome fantasia"
+                                value={filtroFornecedor}
+                                onChange={(e) => setFiltroFornecedor(e.target.value)}
+                                className="w-44"
+                            />
+                        </div>
+
+                        {/* Valor mínimo/máximo */}
+                        <div className="flex flex-col">
+                            <Label htmlFor="filtroValorMin">Valor mín.</Label>
+                            <Input
+                                id="filtroValorMin"
+                                type="number"
+                                step="0.01"
+                                placeholder="0,00"
+                                value={filtroValorMin}
+                                onChange={(e) => setFiltroValorMin(e.target.value)}
+                                className="w-28"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <Label htmlFor="filtroValorMax">Valor máx.</Label>
+                            <Input
+                                id="filtroValorMax"
+                                type="number"
+                                step="0.01"
+                                placeholder="0,00"
+                                value={filtroValorMax}
+                                onChange={(e) => setFiltroValorMax(e.target.value)}
+                                className="w-28"
+                            />
+                        </div>
+
+                        {/* Tipo de Documento */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" aria-label="Abrir filtros">
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    <span className="hidden sm:inline">
+                                        Tipo Documento{filtroTiposDocumento.length > 0 ? ` (${filtroTiposDocumento.length})` : ''}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-72 max-h-80 overflow-y-auto" align="end">
+                                <DropdownMenuLabel>Tipo de Documento</DropdownMenuLabel>
+                                <DropdownMenuCheckboxItem
+                                    checked={filtroTiposDocumento.length === 0}
+                                    onCheckedChange={(checked) => { if (checked) setFiltroTiposDocumento([]) }}
+                                >
+                                    Todos
+                                </DropdownMenuCheckboxItem>
+                                {tiposDocumentoDisponiveis.map(tipo => (
+                                    <DropdownMenuCheckboxItem
+                                        key={tipo}
+                                        checked={filtroTiposDocumento.includes(tipo)}
+                                        onCheckedChange={(checked) => {
+                                            setFiltroTiposDocumento(atual =>
+                                                checked ? [...atual, tipo] : atual.filter(t => t !== tipo))
+                                        }}
+                                    >
+                                        {tipo}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
                         {/* Status */}
                         <DropdownMenu>
@@ -762,7 +1132,7 @@ export default function Page({ titulo, grupo }: Props) {
 
             {/* Criar Financeiro */}
             <Dialog open={isFinanceiroDialogOpen} onOpenChange={setIsFinanceiroDialogOpen}>
-                    <DialogContent className="sm:max-w-[480px]">
+                    <DialogContent className="sm:max-w-[640px] max-h-[90dvh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Criar Financeiro</DialogTitle>
                         </DialogHeader>
@@ -847,21 +1217,20 @@ export default function Page({ titulo, grupo }: Props) {
                                 <Input id="fin-numero-documento" maxLength={10} value={formFinanceiro.numero_documento} onChange={e => setFormFinanceiro(s => ({ ...s, numero_documento: e.target.value }))} />
                             </div>
 
-                            <div className="flex flex-col gap-2">
-                                <Label htmlFor="fin-valor">Valor</Label>
-                                <Input id="fin-valor" type="number" step="0.01" min="0" value={formFinanceiro.valor} onChange={e => setFormFinanceiro(s => ({ ...s, valor: e.target.value }))} />
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="fin-natureza">Natureza Financeira</Label>
-                                    <Input id="fin-natureza" value={formFinanceiro.codigo_natureza_financeira} onChange={e => setFormFinanceiro(s => ({ ...s, codigo_natureza_financeira: e.target.value }))} />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="fin-ccusto">Centro de custo</Label>
-                                    <Input id="fin-ccusto" value={formFinanceiro.cod_ccusto} onChange={e => setFormFinanceiro(s => ({ ...s, cod_ccusto: e.target.value }))} />
-                                </div>
-                            </div>
+                            <Form {...formItensFinanceiro}>
+                                <ItensFinanceirosSection
+                                    form={formItensFinanceiro}
+                                    centrosDeCusto={centrosDeCusto}
+                                    contasFinanceiras={contasFinanceiras}
+                                    openCcustoIndex={openCcustoIndex}
+                                    setOpenCcustoIndex={setOpenCcustoIndex}
+                                    openCcustoRateioIndex={openCcustoRateioIndex}
+                                    setOpenCcustoRateioIndex={setOpenCcustoRateioIndex}
+                                    openCodcontaIndex={openCodcontaIndex}
+                                    setOpenCodcontaIndex={setOpenCodcontaIndex}
+                                    mostrarNaturezaFinanceira
+                                />
+                            </Form>
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <Button type="button" variant="outline" onClick={() => setIsFinanceiroDialogOpen(false)} disabled={isCriandoFinanceiro}>Cancelar</Button>
@@ -883,6 +1252,20 @@ export default function Page({ titulo, grupo }: Props) {
                         </DialogHeader>
                         <div className="w-full">
                             <DataTable columns={colunasAprovacoes} data={resultsAprovadores} loading={isLoading} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {/* Itens aglutinados */}
+            {aglutinadosSelecionados && (
+                <Dialog open={isModalAglutinadosOpen} onOpenChange={setIsModalAglutinadosOpen}>
+                    <DialogContent className="w-fit sm:max-w-[90vw] overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-center">{`Lançamentos aglutinados — documento ${aglutinadosSelecionados.numero_documento}`}</DialogTitle>
+                        </DialogHeader>
+                        <div className="w-full">
+                            <DataTable columns={colunasAglutinados} data={aglutinadosSelecionados.itens_aglutinados ?? []} loading={isLoading} />
                         </div>
                     </DialogContent>
                 </Dialog>

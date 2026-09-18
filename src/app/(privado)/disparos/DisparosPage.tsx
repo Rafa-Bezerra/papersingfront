@@ -23,17 +23,21 @@ import {
 import {
   DisparoDestinatario,
   DisparoEmail,
+  EmailComunicadoFinanceiroNotificacao,
   EmailContratoNotificacao,
   EmailPainelConfig,
   MODULOS_EMAIL,
   PERFIS_DISPARO,
+  criarEmailComunicadoFinanceiro,
   criarEmailContrato,
   enviarDisparoPerfil,
   enviarEmailTeste,
+  excluirEmailComunicadoFinanceiro,
   excluirEmailContrato,
   getConfigDisparos,
   getDestinatariosDisparo,
   getDisparos,
+  getEmailsComunicadoFinanceiro,
   getEmailsContrato,
   reenviarDisparo,
   salvarConfigDisparos
@@ -86,6 +90,12 @@ export default function DisparosPage() {
   const [salvandoContrato, setSalvandoContrato] = useState(false)
   const [excluindoContrato, setExcluindoContrato] = useState<number | null>(null)
 
+  const [emailsFinanceiroCI, setEmailsFinanceiroCI] = useState<EmailComunicadoFinanceiroNotificacao[]>([])
+  const [carregandoFinanceiroCI, setCarregandoFinanceiroCI] = useState(false)
+  const [novoEmailFinanceiroCI, setNovoEmailFinanceiroCI] = useState('')
+  const [salvandoFinanceiroCI, setSalvandoFinanceiroCI] = useState(false)
+  const [excluindoFinanceiroCI, setExcluindoFinanceiroCI] = useState<number | null>(null)
+
   function togglePerfil(id: string, checked: boolean) {
     setPerfis((atual) => {
       const next = checked ? [...atual, id] : atual.filter((p) => p !== id)
@@ -122,6 +132,7 @@ export default function DisparosPage() {
     }
     carregar()
     carregarEmailsContrato()
+    carregarEmailsFinanceiroCI()
     getConfigDisparos()
       .then((cfg) => {
         setConfig(cfg)
@@ -371,6 +382,69 @@ export default function DisparosPage() {
     }
   }
 
+  async function carregarEmailsFinanceiroCI() {
+    setCarregandoFinanceiroCI(true)
+    try {
+      const lista = await getEmailsComunicadoFinanceiro()
+      setEmailsFinanceiroCI(lista)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível listar e-mails de financeiro (CI).')
+    } finally {
+      setCarregandoFinanceiroCI(false)
+    }
+  }
+
+  async function handleSalvarEmailFinanceiroCI() {
+    if (!novoEmailFinanceiroCI.trim()) {
+      toast.error('Informe o e-mail.')
+      return
+    }
+    setSalvandoFinanceiroCI(true)
+    try {
+      await criarEmailComunicadoFinanceiro(novoEmailFinanceiroCI.trim())
+      toast.success('E-mail cadastrado para notificação de financeiro (CI).')
+      setNovoEmailFinanceiroCI('')
+      await carregarEmailsFinanceiroCI()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar e-mail.')
+    } finally {
+      setSalvandoFinanceiroCI(false)
+    }
+  }
+
+  async function handleExcluirEmailFinanceiroCI(id: number) {
+    if (!window.confirm(`Excluir o e-mail #${id} das notificações de financeiro (CI)?`)) return
+    setExcluindoFinanceiroCI(id)
+    try {
+      await excluirEmailComunicadoFinanceiro(id)
+      toast.success('E-mail excluído.')
+      await carregarEmailsFinanceiroCI()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir e-mail.')
+    } finally {
+      setExcluindoFinanceiroCI(null)
+    }
+  }
+
+  const colunasFinanceiroCI: ColumnDef<EmailComunicadoFinanceiroNotificacao>[] = useMemo(() => [
+    { accessorKey: 'id', header: 'ID' },
+    { accessorKey: 'email', header: 'Email' },
+    {
+      id: 'actions',
+      header: 'Ações',
+      cell: ({ row }) => (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={excluindoFinanceiroCI === row.original.id}
+          onClick={() => handleExcluirEmailFinanceiroCI(row.original.id)}
+        >
+          {excluindoFinanceiroCI === row.original.id ? 'Excluindo…' : 'Excluir'}
+        </Button>
+      ),
+    },
+  ], [excluindoFinanceiroCI])
+
   const colunasContrato: ColumnDef<EmailContratoNotificacao>[] = useMemo(() => [
     { accessorKey: 'id', header: 'ID' },
     { accessorKey: 'email', header: 'Email' },
@@ -449,6 +523,7 @@ export default function DisparosPage() {
       <TabsList className="flex-wrap h-auto">
         <TabsTrigger value="config"><Settings className="w-4 h-4" /> Configuração</TabsTrigger>
         <TabsTrigger value="contratos"><SquarePlus className="w-4 h-4" /> Contratos</TabsTrigger>
+        <TabsTrigger value="financeiro-ci"><SquarePlus className="w-4 h-4" /> Financeiro CI</TabsTrigger>
         <TabsTrigger value="disparar"><Send className="w-4 h-4" /> Disparar por perfil</TabsTrigger>
         <TabsTrigger value="historico"><Mail className="w-4 h-4" /> Histórico</TabsTrigger>
         <TabsTrigger value="plugsign"><FolderLock className="w-4 h-4" /> PlugSign</TabsTrigger>
@@ -612,6 +687,38 @@ export default function DisparosPage() {
               columns={colunasContrato}
               data={emailsContrato}
               loading={carregandoContrato}
+            />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="financeiro-ci">
+        <Card className="border-0 shadow-none">
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-xl">Emails de notificação de financeiro (Comunicados)</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Sempre que um Comunicado Interno for totalmente aprovado, os e-mails cadastrados abaixo
+              serão notificados. Se a lista estiver vazia, nenhuma notificação é enviada.
+            </p>
+          </CardHeader>
+          <CardContent className="px-0 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                className="max-w-sm"
+                type="email"
+                value={novoEmailFinanceiroCI}
+                onChange={(e) => setNovoEmailFinanceiroCI(e.target.value)}
+                placeholder="email@grupowaybrasil.com.br"
+              />
+              <Button type="button" onClick={handleSalvarEmailFinanceiroCI} disabled={salvandoFinanceiroCI}>
+                <SquarePlus className="mr-1 h-4 w-4" />
+                {salvandoFinanceiroCI ? 'Salvando…' : 'Novo'}
+              </Button>
+            </div>
+            <DataTable
+              columns={colunasFinanceiroCI}
+              data={emailsFinanceiroCI}
+              loading={carregandoFinanceiroCI}
             />
           </CardContent>
         </Card>

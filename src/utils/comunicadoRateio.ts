@@ -6,7 +6,7 @@ export function achatarItensFinanceiros(itens: ComunicadoItemFinanceiro[]): Comu
         (item.rateio ?? []).map(linha => ({
             id: linha.id,
             setor: item.setor,
-            ccusto: item.ccusto,
+            ccusto: linha.ccusto || item.ccusto,
             codconta: linha.codconta,
             valor: linha.valor,
             codigo_natureza_financeira: linha.codigo_natureza_financeira,
@@ -34,6 +34,7 @@ export function agruparItensFinanceiros(linhas: ComunicadoItemFinanceiroFlat[]):
             valor_total: valorTotal,
             rateio: grupo.map(l => ({
                 id: l.id,
+                ccusto: l.ccusto ?? grupo[0].ccusto ?? '',
                 codconta: l.codconta ?? '',
                 modo: 'valor' as const,
                 percentual: l.percentual ?? (valorTotal > 0 ? (l.valor / valorTotal) * 100 : 0),
