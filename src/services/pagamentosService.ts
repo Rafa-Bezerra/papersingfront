@@ -13,6 +13,27 @@ export async function getAll(data: PagamentoGetAll, signal?: AbortSignal): Promi
     return list ?? [];
 }
 
+/** Busca um lançamento por IDLAN (usa unidade do token ou X-Gestor-Unidade). */
+export async function getLancamento(
+    idlan: number,
+    grupo: string
+): Promise<Pagamento | null> {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const base = {
+        dateFrom: "1900-01-01",
+        dateTo: hoje,
+        grupo,
+        situacao: "",
+        idlan,
+    };
+    for (const status of ["EM ABERTO", ""]) {
+        const lista = await getAll({ ...base, status });
+        const hit = lista.find((p) => p.idlan === idlan) ?? lista[0];
+        if (hit) return hit;
+    }
+    return null;
+}
+
 export async function getAllAprovadores(data: PagamentoAprovadoresGetAll): Promise<PagamentoAprovador[]> {
     const res = await fetch(`${API_BASE}/api/${caminho}/aprovadores`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {

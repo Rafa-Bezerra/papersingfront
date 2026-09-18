@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Download,
   Eye,
+  Printer,
   FileUp,
   MapPin,
   MessageSquare,
@@ -49,7 +50,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PopoverPortal } from '@radix-ui/react-popover'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
-import { toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, toBase64 } from '@/utils/functions'
+import { base64ParaImpressao } from '@/utils/documentoAnexo'
 import {
   baixarDocumentoAssinadoSolicitacao,
   criarSolicitacaoAssinatura,
@@ -723,6 +725,28 @@ export default function SolicitacaoAssinaturaPanel({
     } finally {
       setBaixandoKey(null)
     }
+  }
+
+  async function handleImprimirAssinado(documentKey: string, nome: string) {
+    setBaixandoKey(documentKey)
+    try {
+      const res = await baixarDocumentoAssinadoSolicitacao(documentKey, nome)
+      imprimirPdfBase64(base64ParaImpressao(res.base64))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao imprimir PDF assinado.')
+    } finally {
+      setBaixandoKey(null)
+    }
+  }
+
+  function handleImprimirAssinadoAberto() {
+    if (!assinadoB64) return
+    imprimirPdfBase64(base64ParaImpressao(assinadoB64))
+  }
+
+  function handleImprimirPreview() {
+    if (!pdfPreviewB64) return
+    imprimirPdfBase64(base64ParaImpressao(pdfPreviewB64))
   }
 
   /** Limpa o formulário para um novo envio (mantém o bloco de resultado). */
@@ -1499,6 +1523,17 @@ export default function SolicitacaoAssinaturaPanel({
                       <Download className="h-3.5 w-3.5 mr-1.5" />
                       Baixar
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      disabled={baixandoKey === doc.documentKey}
+                      onClick={() => handleImprimirAssinado(doc.documentKey, doc.nome)}
+                    >
+                      <Printer className="h-3.5 w-3.5 mr-1.5" />
+                      Imprimir
+                    </Button>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground break-all">
@@ -1554,6 +1589,7 @@ export default function SolicitacaoAssinaturaPanel({
         initialBoxH={placeTipo.h}
         markers={placeMarkers}
         onSign={confirmarPosicao}
+        onPrint={handleImprimirPreview}
         extraControls={
           <div className="flex flex-wrap items-center gap-1.5">
             {arquivos.length > 1 && (
@@ -1631,6 +1667,7 @@ export default function SolicitacaoAssinaturaPanel({
         title={pdfParaPosicionar?.name || 'Documento'}
         pdfBase64={pdfPreviewB64}
         canSign={false}
+        onPrint={handleImprimirPreview}
         markers={allPdfMarkers}
         placeHint={
           allPdfMarkers.length
@@ -1648,6 +1685,7 @@ export default function SolicitacaoAssinaturaPanel({
         title={assinadoTitulo}
         pdfBase64={assinadoB64}
         canSign={false}
+        onPrint={handleImprimirAssinadoAberto}
       />
     </div>
   )

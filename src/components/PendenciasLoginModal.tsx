@@ -1,20 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, RefreshCw, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PendenciaInlineViewer } from "@/components/PendenciaInlineViewer";
 import { PendenciaItemCard } from "@/components/PendenciaItemCard";
 import {
   getPendenciasGestor,
   normalizarPorUnidade,
+  PENDENCIAS_INVALIDAR_EVENT,
   tiposComPendencias,
   unidadesComPendencias,
 } from "@/services/pendenciasService";
 import { PendenciaGestorItem, PendenciaGestorResumoUnidadeTipo } from "@/types/Pendencias";
 import {
-  abrirPendencia,
   consumirAbrirPendenciasAposLogin,
   corUnidadePendencia,
   labelTipoPendencia,
@@ -23,7 +24,7 @@ import {
   wasPendenciasModalDismissed,
 } from "@/utils/pendenciaNavigation";
 import { cn } from "@/lib/utils";
-import { pendenciaItemKey } from "@/utils/pendenciaItemKey";
+import { mesmaPendencia, pendenciaItemKey } from "@/utils/pendenciaItemKey";
 
 function eqUnidade(a: string, b: string): boolean {
   return a.trim().toUpperCase() === b.trim().toUpperCase();
@@ -70,7 +71,6 @@ function contagemEsperada(
 
 export default function PendenciasLoginModal() {
   const router = useRouter();
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [itensGeral, setItensGeral] = useState<PendenciaGestorItem[]>([]);
   const [itensExibidos, setItensExibidos] = useState<PendenciaGestorItem[]>([]);
@@ -82,6 +82,7 @@ export default function PendenciasLoginModal() {
   const [avaliado, setAvaliado] = useState(false);
   const [recarregando, setRecarregando] = useState(false);
   const [abrindoId, setAbrindoId] = useState<string | null>(null);
+  const [itemInline, setItemInline] = useState<PendenciaGestorItem | null>(null);
   const [filtroUnidade, setFiltroUnidade] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
   const timerRef = useRef<number | null>(null);
@@ -127,7 +128,7 @@ export default function PendenciasLoginModal() {
     setLoading(true);
 
     try {
-      const data = await getPendenciasGestor(30, { force: true });
+      const data = await getPendenciasGestor(30, opts?.forcarAbrir ? { force: true } : undefined);
       if (reqId !== carregarReqRef.current) return;
 
       setItensGeral(data.itens);
@@ -175,16 +176,21 @@ export default function PendenciasLoginModal() {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [carregar, pathname]);
+  }, [carregar]);
 
   useEffect(() => {
     const onLogin = () => void carregar({ forcarAbrir: true });
     const onAbrir = () => void carregar({ forcarAbrir: true });
+    const onInvalidar = () => {
+      if (openRef.current) void carregar({ forcarAbrir: true });
+    };
     window.addEventListener("papersign-login", onLogin);
     window.addEventListener("papersign-abrir-pendencias-modal", onAbrir);
+    window.addEventListener(PENDENCIAS_INVALIDAR_EVENT, onInvalidar);
     return () => {
       window.removeEventListener("papersign-login", onLogin);
       window.removeEventListener("papersign-abrir-pendencias-modal", onAbrir);
+      window.removeEventListener(PENDENCIAS_INVALIDAR_EVENT, onInvalidar);
     };
   }, [carregar]);
 
@@ -249,6 +255,7 @@ export default function PendenciasLoginModal() {
     setOpen(false);
     setFiltroUnidade("");
     setFiltroTipo("");
+    setItemInline(null);
     marcarResolvido();
   }
 
@@ -260,17 +267,28 @@ export default function PendenciasLoginModal() {
     router.push("/pendencias");
   }
 
-  async function abrirItem(item: PendenciaGestorItem, idx: number) {
+  function abrirItem(item: PendenciaGestorItem, idx: number) {
+    if (!item.id) return;
     const key = pendenciaItemKey(item, idx);
     setAbrindoId(key);
-    markPendenciasModalDismissed();
-    setOpen(false);
-    try {
-      await abrirPendencia(item);
-    } catch (error) {
-      console.warn("PendenciasLoginModal: erro ao abrir item", error);
-      setAbrindoId(null);
+    setItemInline(item);
+    setAbrindoId(null);
+  }
+
+  function voltarListaInline() {
+    setItemInline(null);
+    void carregar({ forcarAbrir: true });
+  }
+
+  function concluirItemInline() {
+    const concluido = itemInline;
+    setItemInline(null);
+    if (concluido) {
+      setItensGeral((prev) => prev.filter((i) => !mesmaPendencia(i, concluido)));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setTotalExibidos((prev) => Math.max(0, prev - 1));
     }
+    void carregar({ forcarAbrir: true });
   }
 
   if (total === 0 && !open && !loading) return null;
@@ -283,8 +301,14 @@ export default function PendenciasLoginModal() {
       <DialogContent
         scrollBody={false}
         showCloseButton={false}
-        className="z-[10001] gap-0 overflow-hidden p-0 sm:max-w-3xl lg:max-w-4xl max-h-[min(92vh,900px)]"
+        className={cn(
+          "z-[10001] gap-0 overflow-hidden p-0 max-h-[min(96vh,920px)]",
+          itemInline
+            ? "sm:max-w-[min(96vw,1100px)]"
+            : "sm:max-w-3xl lg:max-w-4xl max-h-[min(92vh,900px)]"
+        )}
       >
+        {!itemInline && (
         <div className="relative border-b border-red-200/60 bg-gradient-to-br from-red-50/80 via-red-50/30 to-transparent px-6 pt-6 pb-4 dark:border-red-900/50 dark:from-red-950/30 dark:via-slate-900/40 dark:to-transparent">
           <button
             type="button"
@@ -387,7 +411,15 @@ export default function PendenciasLoginModal() {
             </div>
           )}
         </div>
+        )}
 
+        {itemInline ? (
+          <PendenciaInlineViewer
+            item={itemInline}
+            onClose={voltarListaInline}
+            onConcluido={concluirItemInline}
+          />
+        ) : (
         <div className="max-h-[min(62vh,520px)] overflow-y-auto px-5 py-4">
           {loading && itensGeral.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
@@ -430,7 +462,9 @@ export default function PendenciasLoginModal() {
             </p>
           )}
         </div>
+        )}
 
+        {!itemInline && (
         <DialogFooter className="flex-col gap-2 border-t bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <Button
@@ -453,6 +487,7 @@ export default function PendenciasLoginModal() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

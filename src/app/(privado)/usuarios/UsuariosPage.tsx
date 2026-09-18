@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
+import { empresaPermiteProjetos } from '@/utils/projetosModulo'
 import {
   Dialog,
   DialogContent,
@@ -900,7 +901,7 @@ export default function PageUsuarios() {
                   name="docusign"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>PlugSing</FormLabel>
+                      <FormLabel>WaySign</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -911,22 +912,24 @@ export default function PageUsuarios() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="projetos"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Projetos</FormLabel>
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {empresaPermiteProjetos(form.watch("empresa")) && (
+                  <FormField
+                    control={form.control}
+                    name="projetos"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Projetos</FormLabel>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="receitas"

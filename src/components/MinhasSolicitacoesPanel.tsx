@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { History, Loader2, RefreshCw, Eye, Download, Bell } from 'lucide-react'
+import { History, Loader2, RefreshCw, Eye, Download, Bell, Printer } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import PdfViewerDialog from '@/components/PdfViewerDialog'
+import { imprimirPdfBase64 } from '@/utils/functions'
+import { base64ParaImpressao } from '@/utils/documentoAnexo'
 import {
   baixarDocumentoAssinadoSolicitacao,
   HistoricoSolicitacaoItem,
@@ -115,7 +117,7 @@ export default function MinhasSolicitacoesPanel() {
   const [historico, setHistorico] = useState<HistoricoSolicitacaoItem[]>([])
 
   const [baixandoKey, setBaixandoKey] = useState<string | null>(null)
-  const [acaoPdf, setAcaoPdf] = useState<'ver' | 'baixar' | null>(null)
+  const [acaoPdf, setAcaoPdf] = useState<'ver' | 'baixar' | 'imprimir' | null>(null)
   const [lembreteKey, setLembreteKey] = useState<string | null>(null)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
@@ -284,6 +286,26 @@ export default function MinhasSolicitacoesPanel() {
     }
   }
 
+  async function imprimirPdf(doc: { documentKey: string; nomeDocumento?: string | null }) {
+    if (!doc.documentKey) return
+    setBaixandoKey(doc.documentKey)
+    setAcaoPdf('imprimir')
+    try {
+      const res = await obterPdfAssinado(doc)
+      imprimirPdfBase64(base64ParaImpressao(res.base64))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao imprimir PDF assinado.')
+    } finally {
+      setBaixandoKey(null)
+      setAcaoPdf(null)
+    }
+  }
+
+  function imprimirPdfAberto() {
+    if (!pdfBase64) return
+    imprimirPdfBase64(base64ParaImpressao(pdfBase64))
+  }
+
   return (
     <div id="tour-plugsign-minhas-painel" className="space-y-4">
       <Card>
@@ -327,7 +349,7 @@ export default function MinhasSolicitacoesPanel() {
         <CardContent className="pt-0 space-y-3">
           <div className="rounded-md border overflow-x-auto">
             <div className="min-w-[820px]">
-            <div className="grid grid-cols-[minmax(150px,1.3fr)_100px_minmax(110px,1fr)_80px_72px_72px_140px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+            <div className="grid grid-cols-[minmax(150px,1.3fr)_100px_minmax(110px,1fr)_80px_72px_72px_200px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
               <span>Documento</span>
               <span>Envio</span>
               <span>Destinatários</span>
@@ -357,7 +379,7 @@ export default function MinhasSolicitacoesPanel() {
                   return (
                     <li
                       key={doc.documentKey}
-                      className="grid grid-cols-[minmax(150px,1.3fr)_100px_minmax(110px,1fr)_80px_72px_72px_140px] gap-2 border-b px-3 py-2.5 text-sm items-center"
+                      className="grid grid-cols-[minmax(150px,1.3fr)_100px_minmax(110px,1fr)_80px_72px_72px_200px] gap-2 border-b px-3 py-2.5 text-sm items-center"
                     >
                       <button
                         type="button"
@@ -453,6 +475,22 @@ export default function MinhasSolicitacoesPanel() {
                                 <Download className="h-3 w-3" />
                               )}
                               <span className="ml-1">Baixar</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-[10px]"
+                              disabled={busy}
+                              onClick={() => imprimirPdf(doc)}
+                              title="Imprimir PDF assinado"
+                            >
+                              {busy && acaoPdf === 'imprimir' ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Printer className="h-3 w-3" />
+                              )}
+                              <span className="ml-1">Imprimir</span>
                             </Button>
                           </>
                         ) : (
@@ -556,6 +594,7 @@ export default function MinhasSolicitacoesPanel() {
         title={pdfTitle}
         pdfBase64={pdfBase64}
         canSign={false}
+        onPrint={imprimirPdfAberto}
         isLoading={baixandoKey != null && pdfOpen}
       />
     </div>

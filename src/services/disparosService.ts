@@ -39,7 +39,7 @@ export const PERFIS_DISPARO = [
   { id: "solicitante", label: "Solicitante" },
   { id: "gestao_pessoas", label: "Gestão de pessoas" },
   { id: "financeiro", label: "Financeiro" },
-  { id: "docusign", label: "PlugSing" },
+  { id: "docusign", label: "WaySign" },
   { id: "projetos", label: "Projetos" },
   { id: "receitas", label: "Receitas" },
   { id: "contratos", label: "Contratos" },

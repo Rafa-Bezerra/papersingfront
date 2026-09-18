@@ -60,7 +60,7 @@ export function labelTipoPendencia(tipo: string): string {
     case "projeto":
       return "Projeto";
     case "plugsign":
-      return "PlugSign";
+      return "WaySign";
     case "restrito":
       return "Restrito";
     case "bordero":

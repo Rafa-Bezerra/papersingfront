@@ -48,6 +48,7 @@ export type PagamentoGetAll = {
     grupo: string,
     status: string,
     situacao: string,
+    idlan?: number,
 }
 export type PagamentoAprovadoresGetAll = {
     id: number,

@@ -127,8 +127,8 @@ export function base64PdfEhValido(dataUrlOuBase64: string): boolean {
     }
 }
 
-export async function getAnexo(caminho_anexo: string): Promise<string> {
-    const body = { caminho_anexo };
+export async function getAnexo(caminho_anexo: string, id_anexo?: number): Promise<string> {
+    const body = { caminho_anexo, id_anexo: id_anexo ?? null };
     const res = await fetch(`${API_BASE}/api/${caminho}/anexo`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     if (!res.ok) {
       const msg = await res.text();

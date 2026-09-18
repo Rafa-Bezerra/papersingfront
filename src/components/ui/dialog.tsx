@@ -48,6 +48,7 @@ function DialogOverlay({
 
 function DialogContent({
   className,
+  overlayClassName,
   children,
   showCloseButton = true,
   scrollBody = true,
@@ -56,10 +57,11 @@ function DialogContent({
   showCloseButton?: boolean
   /** When true (default), body scrolls inside the panel so the close control stays aligned with the dialog frame on narrow viewports. */
   scrollBody?: boolean
+  overlayClassName?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

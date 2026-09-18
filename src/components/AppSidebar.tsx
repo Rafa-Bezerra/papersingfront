@@ -62,6 +62,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userFinanceiro, setUserFinanceiro] = useState(false)
   const [userDocusign, setUserDocusign] = useState(false)
   const [userProjetos, setUserProjetos] = useState(false)
+  const [userUnidade, setUserUnidade] = useState("")
   const [userReceitas, setUserReceitas] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
@@ -94,6 +95,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserFinanceiro(user.financeiro);
         setUserDocusign(user.docusign);
         setUserProjetos(user.projetos);
+        setUserUnidade(String(user.unidade ?? ""));
         setUserReceitas(user.receitas);
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
@@ -134,7 +136,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'Aquisição de serviços': <Briefcase className="w-5 h-5" />,
     'Outras movimentações': <MoreHorizontal className="w-5 h-5" />,
     'Documentos': <FileText className="w-5 h-5" />,
-    'PlugSing': <FileText className="w-5 h-5" />,
+    'WaySign': <FileText className="w-5 h-5" />,
     'Projetos': <FileText className="w-5 h-5" />,
     'Receitas': <CircleDollarSign className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
@@ -256,6 +258,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
+                      if (item.url === "/projetos" && userUnidade.trim().toUpperCase() !== "WAY CSC") return null
                       // Receitas: só quem tem a flag (admin sempre vê).
                       // Financeiro NÃO herda este módulo automaticamente.
                       if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;

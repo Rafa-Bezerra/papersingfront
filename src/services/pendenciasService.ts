@@ -16,6 +16,16 @@ const cache = new Map<string, { at: number; data: PendenciasGestorResponse }>();
 
 const inflight = new Map<string, Promise<PendenciasGestorResponse>>();
 
+export const PENDENCIAS_ATUALIZADAS_EVENT = "papersign-pendencias-atualizadas";
+export const PENDENCIAS_INVALIDAR_EVENT = "papersign-pendencias-invalidar";
+
+function notificarPendenciasAtualizadas(data: PendenciasGestorResponse): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(PENDENCIAS_ATUALIZADAS_EVENT, { detail: data })
+  );
+}
+
 
 
 /** Garante array de { unidade, total } — evita crash ao iterar resposta da API. */
@@ -135,6 +145,8 @@ function normalizeItem(raw: Record<string, unknown>) {
 
     detalhe: (raw.detalhe ?? raw.Detalhe ?? null) as string | null,
 
+    codigoAtendimento: (raw.codigoAtendimento ?? raw.CodigoAtendimento ?? null) as number | null,
+
   };
 
 }
@@ -180,9 +192,10 @@ function normalizeResponse(raw: Record<string, unknown>): PendenciasGestorRespon
 
 
 export function invalidatePendenciasGestorCache(): void {
-
   cache.clear();
-
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(PENDENCIAS_INVALIDAR_EVENT));
+  }
 }
 
 
@@ -203,18 +216,12 @@ export async function getPendenciasGestor(
 
 
 
+  const pending = inflight.get(key);
+  if (pending) return pending;
+
   if (!opts?.force) {
-
     const hit = cache.get(key);
-
     if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
-
-
-
-    const pending = inflight.get(key);
-
-    if (pending) return pending;
-
   }
 
 
@@ -238,11 +245,9 @@ export async function getPendenciasGestor(
     .then(normalizeResponse)
 
     .then((data) => {
-
       cache.set(key, { at: Date.now(), data });
-
+      if (!unidade && !tipo) notificarPendenciasAtualizadas(data);
       return data;
-
     })
 
     .finally(() => {

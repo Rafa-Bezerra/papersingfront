@@ -1,8 +1,14 @@
-import type { Documento, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
+import type { Documento, DocumentoAnexo, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
 import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, CERTIFICADO_TIMEOUT_MS, headers } from "@/utils/constants";
 const caminho = "Docusign";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
+
+function normalizarDocumento(raw: Record<string, unknown>): Documento {
+    const anexos = (raw.anexos ?? raw.Anexos ?? []) as DocumentoAnexo[];
+    const aprovadores = (raw.aprovadores ?? raw.Aprovadores ?? []) as DocumentoAprovacao[];
+    return { ...(raw as Documento), anexos: Array.isArray(anexos) ? anexos : [], aprovadores: Array.isArray(aprovadores) ? aprovadores : [] };
+}
 
 export async function getAll(): Promise<Documento[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);       
@@ -13,8 +19,61 @@ export async function getAll(): Promise<Documento[]> {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
     }
-    const list: Documento[] = await res.json();
-    return list;
+    const list = await res.json();
+    return Array.isArray(list) ? list.map((item) => normalizarDocumento(item as Record<string, unknown>)) : [];
+}
+
+export async function getAnexosDocumento(id: number): Promise<DocumentoAnexo[]> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/documento/${id}/anexos`, {
+        headers: headers(),
+    });
+    if (res.status === 404) {
+        const msg = (await res.text()).trim();
+        if (/não encontrado|sem permissão/i.test(msg)) {
+            throw new Error(msg);
+        }
+        throw new Error(
+            "Endpoint de anexos não encontrado na API. Reinicie a API local (porta 5170) ou atualize o servidor."
+        );
+    }
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `Erro ${res.status} ao buscar anexos do documento`);
+    }
+    const list = await res.json();
+    return Array.isArray(list) ? list : [];
+}
+
+export async function resgatarDocumentoPlugSign(id: number): Promise<DocumentoAnexo | null> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/documento/${id}/resgatar-plugsign`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({}),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `Erro ${res.status} ao resgatar documento na PlugSign`);
+    }
+    const data = await res.json();
+    const anexo = (data?.anexo ?? data) as DocumentoAnexo;
+    return anexo?.id ? anexo : null;
+}
+
+export async function adicionarAnexoDocumento(
+    id: number,
+    data: Pick<DocumentoAnexo, "anexo" | "nome" | "documento_principal">
+): Promise<DocumentoAnexo> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/documento/${id}/anexos`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `Erro ${res.status} ao anexar documento`);
+    }
+    return await res.json();
 }
 
 export async function createElement(data: Documento): Promise<void> {
@@ -213,8 +272,8 @@ export function base64PdfEhValido(dataUrlOuBase64: string): boolean {
     }
 }
 
-export async function getAnexo(caminho_anexo: string): Promise<string> {
-    const body = { caminho_anexo };
+export async function getAnexo(caminho_anexo: string, id_anexo?: number): Promise<string> {
+    const body = { caminho_anexo, id_anexo: id_anexo ?? null };
     const res = await fetch(`${API_BASE}/api/${caminho}/anexo`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     if (!res.ok) {
       const msg = await res.text();

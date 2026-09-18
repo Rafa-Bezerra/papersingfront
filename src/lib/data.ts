@@ -23,7 +23,7 @@ export const data = {
         { title: "Aquisição de serviços", url: "/aquisicoes" },
         { title: "Outras movimentações", url: "/outras" },
         { title: "Documentos", url: "/documentos" },
-        { title: "PlugSing", url: "/docusign" },
+        { title: "WaySign", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },
         { title: "Receitas", url: "/receitas" },
         { title: "Pagamentos CI", url: "/comunicados" },

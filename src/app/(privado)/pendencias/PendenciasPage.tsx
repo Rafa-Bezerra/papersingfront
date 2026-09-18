@@ -6,20 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PendenciaInlineViewer } from "@/components/PendenciaInlineViewer";
 import { PendenciaItemCard } from "@/components/PendenciaItemCard";
 import {
   getPendenciasGestor,
   normalizarPorUnidade,
+  PENDENCIAS_ATUALIZADAS_EVENT,
+  PENDENCIAS_INVALIDAR_EVENT,
   tiposComPendencias,
   unidadesComPendencias,
 } from "@/services/pendenciasService";
+import type { PendenciasGestorResponse } from "@/types/Pendencias";
 import { PendenciaGestorItem, PendenciaGestorResumoUnidadeTipo } from "@/types/Pendencias";
 import {
-  abrirPendencia,
   corUnidadePendencia,
   labelTipoPendencia,
 } from "@/utils/pendenciaNavigation";
-import { pendenciaItemKey } from "@/utils/pendenciaItemKey";
+import { mesmaPendencia, pendenciaItemKey } from "@/utils/pendenciaItemKey";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -53,6 +56,7 @@ export default function PendenciasPage() {
   const [loading, setLoading] = useState(true);
   const [recarregando, setRecarregando] = useState(false);
   const [abrindo, setAbrindo] = useState<string | null>(null);
+  const [itemInline, setItemInline] = useState<PendenciaGestorItem | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroUnidade, setFiltroUnidade] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
@@ -61,29 +65,45 @@ export default function PendenciasPage() {
 
   const temFiltroApi = Boolean(filtroUnidade || filtroTipo);
 
-  const carregar = useCallback(async () => {
+  const aplicarDados = useCallback((data: PendenciasGestorResponse) => {
+    setItensGeral(data.itens);
+    setTotal(data.total);
+    setPorUnidade(normalizarPorUnidade(data.porUnidade, data.itens));
+    setPorUnidadeTipo(data.porUnidadeTipo ?? []);
+    setTotalExibidos(data.totalExibidos ?? data.itens.length);
+    setLoading(false);
+  }, []);
+
+  const carregar = useCallback(async (force = false) => {
     const reqId = ++carregarReqRef.current;
     setLoading(true);
 
     try {
-      const data = await getPendenciasGestor(30, { force: true });
+      const data = await getPendenciasGestor(30, force ? { force: true } : undefined);
       if (reqId !== carregarReqRef.current) return;
-
-      setItensGeral(data.itens);
-      setTotal(data.total);
-      setPorUnidade(normalizarPorUnidade(data.porUnidade, data.itens));
-      setPorUnidadeTipo(data.porUnidadeTipo ?? []);
-      setTotalExibidos(data.totalExibidos ?? data.itens.length);
+      aplicarDados(data);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao carregar pendências");
-    } finally {
       if (reqId === carregarReqRef.current) setLoading(false);
     }
-  }, []);
+  }, [aplicarDados]);
 
   useEffect(() => {
-    void carregar();
-  }, [carregar]);
+    void carregar(false);
+
+    const onAtualizado = (event: Event) => {
+      const data = (event as CustomEvent<PendenciasGestorResponse>).detail;
+      if (data) aplicarDados(data);
+    };
+    const onInvalidar = () => void carregar(true);
+
+    window.addEventListener(PENDENCIAS_ATUALIZADAS_EVENT, onAtualizado);
+    window.addEventListener(PENDENCIAS_INVALIDAR_EVENT, onInvalidar);
+    return () => {
+      window.removeEventListener(PENDENCIAS_ATUALIZADAS_EVENT, onAtualizado);
+      window.removeEventListener(PENDENCIAS_INVALIDAR_EVENT, onInvalidar);
+    };
+  }, [carregar, aplicarDados]);
 
   useEffect(() => {
     const local = filtrarItens(itensGeral, filtroUnidade, filtroTipo);
@@ -144,15 +164,28 @@ export default function PendenciasPage() {
     });
   }, [itensExibidos, busca]);
 
-  async function handleAbrir(item: PendenciaGestorItem, idx: number) {
+  function handleAbrir(item: PendenciaGestorItem, idx: number) {
+    if (!item.id) return;
     const key = pendenciaItemKey(item, idx);
     setAbrindo(key);
-    try {
-      await abrirPendencia(item);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao abrir pendência");
-      setAbrindo(null);
+    setItemInline(item);
+    setAbrindo(null);
+  }
+
+  function fecharAssinaturaInline() {
+    setItemInline(null);
+    void carregar(true);
+  }
+
+  function concluirItemInline() {
+    const concluido = itemInline;
+    setItemInline(null);
+    if (concluido) {
+      setItensGeral((prev) => prev.filter((i) => !mesmaPendencia(i, concluido)));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setTotalExibidos((prev) => Math.max(0, prev - 1));
     }
+    void carregar(true);
   }
 
   function selecionarUnidade(unidade: string) {
@@ -190,7 +223,7 @@ export default function PendenciasPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void carregar()}
+          onClick={() => void carregar(true)}
           disabled={loading || recarregando}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading || recarregando ? "animate-spin" : ""}`} />
@@ -274,6 +307,18 @@ export default function PendenciasPage() {
           </Button>
         )}
       </div>
+
+      {itemInline && (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <PendenciaInlineViewer
+              item={itemInline}
+              onClose={fecharAssinaturaInline}
+              onConcluido={concluirItemInline}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {loading && itensGeral.length === 0 ? (
         <div className="space-y-2">

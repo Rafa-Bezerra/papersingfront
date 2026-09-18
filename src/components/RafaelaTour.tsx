@@ -116,11 +116,28 @@ function passoEhPendencias(passo: TourPasso): boolean {
   return false
 }
 
+const NOME_MODULO_ASSINATURA = 'WaySign'
+
+/** Nome do módulo no menu/tour (WaySign). Mantém PlugSign só como provedor externo de assinatura. */
+function normalizarTextoTour(texto: string): string {
+  if (!texto) return texto
+  return texto
+    .replace(/Módulo PlugSign/g, `Módulo ${NOME_MODULO_ASSINATURA}`)
+    .replace(/módulo PlugSign/g, `módulo ${NOME_MODULO_ASSINATURA}`)
+    .replace(/Guias do PlugSign/g, `Guias do ${NOME_MODULO_ASSINATURA}`)
+    .replace(/No PlugSign, as pessoas assinam/g, `No ${NOME_MODULO_ASSINATURA}, as pessoas assinam`)
+    .replace(/projetos, PlugSign de todas/g, `projetos, ${NOME_MODULO_ASSINATURA} de todas`)
+    .replace(/projetos, PlugSign e/g, `projetos, ${NOME_MODULO_ASSINATURA} e`)
+    .replace(/, PlugSign\)/g, `, ${NOME_MODULO_ASSINATURA})`)
+    .replace(/documento, PlugSign, etc/g, `documento, ${NOME_MODULO_ASSINATURA}, etc`)
+    .replace(/PlugSign e demais tipos/g, `${NOME_MODULO_ASSINATURA} e demais tipos`)
+}
+
 function listarModulosTour(): string[] {
   const mods: string[] = ['Pendências do gestor']
   if (usuarioPodeReceitas()) mods.push('Receitas')
   if (usuarioPodePagamentosCi()) mods.push('Pagamentos CI')
-  if (usuarioPodePlugSign()) mods.push('PlugSign')
+  if (usuarioPodePlugSign()) mods.push(NOME_MODULO_ASSINATURA)
   return mods
 }
 
@@ -133,7 +150,7 @@ function juntarListaPt(itens: string[]): string {
 
 /**
  * Regras do tour:
- * - sem Receitas, sem Pagamentos CI e sem PlugSign → só GLPI
+ * - sem Receitas, sem Pagamentos CI e sem WaySign → só GLPI
  * - cada módulo liberado entra no tour + GLPI
  * - passo de financeiro RM no formulário da CI só com financeiro_totvs
  * Menu lateral só entra quando há pelo menos um módulo.
@@ -164,18 +181,18 @@ function mensagemIntroPorPerfil(): string {
   const mods = listarModulosTour()
   const outros = mods.filter((m) => m !== 'Pendências do gestor')
   if (outros.length === 0) {
-    return 'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar a nova Caixa de Pendências do gestor (todas as WAY em um só lugar) e o suporte para abertura de chamado no GLPI.'
+    return 'Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar a nova Caixa de Pendências do gestor: todas as WAY em um só lugar, com assinatura e aprovação direto no modal — sem trocar de base.\n\nTambém mostro o suporte para abertura de chamado no GLPI.'
   }
-  return `Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar ${juntarListaPt(mods)} e o suporte para abertura de chamado.`
+  return `Olá, sou a Raphaela!\n\nNosso sistema teve uma atualização.\n\nVou te mostrar ${juntarListaPt(mods)} e o suporte para abertura de chamado.\n\nDestaque nas pendências: você assina, aprova ou recusa no modal, em qualquer WAY, sem trocar de base.`
 }
 
 function mensagemFimPorPerfil(): string {
   const mods = listarModulosTour()
   if (mods.length <= 1) {
-    return 'Pronto!\n\nNa Caixa de Pendências você vê tudo que aguarda sua aprovação ou assinatura em qualquer WAY — e ao clicar em um item o sistema abre o documento na base correta.\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!'
+    return 'Pronto!\n\nNa Caixa de Pendências você vê tudo que aguarda sua aprovação ou assinatura em qualquer WAY. Ao clicar, abre o modal: visualize o PDF, assine, aprove ou recuse na mesma tela — o PaperSign usa a base da pendência e você não precisa trocar de unidade.\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!'
   }
   let extras =
-    '\n\nNa Caixa de Pendências, movimentos, documentos, RDV, fiscal, projetos e PlugSign de todas as WAY aparecem juntos — clique no item para abrir na unidade certa.'
+    `\n\nNa Caixa de Pendências, movimentos, documentos, RDV, fiscal, projetos e ${NOME_MODULO_ASSINATURA} de todas as WAY aparecem juntos. No modal você assina, aprova ou recusa sem trocar de base — o sistema abre na unidade certa automaticamente.`
   if (usuarioPodeReceitas()) {
     extras +=
       '\n\nReceitas aparece só para administrador ou quem tem a permissão Receitas em Usuários.'
@@ -186,7 +203,7 @@ function mensagemFimPorPerfil(): string {
   }
   if (usuarioPodePlugSign()) {
     extras +=
-      '\n\nNo PlugSign, as pessoas assinam pela PlugSign, mas todo o processo (envio, andamento e PDF) fica no PaperSign.'
+      `\n\nNo ${NOME_MODULO_ASSINATURA}, as pessoas assinam pela PlugSign, mas todo o processo (envio, andamento e PDF) fica no PaperSign.`
   }
   return `Pronto! Essas foram as novidades.${extras}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
@@ -502,8 +519,8 @@ export default function RafaelaTour() {
           )
         },
         popover: {
-          title: p.titulo || tour.titulo || 'Novidade',
-          description: p.mensagem.replace(/\n/g, '<br/>'),
+          title: normalizarTextoTour(p.titulo || tour.titulo || 'Novidade'),
+          description: normalizarTextoTour(p.mensagem).replace(/\n/g, '<br/>'),
           side: ladoDriver(p.lado),
           align: 'start',
         },
