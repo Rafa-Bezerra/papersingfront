@@ -68,6 +68,11 @@ import {
 } from '@/types/Comunicado'
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService'
 import { Label } from '@/components/ui/label'
+import { ItensFinanceirosSection } from '@/components/financeiro/ItensFinanceirosSection'
+
+function labelFornecedor(f: Fornecedor): string {
+    return f.cnpj ? `${f.nome} - ${f.cnpj}` : f.nome
+}
 
 function limparPdfBase64(raw: string): string {
     let s = (raw ?? '').trim()
@@ -115,6 +120,7 @@ export default function Page() {
     const [openCodcontaIndex, setOpenCodcontaIndex] = useState<string | null>(null)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
     const [openCcustoIndex, setOpenCcustoIndex] = useState<number | null>(null)
+    const [openCcustoRateioIndex, setOpenCcustoRateioIndex] = useState<string | null>(null)
     const [file, setFile] = useState<File | null>(null)
     const [fileName, setFileName] = useState<string>("")
 
@@ -160,7 +166,7 @@ export default function Page() {
             cargo: '',
             cidade_origem: '',
             concessionaria: '',
-            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
+            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ ccusto: '', codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
             rodape: '',
             corpo_documento: '',
             codcfo: '',
@@ -470,7 +476,7 @@ export default function Page() {
             anexo: '',
             nome: '',
             aprovadores: [],
-            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
+            itensFinanceiros: [{ setor: '', ccusto: '', valor_total: 0, rateio: [{ ccusto: '', codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }] }],
             corpo_documento: '',
             codcfo: '',
             cod_tipo_documento: '',
@@ -992,14 +998,15 @@ ${html}
                                                     <PopoverTrigger asChild>
                                                         <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenFornecedor(true)}>
                                                             <span className="truncate">
-                                                                {fornecedores.find(f => f.codcfo === field.value)?.nome ?? 'Selecione o fornecedor'}
+                                                                {fornecedores.find(f => f.codcfo === field.value) ? labelFornecedor(fornecedores.find(f => f.codcfo === field.value)!) : 'Selecione o fornecedor'}
                                                             </span>
                                                             <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                         </Button>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="p-0 w-[420px] pointer-events-auto">
                                                         <Command filter={(value, search) => {
-                                                            const label = fornecedores.find(f => f.codcfo === value)?.nome || ''
+                                                            const f = fornecedores.find(f => f.codcfo === value)
+                                                            const label = f ? labelFornecedor(f) : ''
                                                             return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
                                                         }}>
                                                             <CommandInput placeholder="Buscar fornecedor..." />
@@ -1008,7 +1015,7 @@ ${html}
                                                                 <CommandGroup>
                                                                     {fornecedores.map(f => (
                                                                         <CommandItem key={f.codcfo} value={f.codcfo} onSelect={() => { field.onChange(f.codcfo); setOpenFornecedor(false) }}>
-                                                                            {f.nome}
+                                                                            {labelFornecedor(f)}
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
@@ -1272,6 +1279,8 @@ ${html}
                                     contasFinanceiras={contasFinanceiras}
                                     openCcustoIndex={openCcustoIndex}
                                     setOpenCcustoIndex={setOpenCcustoIndex}
+                                    openCcustoRateioIndex={openCcustoRateioIndex}
+                                    setOpenCcustoRateioIndex={setOpenCcustoRateioIndex}
                                     openCodcontaIndex={openCodcontaIndex}
                                     setOpenCodcontaIndex={setOpenCodcontaIndex}
                                     mostrarNaturezaFinanceira={userFinanceiroTotvs}
@@ -1298,14 +1307,15 @@ ${html}
                                                                 <PopoverTrigger asChild>
                                                                     <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenFornecedor(true)}>
                                                                         <span className="truncate">
-                                                                            {fornecedores.find(f => f.codcfo === field.value)?.nome ?? 'Selecione o fornecedor'}
+                                                                            {fornecedores.find(f => f.codcfo === field.value) ? labelFornecedor(fornecedores.find(f => f.codcfo === field.value)!) : 'Selecione o fornecedor'}
                                                                         </span>
                                                                         <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                                     </Button>
                                                                 </PopoverTrigger>
                                                                 <PopoverContent className="p-0 w-[420px] pointer-events-auto">
                                                                     <Command filter={(value, search) => {
-                                                                        const label = fornecedores.find(f => f.codcfo === value)?.nome || ''
+                                                                        const f = fornecedores.find(f => f.codcfo === value)
+                                                                        const label = f ? labelFornecedor(f) : ''
                                                                         return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
                                                                     }}>
                                                                         <CommandInput placeholder="Buscar fornecedor..." />
@@ -1314,7 +1324,7 @@ ${html}
                                                                             <CommandGroup>
                                                                                 {fornecedores.map(f => (
                                                                                     <CommandItem key={f.codcfo} value={f.codcfo} onSelect={() => { field.onChange(f.codcfo); setOpenFornecedor(false) }}>
-                                                                                        {f.nome}
+                                                                                        {labelFornecedor(f)}
                                                                                     </CommandItem>
                                                                                 ))}
                                                                             </CommandGroup>
@@ -1728,387 +1738,6 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     );
 }
 
-function ItensFinanceirosSection({
-    form,
-    centrosDeCusto,
-    contasFinanceiras,
-    openCcustoIndex,
-    setOpenCcustoIndex,
-    openCodcontaIndex,
-    setOpenCodcontaIndex,
-    mostrarNaturezaFinanceira,
-}: {
-    form: UseFormReturn<Comunicado>,
-    centrosDeCusto: CentroDeCusto[],
-    contasFinanceiras: ContaFinanceira[],
-    openCcustoIndex: number | null,
-    setOpenCcustoIndex: (v: number | null) => void,
-    openCodcontaIndex: string | null,
-    setOpenCodcontaIndex: (v: string | null) => void,
-    mostrarNaturezaFinanceira?: boolean,
-}) {
-    const { control } = form;
-    const { fields, append, remove } = useFieldArray({ control, name: 'itensFinanceiros' });
-
-    return (
-        <Card id="tour-ci-itens">
-            <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Rateio dos Itens</CardTitle>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => append({
-                        setor: '', ccusto: '', valor_total: 0,
-                        rateio: [{ codconta: '', modo: 'valor', percentual: 100, valor: 0, codigo_natureza_financeira: '' }],
-                    })}
-                >
-                    + Adicionar item
-                </Button>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-6">
-                {fields.map((field, index) => (
-                    <ItemFinanceiroFields
-                        key={field.id}
-                        itemIndex={index}
-                        podeRemover={fields.length > 1}
-                        onRemover={() => remove(index)}
-                        form={form}
-                        centrosDeCusto={centrosDeCusto}
-                        contasFinanceiras={contasFinanceiras}
-                        openCcustoIndex={openCcustoIndex}
-                        setOpenCcustoIndex={setOpenCcustoIndex}
-                        openCodcontaIndex={openCodcontaIndex}
-                        setOpenCodcontaIndex={setOpenCodcontaIndex}
-                        mostrarNaturezaFinanceira={mostrarNaturezaFinanceira}
-                    />
-                ))}
-            </CardContent>
-        </Card>
-    );
-}
-
-// Um item do rateio: setor + centro de custo + valor total, distribuído entre uma ou mais contas
-// contábeis (cada linha em modo "valor" ou "percentual" — o campo não editado é sempre recalculado).
-function ItemFinanceiroFields({
-    itemIndex,
-    podeRemover,
-    onRemover,
-    form,
-    centrosDeCusto,
-    contasFinanceiras,
-    openCcustoIndex,
-    setOpenCcustoIndex,
-    openCodcontaIndex,
-    setOpenCodcontaIndex,
-    mostrarNaturezaFinanceira,
-}: {
-    itemIndex: number,
-    podeRemover: boolean,
-    onRemover: () => void,
-    form: UseFormReturn<Comunicado>,
-    centrosDeCusto: CentroDeCusto[],
-    contasFinanceiras: ContaFinanceira[],
-    openCcustoIndex: number | null,
-    setOpenCcustoIndex: (v: number | null) => void,
-    openCodcontaIndex: string | null,
-    setOpenCodcontaIndex: (v: string | null) => void,
-    mostrarNaturezaFinanceira?: boolean,
-}) {
-    const { control, setValue, getValues } = form;
-    const { fields: rateioFields, append: appendRateio, remove: removeRateio } = useFieldArray({
-        control, name: `itensFinanceiros.${itemIndex}.rateio`,
-    });
-    const item = form.watch(`itensFinanceiros.${itemIndex}`);
-    const valorTotal = item?.valor_total ?? 0;
-    const somaRateio = (item?.rateio ?? []).reduce((acc, r) => acc + (Number(r?.valor) || 0), 0);
-    const restante = Math.round((valorTotal - somaRateio) * 100) / 100;
-
-    function recalcularRateioPorValorTotal(novoTotal: number) {
-        const linhas = getValues(`itensFinanceiros.${itemIndex}.rateio`) ?? [];
-        linhas.forEach((linha, ri) => {
-            if (linha.modo === 'percentual') {
-                const novoValor = Math.round((Number(linha.percentual) || 0) / 100 * novoTotal * 100) / 100;
-                setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
-            }
-        });
-    }
-
-    function onChangeValorLinha(ri: number, novoValor: number) {
-        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
-        const total = getValues(`itensFinanceiros.${itemIndex}.valor_total`) || 0;
-        const novoPercentual = total > 0 ? Math.round((novoValor / total) * 100 * 100) / 100 : 0;
-        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`, novoPercentual);
-    }
-
-    function onChangePercentualLinha(ri: number, novoPercentual: number) {
-        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`, novoPercentual);
-        const total = getValues(`itensFinanceiros.${itemIndex}.valor_total`) || 0;
-        const novoValor = Math.round((novoPercentual / 100) * total * 100) / 100;
-        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`, novoValor);
-    }
-
-    return (
-        <div className="border rounded-md p-3 flex flex-col gap-3 relative">
-            {podeRemover && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 h-7 w-7"
-                    onClick={onRemover}
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                        )}
-            <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-
-                        {/* Setor */}
-                        <FormField
-                            control={control}
-                name={`itensFinanceiros.${itemIndex}.setor`}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Setor</FormLabel>
-                                    <FormControl>
-                                        <Input {...f} placeholder="Ex: Tecnologia da Informação" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Centro de Custo */}
-                        <FormField
-                            control={control}
-                name={`itensFinanceiros.${itemIndex}.ccusto`}
-                            rules={{ required: 'Centro de custo obrigatório' }}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Centro de Custo</FormLabel>
-                                    <FormControl>
-                            <Popover open={openCcustoIndex === itemIndex} onOpenChange={open => setOpenCcustoIndex(open ? itemIndex : null)} modal={false}>
-                                            <PopoverTrigger asChild>
-                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCcustoIndex(itemIndex)}>
-                                                    {centrosDeCusto.find(c => c.ccusto === f.value)?.custo ?? 'Selecione'}
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                <Command filter={(value, search) => {
-                                                    const label = centrosDeCusto.find(m => m.ccusto === value)?.custo || ''
-                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                }}>
-                                                    <CommandInput placeholder="Buscar centro..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {centrosDeCusto.map(c => (
-                                                                <CommandItem key={c.ccusto} value={c.ccusto} onSelect={() => { f.onChange(c.ccusto); setOpenCcustoIndex(null) }}>
-                                                                    {c.ccusto} - {c.custo}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-            {/* Valor Total do item */}
-            <FormField
-                control={control}
-                name={`itensFinanceiros.${itemIndex}.valor_total`}
-                rules={{ required: 'Valor total obrigatório' }}
-                render={({ field: f }) => (
-                    <FormItem>
-                        <FormLabel>Valor Total do Item (R$)</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="number" step="0.01" min="0"
-                                {...f}
-                                onChange={e => {
-                                    const novoTotal = parseFloat(e.target.value) || 0;
-                                    f.onChange(novoTotal);
-                                    recalcularRateioPorValorTotal(novoTotal);
-                                }}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-
-            {/* Rateio entre contas contábeis */}
-            <div className="flex flex-col gap-3 border-t pt-3">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Rateio entre contas contábeis</span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendRateio({ codconta: '', modo: 'valor', percentual: 0, valor: 0, codigo_natureza_financeira: '' })}
-                    >
-                        + Adicionar conta
-                    </Button>
-                </div>
-
-                {rateioFields.map((rateioField, ri) => {
-                    const linha = item?.rateio?.[ri];
-                    const modo = linha?.modo ?? 'valor';
-                    const popoverKey = `${itemIndex}-${ri}`;
-                    return (
-                        <div key={rateioField.id} className="border rounded-md p-3 flex flex-col gap-3 relative">
-                            {rateioFields.length > 1 && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute top-2 right-2 h-7 w-7"
-                                    onClick={() => removeRateio(ri)}
-                                >
-                                    <X className="w-4 h-4" />
-                                </Button>
-                            )}
-
-                        {/* Conta Contábil */}
-                        <FormField
-                            control={control}
-                                name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codconta`}
-                            rules={{ required: 'Conta contábil obrigatória' }}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Conta Contábil</FormLabel>
-                                    <FormControl>
-                                            <Popover open={openCodcontaIndex === popoverKey} onOpenChange={open => setOpenCodcontaIndex(open ? popoverKey : null)} modal={false}>
-                                            <PopoverTrigger asChild>
-                                                    <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenCodcontaIndex(popoverKey)}>
-                                                    {contasFinanceiras.find(x => x.codconta === f.value)?.contabil ?? 'Selecione'}
-                                                    <ChevronsUpDown className="opacity-50 size-4" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="p-0 w-[600px] pointer-events-auto">
-                                                <Command filter={(value, search) => {
-                                                    const label = contasFinanceiras.find(m => m.codconta === value)?.contabil || contasFinanceiras.find(m => m.codconta === value)?.codconta || ''
-                                                    return (label.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase())) ? 1 : 0
-                                                }}>
-                                                    <CommandInput placeholder="Buscar conta..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {contasFinanceiras.map(x => (
-                                                                    <CommandItem key={x.codconta} value={x.codconta} onSelect={() => {
-                                                                        f.onChange(x.codconta);
-                                                                        setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`, x.codconta);
-                                                                        setOpenCodcontaIndex(null)
-                                                                    }}>
-                                                                    {x.codconta} - {x.contabil}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                            {/* Toggle valor absoluto / percentual */}
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={modo === 'valor' ? 'default' : 'outline'}
-                                    onClick={() => setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.modo`, 'valor')}
-                                >
-                                    Valor (R$)
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={modo === 'percentual' ? 'default' : 'outline'}
-                                    onClick={() => setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.modo`, 'percentual')}
-                                >
-                                    Percentual (%)
-                                </Button>
-                            </div>
-
-                            {modo === 'valor' ? (
-                        <FormField
-                            control={control}
-                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.valor`}
-                            render={({ field: f }) => (
-                                <FormItem>
-                                    <FormLabel>Valor (R$)</FormLabel>
-                                    <FormControl>
-                                                <Input type="number" step="0.01" min="0" {...f}
-                                                    onChange={e => onChangeValorLinha(ri, parseFloat(e.target.value) || 0)} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                            ) : (
-                                <FormField
-                                    control={control}
-                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual`}
-                                    render={({ field: f }) => (
-                                        <FormItem>
-                                            <FormLabel>Percentual (%)</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" step="0.01" min="0" max="100" {...f}
-                                                    onChange={e => onChangePercentualLinha(ri, parseFloat(e.target.value) || 0)} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            )}
-
-                            <span className="text-xs text-muted-foreground">
-                                {modo === 'valor'
-                                    ? `≈ ${(linha?.percentual ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do valor total`
-                                    : `≈ R$ ${(linha?.valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            </span>
-
-                            {/* Natureza Financeira — só quando o criador detém a claim financeiro_totvs;
-                                usada como CODNATFINANCEIRA (FLANRATCCU) na criação automática do financeiro
-                                ao aprovar o comunicado. */}
-                            {mostrarNaturezaFinanceira && (
-                                <FormField
-                                    control={control}
-                                    name={`itensFinanceiros.${itemIndex}.rateio.${ri}.codigo_natureza_financeira`}
-                                    rules={{ required: 'Natureza Financeira obrigatória' }}
-                                    render={({ field: f }) => (
-                                        <FormItem>
-                                            <FormLabel>Natureza Financeira (CODTBORCAMENTO)</FormLabel>
-                                            <FormControl>
-                                                <Input {...f} value={f.value ?? ''} placeholder="Ex: 1.01.001" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            )}
-                    </div>
-                    );
-                })}
-
-                <span className={`text-sm font-medium ${Math.abs(restante) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
-                    Restante a ratear: R$ {restante.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-            </div>
-        </div>
-    );
-}
-
 export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number, centrosDeCusto: CentroDeCusto[] = [], contasFinanceiras: ContaFinanceira[] = []): string {
 
     const aprovadores = data.aprovadores ?? [];
@@ -2253,14 +1882,15 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
             </thead>
             <tbody>
                 ${(data.itensFinanceiros ?? []).map((item, i) => {
-                    const ccustoDesc = centrosDeCusto.find(c => c.ccusto === item.ccusto)?.custo;
                     const linhasRateio = (item.rateio ?? []).map((linha, ri) => {
+                        const linhaCcusto = linha.ccusto || item.ccusto;
+                        const ccustoDesc = centrosDeCusto.find(c => c.ccusto === linhaCcusto)?.custo;
                         const contaDesc = contasFinanceiras.find(c => c.codconta === linha.codconta)?.contabil;
                         return `
                 <tr>
                     <td style="padding:5px 8px; text-align:center;">${ri === 0 ? i + 1 : ""}</td>
                     <td style="padding:5px 8px;">${ri === 0 ? (item.setor ?? "") : ""}</td>
-                    <td style="padding:5px 8px;">${ri === 0 ? `${item.ccusto ?? ""}${ccustoDesc ? ` - ${ccustoDesc}` : ""}` : ""}</td>
+                    <td style="padding:5px 8px;">${linhaCcusto ?? ""}${ccustoDesc ? ` - ${ccustoDesc}` : ""}</td>
                     <td style="padding:5px 8px;">${linha.codconta ?? ""}${contaDesc ? ` - ${contaDesc}` : ""}</td>
                     <td style="padding:5px 8px; text-align:right;">${(linha.percentual ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td>
                     <td style="padding:5px 8px; text-align:right;">${(linha.valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

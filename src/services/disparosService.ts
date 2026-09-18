@@ -163,3 +163,36 @@ export async function excluirEmailContrato(id: number): Promise<void> {
     throw new Error(msg || `Erro ${res.status} ao excluir e-mail de contrato`);
   }
 }
+
+export interface EmailComunicadoFinanceiroNotificacao {
+  id: number;
+  unidade?: string;
+  email: string;
+}
+
+export async function getEmailsComunicadoFinanceiro(): Promise<EmailComunicadoFinanceiroNotificacao[]> {
+  return fetchJson<EmailComunicadoFinanceiroNotificacao[]>(`${API_BASE}/api/Disparos/comunicados-financeiro-emails`);
+}
+
+export async function criarEmailComunicadoFinanceiro(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/comunicados-financeiro-emails`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao adicionar e-mail de financeiro (CI)`);
+  }
+}
+
+export async function excluirEmailComunicadoFinanceiro(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/comunicados-financeiro-emails/${id}`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao excluir e-mail de financeiro (CI)`);
+  }
+}

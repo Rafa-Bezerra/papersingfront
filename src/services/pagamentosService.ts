@@ -1,4 +1,4 @@
-import { Pagamento, PagamentoAprovador, PagamentoAprovadoresGetAll, PagamentoAprovar, PagamentoAssinarDocumento, PagamentoGerarDocumento, PagamentoGetAll, PagamentoGetDocumento, CriarFinanceiroPagamentoPayload, CriarFinanceiroPagamentoResult } from "@/types/Pagamentos";
+import { Pagamento, PagamentoAglutinadoItem, PagamentoAprovador, PagamentoAprovadoresGetAll, PagamentoAprovar, PagamentoAprovarLote, PagamentoAprovarLoteResultado, PagamentoAssinarDocumento, PagamentoGerarDocumento, PagamentoGerarDocumentoLote, PagamentoGetAll, PagamentoGetDocumento, CriarFinanceiroPagamentoPayload, CriarFinanceiroPagamentoResult } from "@/types/Pagamentos";
 import { API_BASE, fetchJson, headers } from "@/utils/constants";
 const caminho = "Pagamentos";
 const elemento_singular = "pagamento";
@@ -31,12 +31,32 @@ export async function aprovarPagamento(data: PagamentoAprovar): Promise<void> {
     }
 }
 
+/** Aprova/reprova de uma vez todos os IDLAN de um grupo de lançamentos aglutinados. */
+export async function aprovarLotePagamento(data: PagamentoAprovarLote): Promise<PagamentoAprovarLoteResultado> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/aprovar-lote`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao aprovar em lote: ${msg}`);
+    }
+    return res.json();
+}
+
 export async function gerarDocumento(data: PagamentoGerarDocumento) {
     const res = await fetch(`${API_BASE}/api/${caminho}/gerar_documento/${data.idlan}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
     }
+}
+
+/** Grava o mesmo documento (autorização de pagamento do grupo aglutinado) para vários IDLAN de uma vez. */
+export async function gerarDocumentoLote(data: PagamentoGerarDocumentoLote) {
+    const res = await fetch(`${API_BASE}/api/${caminho}/gerar_documento_lote`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao gerar documento aglutinado: ${msg}`);
+    }
+    return res.json();
 }
 
 export async function getDocumento(data: PagamentoGetDocumento): Promise<string> {
@@ -69,9 +89,7 @@ export async function criarFinanceiro(payload: CriarFinanceiroPagamentoPayload):
             dataVencimento: payload.data_vencimento,
             dataEmissao: payload.data_emissao,
             numeroDocumento: payload.numero_documento,
-            valor: payload.valor,
-            codigoNaturezaFinanceira: payload.codigo_natureza_financeira,
-            codCcusto: payload.cod_ccusto,
+            itensFinanceiros: payload.itensFinanceiros,
         }),
     });
     const data = await res.json().catch(() => ({}));
@@ -81,4 +99,4 @@ export async function criarFinanceiro(payload: CriarFinanceiroPagamentoPayload):
     return data as CriarFinanceiroPagamentoResult;
 }
 
-export type { Pagamento, PagamentoGetAll, PagamentoAprovadoresGetAll, PagamentoAprovar, PagamentoAprovador, PagamentoGerarDocumento, PagamentoGetDocumento, PagamentoAssinarDocumento, CriarFinanceiroPagamentoPayload, CriarFinanceiroPagamentoResult }
+export type { Pagamento, PagamentoAglutinadoItem, PagamentoGetAll, PagamentoAprovadoresGetAll, PagamentoAprovar, PagamentoAprovarLote, PagamentoAprovarLoteResultado, PagamentoAprovador, PagamentoGerarDocumento, PagamentoGerarDocumentoLote, PagamentoGetDocumento, PagamentoAssinarDocumento, CriarFinanceiroPagamentoPayload, CriarFinanceiroPagamentoResult }

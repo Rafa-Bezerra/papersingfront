@@ -1,3 +1,5 @@
+import { ComunicadoItemFinanceiroFlat } from '@/types/Comunicado'
+
 export type Pagamento = {
     idlan: number,
     nome_fantasia: string,
@@ -21,6 +23,17 @@ export type Pagamento = {
     documento_assinado: boolean,
     status_aprovacao: string,
     caminho_anexo: string,
+    itens_aglutinados?: PagamentoAglutinadoItem[] | null,
+}
+export type PagamentoAglutinadoItem = {
+    idlan: number,
+    nome_fantasia: string,
+    data_vencimento: string,
+    valor_original: number,
+    status_aprovacao: string,
+    caminho_anexo: string,
+    possui_documento: boolean,
+    documento_assinado: boolean,
 }
 export type PagamentoAprovador = {
     id: number,
@@ -48,8 +61,22 @@ export type PagamentoAprovar = {
     usuario?: string,
     nome?: string,
 }
+export type PagamentoAprovarLote = {
+    ids: number[],
+    grupo: string,
+    aprovar: boolean,
+}
+export type PagamentoAprovarLoteResultado = {
+    sucesso: number[],
+    falhas: { id: number, erro: string }[],
+}
 export type PagamentoGerarDocumento = {
     idlan: number,
+    grupo: string,
+    arquivo: string
+}
+export type PagamentoGerarDocumentoLote = {
+    ids: number[],
     grupo: string,
     arquivo: string
 }
@@ -76,9 +103,9 @@ export type CriarFinanceiroPagamentoPayload = {
     data_vencimento: string;
     data_emissao?: string;
     numero_documento?: string;
-    valor: number;
-    codigo_natureza_financeira: string;
-    cod_ccusto?: string;
+    // Rateio por item (flat — uma linha por conta contábil/centro de custo), mesmo formato usado
+    // por /comunicados (ver achatarItensFinanceiros em @/utils/comunicadoRateio).
+    itensFinanceiros: ComunicadoItemFinanceiroFlat[];
 }
 export type CriarFinanceiroPagamentoResult = {
     sucesso: boolean;
