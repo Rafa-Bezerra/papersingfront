@@ -122,6 +122,14 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               setIsAuthorized(false);
             }
 
+            // Status do pedido (RM): admin + WAY CSC.
+            if (
+              normalizedPath === "/status-pedido" &&
+              (!isAdmin || String(parsedUser?.unidade ?? "").trim().toUpperCase() !== "WAY CSC")
+            ) {
+              setIsAuthorized(false);
+            }
+
             // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
             if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
               setIsAuthorized(false);

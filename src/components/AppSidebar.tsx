@@ -1,7 +1,7 @@
 // components/AppSidebar.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -157,19 +157,25 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     Configurações: <Settings className="w-5 h-5" />,
   }
 
-  const configItems = [
-    { title: 'Alçadas', url: '/alcadas' },
-    { title: 'Usuários', url: '/usuarios' },
-    { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
-    { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
-    { title: 'Fornecedores Restritos', url: '/fornecedores-restritos' },
-    { title: 'Aprovadores Impostos', url: '/impostosaprovadores' },
-    { title: 'Aprovadores Fiscal', url: '/fiscalaprovadores' },
-    { title: 'Aprovadores RH', url: '/rhaprovadores' },
-    { title: 'Centros de custos', url: '/centros-custos' },
-    { title: 'Disparos', url: '/disparos' },
-    { title: 'Cadastro de externos', url: '/cadastro-externos' },
-  ]
+  const configItems = useMemo(() => {
+    const items = [
+      { title: 'Alçadas', url: '/alcadas' },
+      { title: 'Usuários', url: '/usuarios' },
+      { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
+      { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
+      { title: 'Fornecedores Restritos', url: '/fornecedores-restritos' },
+      { title: 'Aprovadores Impostos', url: '/impostosaprovadores' },
+      { title: 'Aprovadores Fiscal', url: '/fiscalaprovadores' },
+      { title: 'Aprovadores RH', url: '/rhaprovadores' },
+      { title: 'Centros de custos', url: '/centros-custos' },
+      { title: 'Disparos', url: '/disparos' },
+      { title: 'Cadastro de externos', url: '/cadastro-externos' },
+    ]
+    if (userUnidade.trim().toUpperCase() === 'WAY CSC') {
+      items.push({ title: 'Status do pedido', url: '/status-pedido' })
+    }
+    return items
+  }, [userUnidade])
 
   return (
     <>

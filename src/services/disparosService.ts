@@ -196,3 +196,36 @@ export async function excluirEmailComunicadoFinanceiro(id: number): Promise<void
     throw new Error(msg || `Erro ${res.status} ao excluir e-mail de financeiro (CI)`);
   }
 }
+
+export interface EmailRdvAprovadoNotificacao {
+  id: number;
+  unidade?: string;
+  email: string;
+}
+
+export async function getEmailsRdvAprovado(): Promise<EmailRdvAprovadoNotificacao[]> {
+  return fetchJson<EmailRdvAprovadoNotificacao[]>(`${API_BASE}/api/Disparos/rdv-aprovado-emails`);
+}
+
+export async function criarEmailRdvAprovado(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/rdv-aprovado-emails`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao adicionar e-mail de RDV aprovado`);
+  }
+}
+
+export async function excluirEmailRdvAprovado(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/Disparos/rdv-aprovado-emails/${id}`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `Erro ${res.status} ao excluir e-mail de RDV aprovado`);
+  }
+}
