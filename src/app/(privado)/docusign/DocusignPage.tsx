@@ -31,7 +31,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { base64ParaImpressao, podeExcluirDocumentoCriador, resolverAnexoDocumento, usuarioParticipaDocumento } from '@/utils/documentoAnexo'
+import { base64ParaImpressao, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -341,15 +341,8 @@ export default function Page() {
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                const participa = usuarioParticipaDocumento({
-                    usuario_criacao: d.usuario_criacao,
-                    usuario_nome: d.usuario_nome,
-                    userCodusuario,
-                    userName,
-                    aprovadores: d.aprovadores,
-                    anexos: d.anexos,
-                })
-                return matchQuery && matchSituacao && participa && matchSolicitante && matchDateFrom && matchDateTo
+                // Visibilidade já vem filtrada pela API (inclui chapa x login nominal).
+                return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo
             })
 
             setResults(filtrados)

@@ -25,20 +25,24 @@ import {
   DisparoEmail,
   EmailComunicadoFinanceiroNotificacao,
   EmailContratoNotificacao,
+  EmailRdvAprovadoNotificacao,
   EmailPainelConfig,
   MODULOS_EMAIL,
   PERFIS_DISPARO,
   criarEmailComunicadoFinanceiro,
   criarEmailContrato,
+  criarEmailRdvAprovado,
   enviarDisparoPerfil,
   enviarEmailTeste,
   excluirEmailComunicadoFinanceiro,
   excluirEmailContrato,
+  excluirEmailRdvAprovado,
   getConfigDisparos,
   getDestinatariosDisparo,
   getDisparos,
   getEmailsComunicadoFinanceiro,
   getEmailsContrato,
+  getEmailsRdvAprovado,
   reenviarDisparo,
   salvarConfigDisparos
 } from '@/services/disparosService'
@@ -96,6 +100,12 @@ export default function DisparosPage() {
   const [salvandoFinanceiroCI, setSalvandoFinanceiroCI] = useState(false)
   const [excluindoFinanceiroCI, setExcluindoFinanceiroCI] = useState<number | null>(null)
 
+  const [emailsRdvAprovado, setEmailsRdvAprovado] = useState<EmailRdvAprovadoNotificacao[]>([])
+  const [carregandoRdvAprovado, setCarregandoRdvAprovado] = useState(false)
+  const [novoEmailRdvAprovado, setNovoEmailRdvAprovado] = useState('')
+  const [salvandoRdvAprovado, setSalvandoRdvAprovado] = useState(false)
+  const [excluindoRdvAprovado, setExcluindoRdvAprovado] = useState<number | null>(null)
+
   function togglePerfil(id: string, checked: boolean) {
     setPerfis((atual) => {
       const next = checked ? [...atual, id] : atual.filter((p) => p !== id)
@@ -133,6 +143,7 @@ export default function DisparosPage() {
     carregar()
     carregarEmailsContrato()
     carregarEmailsFinanceiroCI()
+    carregarEmailsRdvAprovado()
     getConfigDisparos()
       .then((cfg) => {
         setConfig(cfg)
@@ -426,6 +437,50 @@ export default function DisparosPage() {
     }
   }
 
+  async function carregarEmailsRdvAprovado() {
+    setCarregandoRdvAprovado(true)
+    try {
+      const lista = await getEmailsRdvAprovado()
+      setEmailsRdvAprovado(lista)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível listar e-mails de RDV aprovado.')
+    } finally {
+      setCarregandoRdvAprovado(false)
+    }
+  }
+
+  async function handleSalvarEmailRdvAprovado() {
+    if (!novoEmailRdvAprovado.trim()) {
+      toast.error('Informe o e-mail.')
+      return
+    }
+    setSalvandoRdvAprovado(true)
+    try {
+      await criarEmailRdvAprovado(novoEmailRdvAprovado.trim())
+      toast.success('E-mail cadastrado para notificação de RDV aprovado.')
+      setNovoEmailRdvAprovado('')
+      await carregarEmailsRdvAprovado()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar e-mail.')
+    } finally {
+      setSalvandoRdvAprovado(false)
+    }
+  }
+
+  async function handleExcluirEmailRdvAprovado(id: number) {
+    if (!window.confirm(`Excluir o e-mail #${id} das notificações de RDV aprovado?`)) return
+    setExcluindoRdvAprovado(id)
+    try {
+      await excluirEmailRdvAprovado(id)
+      toast.success('E-mail excluído.')
+      await carregarEmailsRdvAprovado()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir e-mail.')
+    } finally {
+      setExcluindoRdvAprovado(null)
+    }
+  }
+
   const colunasFinanceiroCI: ColumnDef<EmailComunicadoFinanceiroNotificacao>[] = useMemo(() => [
     { accessorKey: 'id', header: 'ID' },
     { accessorKey: 'email', header: 'Email' },
@@ -463,6 +518,25 @@ export default function DisparosPage() {
       ),
     },
   ], [excluindoContrato])
+
+  const colunasRdvAprovado: ColumnDef<EmailRdvAprovadoNotificacao>[] = useMemo(() => [
+    { accessorKey: 'id', header: 'ID' },
+    { accessorKey: 'email', header: 'Email' },
+    {
+      id: 'actions',
+      header: 'Ações',
+      cell: ({ row }) => (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={excluindoRdvAprovado === row.original.id}
+          onClick={() => handleExcluirEmailRdvAprovado(row.original.id)}
+        >
+          {excluindoRdvAprovado === row.original.id ? 'Excluindo…' : 'Excluir'}
+        </Button>
+      ),
+    },
+  ], [excluindoRdvAprovado])
 
   const columns = useMemo<ColumnDef<DisparoEmail>[]>(() => [
     {
@@ -524,6 +598,7 @@ export default function DisparosPage() {
         <TabsTrigger value="config"><Settings className="w-4 h-4" /> Configuração</TabsTrigger>
         <TabsTrigger value="contratos"><SquarePlus className="w-4 h-4" /> Contratos</TabsTrigger>
         <TabsTrigger value="financeiro-ci"><SquarePlus className="w-4 h-4" /> Financeiro CI</TabsTrigger>
+        <TabsTrigger value="rdv-aprovado"><SquarePlus className="w-4 h-4" /> RDV aprovado</TabsTrigger>
         <TabsTrigger value="disparar"><Send className="w-4 h-4" /> Disparar por perfil</TabsTrigger>
         <TabsTrigger value="historico"><Mail className="w-4 h-4" /> Histórico</TabsTrigger>
         <TabsTrigger value="plugsign"><FolderLock className="w-4 h-4" /> PlugSign</TabsTrigger>
@@ -719,6 +794,38 @@ export default function DisparosPage() {
               columns={colunasFinanceiroCI}
               data={emailsFinanceiroCI}
               loading={carregandoFinanceiroCI}
+            />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="rdv-aprovado">
+        <Card className="border-0 shadow-none">
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-xl">Emails de notificação de RDV aprovado</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Quando um RDV for totalmente aprovado na sua unidade, os e-mails cadastrados abaixo receberão
+              aviso com o PDF assinado em anexo. Cada base configura a própria lista (ex.: Poliana no CSC).
+            </p>
+          </CardHeader>
+          <CardContent className="px-0 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                className="max-w-sm"
+                type="email"
+                value={novoEmailRdvAprovado}
+                onChange={(e) => setNovoEmailRdvAprovado(e.target.value)}
+                placeholder="email@grupowaybrasil.com.br"
+              />
+              <Button type="button" onClick={handleSalvarEmailRdvAprovado} disabled={salvandoRdvAprovado}>
+                <SquarePlus className="mr-1 h-4 w-4" />
+                {salvandoRdvAprovado ? 'Salvando…' : 'Novo'}
+              </Button>
+            </div>
+            <DataTable
+              columns={colunasRdvAprovado}
+              data={emailsRdvAprovado}
+              loading={carregandoRdvAprovado}
             />
           </CardContent>
         </Card>
