@@ -1,4 +1,4 @@
-import { API_BASE, headers } from "@/utils/constants";
+import { API_BASE, apiFetch, headers } from "@/utils/constants";
 
 
 export interface LoginPayload {
@@ -39,29 +39,47 @@ export interface LoginResponse {
   contratos: boolean;
   financeiro_totvs: boolean;
   receitas: boolean;
+  extrato_gestor: boolean;
+  controle_medicao: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE}/api/Usuarios/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+  try {
+    res = await apiFetch(`${API_BASE}/api/Usuarios/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if ((err as Error).name === 'TimeoutError') {
+      throw new Error('O servidor demorou a responder. Verifique se a API está rodando.');
+    }
+    throw new Error('Não foi possível conectar à API. Verifique se o servidor está no ar.');
+  }
 
   const text = await res.text();
 
   if (!res.ok) {
-    throw new Error(text || `Erro ${res.status}`);
+    let msg = (text ?? '').trim().split('\n')[0].trim();
+    if (
+      (msg.startsWith('"') && msg.endsWith('"')) ||
+      (msg.startsWith("'") && msg.endsWith("'"))
+    ) {
+      msg = msg.slice(1, -1);
+    }
+    throw new Error(msg || `Erro ${res.status}`);
   }
 
   const apiData = JSON.parse(text);
-
-  console.log("RAW API:", apiData);
-
-  return normalizeLoginResponse(apiData);
+  const normalized = normalizeLoginResponse(apiData);
+  if (!normalized.token?.trim()) {
+    throw new Error('A API não retornou um token de autenticação.');
+  }
+  return normalized;
 }
 
 function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse {
@@ -94,6 +112,8 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
       apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false
     ),
     receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
+    extrato_gestor: Boolean(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false),
+    controle_medicao: Boolean(apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false),
 
     pagamento_impostos: Boolean(
       apiData.pagamento_impostos ??
@@ -194,6 +214,8 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
     financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
     receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
+    extrato_gestor: apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false,
+    controle_medicao: apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false,
   };
 }
 

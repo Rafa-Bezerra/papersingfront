@@ -6,7 +6,7 @@ import { notificarAprovador } from '@/services/requisicoesService';
 import { FiscalAprovacao, FiscalItem } from "@/types/Fiscal";
 import { base64ToBlob, dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney } from "@/utils/functions";
 import JSZip from "jszip";
-import { saveAs } from "file-saver";
+import { baixarBlob, mensagemDownloadSucesso } from "@/utils/downloadFile";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -469,7 +469,7 @@ export default function Page() {
         }
     }
 
-    const handleDownloadAnexoFiscal = useCallback((doc: FiscalDocumento) => {
+    const handleDownloadAnexoFiscal = useCallback(async (doc: FiscalDocumento) => {
         if (!doc.anexo) return;
         try {
             const { base64, mime } = parseFiscalAnexoBase64(doc.anexo);
@@ -477,7 +477,8 @@ export default function Page() {
             const ext = extForMime(mime);
             let name = safeAnexoFileName(doc.nome, doc.id);
             if (!name.toLowerCase().endsWith(ext)) name += ext;
-            saveAs(blob, name);
+            const result = await baixarBlob(blob, name);
+            toast.success(mensagemDownloadSucesso(result, name));
         } catch (err) {
             toast.error((err as Error).message || "Não foi possível baixar o anexo.");
         }
@@ -503,7 +504,9 @@ export default function Page() {
                 }
             }
             const content = await zip.generateAsync({ type: "blob" });
-            saveAs(content, `anexos_mov_${selectedResult.fiscal.idmov}.zip`);
+            const zipName = `anexos_mov_${selectedResult.fiscal.idmov}.zip`;
+            const result = await baixarBlob(content, zipName);
+            toast.success(mensagemDownloadSucesso(result, zipName));
         } catch (err) {
             toast.error((err as Error).message || "Não foi possível gerar o arquivo ZIP.");
         }

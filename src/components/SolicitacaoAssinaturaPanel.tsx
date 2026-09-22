@@ -52,6 +52,7 @@ import { PopoverPortal } from '@radix-ui/react-popover'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import { imprimirPdfBase64, toBase64 } from '@/utils/functions'
 import { base64ParaImpressao } from '@/utils/documentoAnexo'
+import { baixarBase64, mensagemDownloadSucesso } from '@/utils/downloadFile'
 import {
   baixarDocumentoAssinadoSolicitacao,
   criarSolicitacaoAssinatura,
@@ -715,11 +716,9 @@ export default function SolicitacaoAssinaturaPanel({
     setBaixandoKey(documentKey)
     try {
       const res = await baixarDocumentoAssinadoSolicitacao(documentKey, nome)
-      toast.success(res.message || 'PDF salvo no PaperSign.')
-      const link = document.createElement('a')
-      link.href = `data:application/pdf;base64,${res.base64}`
-      link.download = res.nome || `${nome || 'assinado'}.pdf`
-      link.click()
+      const nomeArquivo = res.nome || `${nome || 'assinado'}.pdf`
+      const result = await baixarBase64(res.base64, nomeArquivo)
+      toast.success(res.message || mensagemDownloadSucesso(result, nomeArquivo))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha ao baixar PDF assinado.')
     } finally {

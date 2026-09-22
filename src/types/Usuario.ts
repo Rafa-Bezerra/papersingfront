@@ -29,6 +29,8 @@ export type Usuario = {
     contratos: boolean,
     financeiro_totvs: boolean,
     receitas: boolean,
+    extrato_gestor: boolean,
+    controle_medicao: boolean,
     replicar_todas_unidades?: boolean,
     unidade?: string,
 }

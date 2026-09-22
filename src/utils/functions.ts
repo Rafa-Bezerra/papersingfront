@@ -312,7 +312,7 @@ export function rotinaTipoMovimento(tipo_movimento: string | null | undefined): 
     "1.1.21": "Ordens de compra",
     "1.1.22": "Ordens de compra",
     "1.1.30": "Ordens de compra",
-    "1.1.31": "Ordens de compra",
+    "1.1.31": "Medição",
     "1.1.32": "Ordens de compra",
     "1.1.33": "Ordens de compra",
     "1.1.34": "Ordens de compra",

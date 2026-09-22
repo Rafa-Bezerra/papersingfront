@@ -55,7 +55,7 @@ import {
     deleteElement as deleteAnexo
 } from '@/services/anexoService';
 import JSZip from "jszip";
-import { saveAs } from "file-saver";
+import { baixarBlob, mensagemDownloadSucesso } from "@/utils/downloadFile";
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { useForm } from 'react-hook-form';
 import {
@@ -621,7 +621,9 @@ export default function Page() {
             }
         }
         const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, `anexos_mov_${requisicaoSelecionada!.requisicao.idmov}.zip`);
+        const zipName = `anexos_mov_${requisicaoSelecionada!.requisicao.idmov}.zip`;
+        const result = await baixarBlob(content, zipName);
+        toast.success(mensagemDownloadSucesso(result, zipName));
     };
 
     const colunas = useMemo<ColumnDef<RequisicaoDto>[]>(

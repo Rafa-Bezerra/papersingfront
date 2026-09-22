@@ -29,6 +29,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { baixarDataUrl, mensagemDownloadSucesso } from '@/utils/downloadFile'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import {
@@ -420,13 +421,9 @@ export default function Page() {
 
             const isPdf = arquivo.startsWith('data:application/pdf') || base64PdfEhValido(arquivo);
             if (!isPdf) {
-                const link = document.createElement('a');
-                link.href = arquivo;
-                link.download = anexo.nome || 'anexo';
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                toast.success(`Download iniciado: ${anexo.nome || 'anexo'}`);
+                const nome = anexo.nome || 'anexo';
+                const result = await baixarDataUrl(arquivo, nome);
+                toast.success(mensagemDownloadSucesso(result, nome));
                 return;
             }
 

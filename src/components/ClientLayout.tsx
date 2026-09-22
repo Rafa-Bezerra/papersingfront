@@ -100,6 +100,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const unidadeProjetos =
               String(parsedUser?.unidade ?? "").trim().toUpperCase() === "WAY CSC";
             const canReceitas = Boolean(parsedUser?.receitas);
+            const canExtratoGestor = Boolean(parsedUser?.extrato_gestor);
+            const canControleMedicao = Boolean(parsedUser?.controle_medicao);
 
             // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
             if (
@@ -119,6 +121,14 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
             // Painel de disparos: só administrador.
             if (normalizedPath === "/disparos" && !isAdmin) {
+              setIsAuthorized(false);
+            }
+
+            if (normalizedPath === "/extrato-gestor" && !isAdmin && !canExtratoGestor) {
+              setIsAuthorized(false);
+            }
+
+            if (normalizedPath === "/controle-medicao" && !isAdmin && !canControleMedicao) {
               setIsAuthorized(false);
             }
 

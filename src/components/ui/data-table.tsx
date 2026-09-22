@@ -21,6 +21,12 @@ import {
   TableFooter,
 } from "./table";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type DataTableColumnMeta = {
+  headerClassName?: string;
+  cellClassName?: string;
+};
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData>[];
@@ -36,6 +42,16 @@ interface DataTableProps<TData> {
   paginationExtra?: React.ReactNode;
   /** Atributo data-pendencia-id na linha (deep link do gestor de pendências). */
   getRowDataId?: (row: TData) => string | number | null | undefined;
+  /** Mensagem quando não há linhas (padrão do sistema). */
+  emptyMessage?: string;
+  /** Centraliza cabeçalhos e células (útil em modais). */
+  centered?: boolean;
+  /** Classes extras na tabela (ex.: table-fixed w-full). */
+  tableClassName?: string;
+  /** Classes extras no campo de pesquisa. */
+  searchClassName?: string;
+  /** Linhas por página (padrão: 10). */
+  pageSize?: number;
 }
 
 export function DataTable<TData>({
@@ -48,6 +64,11 @@ export function DataTable<TData>({
   hidePagination = false,
   paginationExtra,
   getRowDataId,
+  emptyMessage = "Nenhum registro encontrado.",
+  centered = false,
+  tableClassName,
+  searchClassName,
+  pageSize = 10,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -56,6 +77,7 @@ export function DataTable<TData>({
     data,
     columns,
     state: { globalFilter, sorting },
+    initialState: { pagination: { pageSize } },
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -72,30 +94,42 @@ export function DataTable<TData>({
     },
   });
 
+  const footerGroups = table.getFooterGroups();
+  const hasFooter = footerGroups.some((group) =>
+    group.headers.some(
+      (header) => !header.isPlaceholder && header.column.columnDef.footer
+    )
+  );
+
   return (
     <div>
       {!hideSearch && (
-        <div className="flex mb-4">
+        <div className={cn("mb-4 flex", centered && "justify-center")}>
           <Input
             placeholder={searchPlaceholder}
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="flex-1"
+            className={cn(centered ? "max-w-md w-full" : "flex-1", searchClassName)}
           />
         </div>
       )}
-      <Table>
+      <Table className={tableClassName}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
                 const canSort = header.column.getCanSort();
                 const sortingState = header.column.getIsSorted();
+                const meta = header.column.columnDef.meta as DataTableColumnMeta | undefined;
                 return (
                   <TableHead
                     key={header.id}
                     onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                    className={canSort ? "cursor-pointer select-none" : undefined}
+                    className={cn(
+                      centered && "text-center",
+                      canSort && "cursor-pointer select-none",
+                      meta?.headerClassName
+                    )}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {canSort && (
@@ -114,54 +148,74 @@ export function DataTable<TData>({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow
-              key={row.id}
-              data-pendencia-id={getRowDataId?.(row.original) ?? undefined}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
+          {table.getRowModel().rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center text-sm text-muted-foreground">
+                {loading ? "Carregando…" : emptyMessage}
+              </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                data-pendencia-id={getRowDataId?.(row.original) ?? undefined}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const meta = cell.column.columnDef.meta as DataTableColumnMeta | undefined;
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(centered && "text-center", meta?.cellClassName)}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))
+          )}
         </TableBody>
-        <TableFooter>
-          {table.getFooterGroups().map((footerGroup) => (
-            <TableRow key={footerGroup.id}>
-              {footerGroup.headers.map((header) => (
-                <TableCell key={header.id} className="font-semibold bg-muted">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                      header.column.columnDef.footer,
-                      header.getContext()
-                    )}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableFooter>
+        {hasFooter && (
+          <TableFooter>
+            {footerGroups.map((footerGroup) => (
+              <TableRow key={footerGroup.id}>
+                {footerGroup.headers.map((header) => (
+                  <TableCell key={header.id} className="bg-muted font-semibold">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                        header.column.columnDef.footer,
+                        header.getContext()
+                      )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableFooter>
+        )}
       </Table>
-      {!hidePagination && (
-        <div className="flex items-center justify-between gap-2 pt-4">
+      {!hidePagination && data.length > 0 && (
+        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage() || loading}
           >
             Anterior
           </Button>
-          <span className="text-sm flex-1 text-center">
-            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+          <span className="text-center text-sm text-muted-foreground sm:flex-1">
+            Página {table.getState().pagination.pageIndex + 1} de {Math.max(1, table.getPageCount())}
+            {' · '}
+            {data.length} registro{data.length === 1 ? '' : 's'}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             {paginationExtra}
             <Button
               size="sm"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage() || loading}
             >

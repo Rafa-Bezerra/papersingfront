@@ -28,7 +28,9 @@ import {
   Search,
   Truck,
   CircleDollarSign,
-  Inbox
+  ClipboardList,
+  Inbox,
+  Ruler,
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -64,6 +66,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
   const [userProjetos, setUserProjetos] = useState(false)
   const [userUnidade, setUserUnidade] = useState("")
   const [userReceitas, setUserReceitas] = useState(false)
+  const [userExtratoGestor, setUserExtratoGestor] = useState(false)
+  const [userControleMedicao, setUserControleMedicao] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -97,6 +101,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
         setUserProjetos(user.projetos);
         setUserUnidade(String(user.unidade ?? ""));
         setUserReceitas(user.receitas);
+        setUserExtratoGestor(Boolean(user.extrato_gestor));
+        setUserControleMedicao(Boolean(user.controle_medicao));
         // setUserAdministrativo(user.administrativo);
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error);
@@ -139,6 +145,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     'WaySign': <FileText className="w-5 h-5" />,
     'Projetos': <FileText className="w-5 h-5" />,
     'Receitas': <CircleDollarSign className="w-5 h-5" />,
+    'Extrato gestor': <ClipboardList className="w-5 h-5" />,
+    'Controle medição': <Ruler className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -268,6 +276,8 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                       // Receitas: só quem tem a flag (admin sempre vê).
                       // Financeiro NÃO herda este módulo automaticamente.
                       if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;
+                      if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
+                      if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações
                       // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
                       if (!userAdmin && !userFinanceiro) {
