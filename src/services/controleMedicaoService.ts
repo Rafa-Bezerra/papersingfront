@@ -1,4 +1,4 @@
-import { API_BASE, fetchJson } from "@/utils/constants";
+import { API_BASE, EXTRATO_CONTROLE_TIMEOUT_MS, fetchJson } from "@/utils/constants";
 
 export type ControleMedicaoPainel = {
   aprovado: number;
@@ -83,7 +83,8 @@ export async function obterPainelControleMedicao(
   return fetchJson<ControleMedicaoPainel>(
     url.toString(),
     undefined,
-    "Erro ao carregar painel de medições"
+    "Erro ao carregar painel de medições",
+    EXTRATO_CONTROLE_TIMEOUT_MS
   );
 }
 
@@ -101,7 +102,8 @@ export async function listarControleMedicao(
   return fetchJson<ControleMedicaoResposta>(
     url.toString(),
     undefined,
-    "Erro ao listar medições"
+    "Erro ao listar medições",
+    EXTRATO_CONTROLE_TIMEOUT_MS
   );
 }
 
