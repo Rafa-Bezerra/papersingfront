@@ -44,6 +44,9 @@ export const API_TIMEOUT_MS = 30_000;
 /** Timeout para agregação de pendências do gestor (várias unidades no SQL). */
 export const PENDENCIAS_TIMEOUT_MS = 90_000;
 
+/** Timeout para consultas pesadas de extrato/controle de medição. */
+export const EXTRATO_CONTROLE_TIMEOUT_MS = 180_000;
+
 /** Timeout para assinatura (comprovante PlugSign pode levar alguns minutos). */
 export const ASSINATURA_TIMEOUT_MS = 300_000;
 

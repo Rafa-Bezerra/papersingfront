@@ -1,4 +1,4 @@
-import { API_BASE, fetchJson, PENDENCIAS_TIMEOUT_MS } from "@/utils/constants";
+import { API_BASE, EXTRATO_CONTROLE_TIMEOUT_MS, fetchJson } from "@/utils/constants";
 
 export type ExtratoGestorItem = {
   idmov: number;
@@ -77,7 +77,7 @@ export async function listarTiposMovimentoExtratoGestor(
     url.toString(),
     undefined,
     "Erro ao buscar tipos de movimento",
-    PENDENCIAS_TIMEOUT_MS
+    EXTRATO_CONTROLE_TIMEOUT_MS
   );
 }
 
@@ -128,6 +128,6 @@ export async function consultarExtratoGestor(
     url.toString(),
     undefined,
     "Erro ao consultar extrato do gestor",
-    PENDENCIAS_TIMEOUT_MS
+    EXTRATO_CONTROLE_TIMEOUT_MS
   );
 }
