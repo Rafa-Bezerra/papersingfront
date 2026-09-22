@@ -1,4 +1,10 @@
 import type { Anexo, AnexoAssinar, AnexoUpload } from "@/types/Anexo";
+import { getAnexo, normalizarPdfDataUrl } from "@/services/documentoService";
+import {
+  baixarBlob,
+  dataUrlParaBlob,
+  type DownloadResult,
+} from "@/utils/downloadFile";
 import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Anexos";
 const elemento_singular = "anexo";
@@ -63,6 +69,24 @@ export async function importarAnexosRM(idmov: number, codigoAtendimento: string 
         throw new Error(`Erro ${res.status} ao importar anexos do RM: ${msg}`);
     }
     return res.json();
+}
+
+export async function baixarAnexo(anexo: Anexo): Promise<DownloadResult> {
+    if (!anexo.anexo?.trim()) {
+        throw new Error("Anexo indisponível para download.");
+    }
+
+    let dataUrl: string;
+    if (anexo.anexo.startsWith("/anexos/")) {
+        dataUrl = await getAnexo(anexo.anexo, anexo.id);
+    } else {
+        dataUrl = normalizarPdfDataUrl(anexo.anexo);
+    }
+
+    const blob = dataUrlParaBlob(dataUrl);
+    let nome = (anexo.nome || "anexo").trim();
+    if (!/\.[a-z0-9]+$/i.test(nome)) nome += ".pdf";
+    return baixarBlob(blob, nome);
 }
 
 export type { Anexo, AnexoAssinar, AnexoUpload }

@@ -24,6 +24,7 @@ import {
 import PdfViewerDialog from '@/components/PdfViewerDialog'
 import { imprimirPdfBase64 } from '@/utils/functions'
 import { base64ParaImpressao } from '@/utils/documentoAnexo'
+import { baixarBase64, mensagemDownloadSucesso } from '@/utils/downloadFile'
 import {
   baixarDocumentoAssinadoSolicitacao,
   HistoricoSolicitacaoItem,
@@ -272,11 +273,9 @@ export default function MinhasSolicitacoesPanel() {
     setAcaoPdf('baixar')
     try {
       const res = await obterPdfAssinado(doc)
-      toast.success(res.message || 'PDF salvo no PaperSign.')
-      const link = document.createElement('a')
-      link.href = `data:application/pdf;base64,${res.base64}`
-      link.download = res.nome || 'assinado.pdf'
-      link.click()
+      const nome = res.nome || 'assinado.pdf'
+      const result = await baixarBase64(res.base64, nome)
+      toast.success(res.message || mensagemDownloadSucesso(result, nome))
       carregar(page, status)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha ao baixar PDF assinado.')

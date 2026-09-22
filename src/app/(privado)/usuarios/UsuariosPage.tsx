@@ -148,6 +148,8 @@ export default function PageUsuarios() {
       contratos: false,
       financeiro_totvs: false,
       receitas: false,
+      extrato_gestor: false,
+      controle_medicao: false,
       replicar_todas_unidades: false,
     }
   })
@@ -286,6 +288,8 @@ export default function PageUsuarios() {
         contratos: response.contratos,
         financeiro_totvs: response.financeiro_totvs,
         receitas: response.receitas,
+        extrato_gestor: response.extrato_gestor,
+        controle_medicao: response.controle_medicao,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -324,6 +328,8 @@ export default function PageUsuarios() {
       contratos: false,
       financeiro_totvs: false,
       receitas: false,
+      extrato_gestor: false,
+      controle_medicao: false,
       replicar_todas_unidades: false,
     })
     setUpdateMode(false)
@@ -940,6 +946,38 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Receitas</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="extrato_gestor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Extrato gestor</FormLabel>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="controle_medicao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Controle medição</FormLabel>
                       <FormControl>
                         <Checkbox
                           checked={field.value}

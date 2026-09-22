@@ -56,6 +56,8 @@ export async function getAll(unidadeFiltro?: string): Promise<Usuario[]> {
                 apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false
             ),
             receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
+            extrato_gestor: Boolean(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false),
+            controle_medicao: Boolean(apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false),
         } as Usuario;
     });
 }
@@ -119,6 +121,8 @@ export async function getElementById(id: number): Promise<Usuario> {
       contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
       financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
       receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
+      extrato_gestor: apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false,
+      controle_medicao: apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false,
     }
 
     return normalized
@@ -164,7 +168,9 @@ export async function updateElement(data: Usuario): Promise<void> {
         PROJETOS: data.projetos,
         CONTRATOS: data.contratos,
         FINANCEIRO_TOTVS: data.financeiro_totvs,
-        RECEITAS: data.receitas
+        RECEITAS: data.receitas,
+        EXTRATO_GESTOR: data.extrato_gestor,
+        CONTROLE_MEDICAO: data.controle_medicao,
     }
 
     const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.sequencial}`, { method: "POST", headers: headers(), body: JSON.stringify(payload) });

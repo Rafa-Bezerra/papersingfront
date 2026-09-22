@@ -26,6 +26,8 @@ export const data = {
         { title: "WaySign", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },
         { title: "Receitas", url: "/receitas" },
+        { title: "Extrato gestor", url: "/extrato-gestor" },
+        { title: "Controle medição", url: "/controle-medicao" },
         { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },
