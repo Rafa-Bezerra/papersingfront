@@ -55,7 +55,7 @@ export type Comunicado = {
     numero_financeiro?: string | null,
     idlan_financeiro_totvs?: number | null,
     erro_financeiro?: string | null,
-    // Campos de criação do financeiro — só relevantes/persistidos para quem detém a claim financeiro_totvs.
+    // Campos de criação do financeiro — obrigatórios na criação para todos os usuários.
     codcfo?: string | null,
     cod_tipo_documento?: string | null,
     data_vencimento?: string | null,
@@ -77,6 +77,9 @@ export type ComunicadoAprovacao = {
     usuario: string,
     nome?: string,
     usuario_nome?: string,
+    // 0 = aprovador manual (selecionado pelo criador); N = nível do aprovador financeiro
+    // (FINANCEIRO_APROVADORES.NIVEL) — governa a ordem sequencial de aprovação.
+    ordem?: number,
 }
 
 export type ComunicadoAssinar = {
