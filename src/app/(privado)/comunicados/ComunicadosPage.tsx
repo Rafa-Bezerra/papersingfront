@@ -69,6 +69,8 @@ import {
 import { CentroDeCusto, ContaFinanceira, getAllCentrosDeCusto, getAllContasFinanceiras } from '@/services/carrinhoService'
 import { Label } from '@/components/ui/label'
 import { ItensFinanceirosSection } from '@/components/financeiro/ItensFinanceirosSection'
+import { getAll as getAllAprovadoresFinanceiro } from '@/services/aprovadoresFinanceiroService'
+import { AprovadoresFinanceiro } from '@/types/AprovadoresFinanceiro'
 
 function labelFornecedor(f: Fornecedor): string {
     return f.cnpj ? `${f.nome} - ${f.cnpj}` : f.nome
@@ -86,7 +88,7 @@ export default function Page() {
     const titulo = 'Pagamentos CI'
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [logo, setLogo] = useState("/way.jpg");
+    const [logo, setLogo] = useState("/logos/wayCSC.png");
     const [isLoading, setIsLoading] = useState(false)
     const [isSearching, setIsSearching] = useState(false)
     const [isSigning, setIsSigning] = useState(false)
@@ -116,6 +118,7 @@ export default function Page() {
     const [arquivoParaImpressao, setArquivoParaImpressao] = useState<string | null>(null)
     const carregou = useRef(false)
 
+    const [aprovadoresFinanceiro, setAprovadoresFinanceiro] = useState<AprovadoresFinanceiro[]>([])
     const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
     const [openCodcontaIndex, setOpenCodcontaIndex] = useState<string | null>(null)
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
@@ -126,6 +129,14 @@ export default function Page() {
 
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
     const [selectedAnexosResult, setSelectedAnexosResult] = useState<ComunicadoAnexo[]>([])
+
+    // Usuários já cadastrados como aprovador financeiro (alçada por valor) não podem ser
+    // selecionados manualmente — eles são adicionados automaticamente pela regra de valor e
+    // devem manter sua ordem de nível, não a de aprovador manual (ORDEM 0).
+    const usuariosParaAprovadoresManuais = useMemo(
+        () => usuarios.filter(u => !aprovadoresFinanceiro.some(fa => fa.usuario === u.codusuario)),
+        [usuarios, aprovadoresFinanceiro]
+    )
 
     const [anexosSubmit, setAnexosSubmit] = useState<ComunicadoAnexo[]>([])
     const [isModalVisualizarAnexoOpen, setIsModalVisualizarAnexoOpen] = useState(false)
@@ -254,26 +265,9 @@ export default function Page() {
             setUserName(user.nome.toUpperCase());
             setCodusuario(user.codusuario.toUpperCase());
             setUserFinanceiroTotvs(Boolean(user.financeiro_totvs));
-            switch (user.unidade) {
-                case "WAY 112":
-                    setLogo("/logos/way112.png");
-                    break;
-                case "WAY 153":
-                    setLogo("/logos/way153.png");
-                    break;
-                case "WAY 262":
-                    setLogo("/logos/way262.png");
-                    break;
-                case "WAY 306":
-                    setLogo("/logos/way306.png");
-                    break;
-                case "WAY 364":
-                    setLogo("/logos/way364.png");
-                    break;
-                default:
-                    setLogo("/way.jpg");
-                    break;
-            }
+            // A logo do documento gerado na criação é sempre a da WAY CSC, independente da
+            // unidade do usuário logado.
+            setLogo("/logos/wayCSC.png");
         }
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -484,13 +478,16 @@ export default function Page() {
             data_emissao: '',
             numero_documento: '',
         })
-        if (userFinanceiroTotvs) {
-            if (fornecedores.length === 0) {
-                getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
-            }
-            if (tiposDocumento.length === 0) {
-                getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
-            }
+        // Fornecedor/Tipo de Documento são obrigatórios para todos os usuários na criação —
+        // carregamento não é mais restrito a quem detém a claim financeiro_totvs.
+        if (fornecedores.length === 0) {
+            getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
+        }
+        if (tiposDocumento.length === 0) {
+            getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
+        }
+        if (aprovadoresFinanceiro.length === 0) {
+            getAllAprovadoresFinanceiro().then(setAprovadoresFinanceiro).catch((err) => toast.error((err as Error).message))
         }
         setUpdateComunicadoMode(false)
         setIsFormComunicadoOpen(true)
@@ -500,12 +497,11 @@ export default function Page() {
         if (!deleteComunicadoId) return
         try {
             await deleteElement(deleteComunicadoId)
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
-            toast.success(`Pagamento excluído`)
+            toast.success(`Comunicado excluído`)
             setDeleteComunicadoId(null)
             await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
 
@@ -520,8 +516,7 @@ export default function Page() {
 
         setIsLoading(true)
 
-        const proxId = results.length > 0 ? Math.max(...results.map(x => x.id)) + 1 : 1;
-        const html = gerarTemplateHTML(data, logo, proxId, centrosDeCusto, contasFinanceiras);
+        const html = gerarTemplateHTML(data, logo, centrosDeCusto, contasFinanceiras, userName, aprovadoresFinanceiro, usuarios, userCodusuario);
 
         // Carrega html2pdf.js na página atual se ainda não estiver carregado
         await new Promise<void>((resolve, reject) => {
@@ -713,13 +708,24 @@ ${html}
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const todasPendentes = row.original.aprovadores.every(ap => ap.aprovacao === 'P');
+                    const totalmenteAprovado = row.original.aprovadores.length > 0
+                        && row.original.aprovadores.every(ap => ap.aprovacao === 'A');
                     const status_bloqueado = ['Reprovado'].includes(row.original.situacao);
 
                     const assinouOuSemAnexo = row.original.anexo !== "SIM" || row.original.documento_assinado === 1;
-                    const podeAprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado && assinouOuSemAnexo;
-                    const podeReprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado;
-                    const podeExcluir = usuarioCriador && todasPendentes;
+
+                    // Trava sequencial por nível (ordem): não pode agir enquanto houver aprovador
+                    // de ordem menor (0 = manual, N = nível financeiro) ainda pendente.
+                    const minhaOrdem = row.original.aprovadores.find(
+                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                    )?.ordem ?? 0;
+                    const aguardandoNivelAnterior = row.original.aprovadores.some(
+                        ap => (ap.ordem ?? 0) < minhaOrdem && ap.aprovacao !== 'A'
+                    );
+
+                    const podeAprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado && assinouOuSemAnexo && !aguardandoNivelAnterior;
+                    const podeReprovar = usuarioAprovador && !usuarioAprovou && !status_bloqueado && !aguardandoNivelAnterior;
+                    const podeExcluir = usuarioCriador && !totalmenteAprovado;
 
                     return (
                         <div className="flex gap-2">
@@ -1270,7 +1276,7 @@ ${html}
                                     )}
                                 />
 
-                                <AprovadoresComunicadosSection form={form} usuarios={usuarios} />
+                                <AprovadoresComunicadosSection form={form} usuarios={usuariosParaAprovadoresManuais} />
 
                                 {/* Bloco financeiro: múltiplos itens */}
                                 <ItensFinanceirosSection
@@ -1283,15 +1289,14 @@ ${html}
                                     setOpenCcustoRateioIndex={setOpenCcustoRateioIndex}
                                     openCodcontaIndex={openCodcontaIndex}
                                     setOpenCodcontaIndex={setOpenCodcontaIndex}
-                                    mostrarNaturezaFinanceira={userFinanceiroTotvs}
+                                    mostrarNaturezaFinanceira={true}
                                 />
 
-                                {/* Criação do financeiro (FLAN) — só para quem detém a claim financeiro_totvs.
-                                    O lançamento é criado automaticamente quando o comunicado for totalmente
-                                    aprovado (ver ComunicadosController.Aprovar); não há mais botão manual
-                                    "Criar Financeiro" nesse ponto do fluxo. */}
-                                {userFinanceiroTotvs && (
-                                    <Card id="tour-ci-financeiro-rm">
+                                {/* Criação do financeiro (FLAN) — obrigatório para todos os usuários na
+                                    criação do comunicado. O lançamento é criado automaticamente quando o
+                                    comunicado for totalmente aprovado (ver ComunicadosController.Aprovar);
+                                    não há mais botão manual "Criar Financeiro" nesse ponto do fluxo. */}
+                                <Card id="tour-ci-financeiro-rm">
                                         <CardHeader>
                                             <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
                                         </CardHeader>
@@ -1299,6 +1304,7 @@ ${html}
                                             <FormField
                                                 control={form.control}
                                                 name="codcfo"
+                                                rules={{ required: 'Fornecedor/Credor obrigatório' }}
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormLabel>Fornecedor / Credor</FormLabel>
@@ -1341,6 +1347,7 @@ ${html}
                                             <FormField
                                                 control={form.control}
                                                 name="cod_tipo_documento"
+                                                rules={{ required: 'Tipo de documento obrigatório' }}
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormLabel>Tipo de Documento</FormLabel>
@@ -1383,6 +1390,7 @@ ${html}
                                                 <FormField
                                                     control={form.control}
                                                     name="data_vencimento"
+                                                    rules={{ required: 'Data de vencimento obrigatória' }}
                                                     render={({ field }) => (
                                                         <FormItem>
                                                             <FormLabel>Data de vencimento</FormLabel>
@@ -1396,6 +1404,7 @@ ${html}
                                                 <FormField
                                                     control={form.control}
                                                     name="data_emissao"
+                                                    rules={{ required: 'Data de emissão obrigatória' }}
                                                     render={({ field }) => (
                                                         <FormItem>
                                                             <FormLabel>Data de emissão</FormLabel>
@@ -1411,6 +1420,7 @@ ${html}
                                             <FormField
                                                 control={form.control}
                                                 name="numero_documento"
+                                                rules={{ required: 'Número do documento obrigatório' }}
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormLabel>Número do documento</FormLabel>
@@ -1423,7 +1433,6 @@ ${html}
                                             />
                                         </CardContent>
                                     </Card>
-                                )}
 
                                 {/** rodapé */}
                                 <FormField
@@ -1738,30 +1747,45 @@ function AprovadoresComunicadosSection({ form, usuarios }: { form: UseFormReturn
     );
 }
 
-export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number, centrosDeCusto: CentroDeCusto[] = [], contasFinanceiras: ContaFinanceira[] = []): string {
+export function gerarTemplateHTML(
+    data: Comunicado, logo: string,
+    centrosDeCusto: CentroDeCusto[] = [], contasFinanceiras: ContaFinanceira[] = [],
+    usuarioCriacaoNome: string = '', aprovadoresFinanceiro: AprovadoresFinanceiro[] = [], usuarios: Usuario[] = [],
+    usuarioCriacaoCodigo: string = ''
+): string {
 
-    const aprovadores = data.aprovadores ?? [];
-    const normNome = (nome?: string) =>
-        stripDiacritics(String(nome ?? "").toUpperCase().trim()).replace(/\s+/g, " ");
+    const totalValue = (data.itensFinanceiros ?? []).reduce((acc, item) => acc + (item.valor_total ?? 0), 0);
 
-    // Regras do Pagamentos C.I:
-    // - "De acordo" sempre será Felipe Antonio de Lellis Andrade e/ou Paulo Gomes / Paulo Lopes (quando estiverem na lista)
-    // - Demais aprovadores sempre entram como "Atenciosamente"
-    const isDeAcordo = (nome?: string) => {
-        const n = normNome(nome);
-        return n === "FELIPE ANTONIO DE LELLIS ANDRADE" || n === "PAULO GOMES" || n === "PAULO LOPES";
-    };
+    // Linha 1 "Atenciosamente": criador do comunicado + aprovadores selecionados manualmente.
+    // Remove o criador da lista de manuais para evitar assinatura duplicada, caso ele tenha se
+    // adicionado como aprovador também.
+    const aprovadoresManuaisSemCriador = (data.aprovadores ?? []).filter(a => a.usuario !== usuarioCriacaoCodigo);
 
-    const deAcordoAprovadoresRaw = aprovadores.filter((a) => isDeAcordo(a.nome));
-    const deAcordoKeys = new Set(
-        deAcordoAprovadoresRaw.map((a) => (a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`))
-    );
-    const deAcordoAprovadores = aprovadores.filter((a) =>
-        deAcordoKeys.has(a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`)
-    );
-    const atenciosamenteAprovadores = aprovadores.filter(
-        (a) => !deAcordoKeys.has(a.usuario ? `u:${a.usuario}` : `n:${normNome(a.nome)}`)
-    );
+    // Aprovadores financeiros (FINANCEIRO_APROVADORES) cujo valor_inicial qualifica pelo valor
+    // total do comunicado (cumulativo — ver AprovadoresFinanceiroController). Os de nível 2
+    // assinam junto do "Atenciosamente" em vez do "De acordo".
+    const aprovadoresFinanceiroQualificados = aprovadoresFinanceiro.filter((fa) => totalValue >= fa.valor_inicial);
+
+    const nivel2Aprovadores: ComunicadoAprovacao[] = aprovadoresFinanceiroQualificados
+        .filter((fa) => fa.nivel === 2)
+        .map((fa) => ({
+            usuario: fa.usuario,
+            nome: usuarios.find((u) => u.codusuario === fa.usuario)?.nome ?? fa.usuario,
+        }));
+
+    const atenciosamenteAprovadores: ComunicadoAprovacao[] = [
+        { usuario: usuarioCriacaoCodigo, nome: usuarioCriacaoNome },
+        ...aprovadoresManuaisSemCriador,
+        ...nivel2Aprovadores,
+    ];
+
+    // Linha 2 "De acordo": demais níveis de FINANCEIRO_APROVADORES.
+    const deAcordoAprovadores: ComunicadoAprovacao[] = aprovadoresFinanceiroQualificados
+        .filter((fa) => fa.nivel !== 2)
+        .map((fa) => ({
+            usuario: fa.usuario,
+            nome: usuarios.find((u) => u.codusuario === fa.usuario)?.nome ?? fa.usuario,
+        }));
 
     const gerarColunasAssinaturas = (lista: ComunicadoAprovacao[]) => {
 
@@ -1840,13 +1864,13 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
             </tr>
             <tr>
                 <td style=" padding:6px;">
-                    <b>Código RQ - </b> ${proxId}
+                    <b>Código RQ - </b> 155
                 </td>
                 <td style=" padding:6px;">
-                    <b>Revisão - </b> 00
+                    <b>Revisão - </b> 01
                 </td>
                 <td style=" padding:6px;">
-                    <b>Data de revisão:</b> ${new Date().toLocaleDateString('pt-BR')}
+                    <b>Data de revisão:</b> 03/01/2025
                 </td>
             </tr>
             <tr>
@@ -1906,7 +1930,7 @@ export function gerarTemplateHTML(data: Comunicado, logo: string, proxId: number
             <tfoot>
                 <tr style="font-weight:bold;">
                     <td colspan="5" style="padding:6px 8px; text-align:right; border-top:2px solid #333;">Total geral</td>
-                    <td style="padding:6px 8px; text-align:right; border-top:2px solid #333;">${(data.itensFinanceiros ?? []).reduce((acc, item) => acc + (item.valor_total ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding:6px 8px; text-align:right; border-top:2px solid #333;">${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
             </tfoot>
         </table>` : ""}
