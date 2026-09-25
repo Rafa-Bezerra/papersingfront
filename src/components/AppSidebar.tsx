@@ -34,16 +34,18 @@ import {
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
 
 interface AppSidebarProps {
   navMain: NavSection[]
+  showPapersignAdmin?: boolean
   isMobileOpen?: boolean
   onMobileToggle?: () => void
   isCollapsed?: boolean
   onCollapseToggle?: () => void
 }
 
-export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, onMobileToggle, isCollapsed: externalCollapsed, onCollapseToggle }: AppSidebarProps) {
+export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobileOpen: externalMobileOpen, onMobileToggle, isCollapsed: externalCollapsed, onCollapseToggle }: AppSidebarProps) {
   const path = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -79,35 +81,40 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
     setIsCollapsed(!isCollapsed)
   })
 
-  useEffect(() => {
+  const applyUserFromSession = () => {
     const storedUser = sessionStorage.getItem("userData");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setUserName(user.nome);
-        setUserEmail(user.email);
-        setUserAdmin(user.admin);
-        setUserDocumentos(user.documentos);
-        setUserRestrito(user.restrito);
-        setUserBordero(user.bordero);
-        setUserExterno(user.externo);
-        setUserComunicados(user.comunicados);
-        setUserFiscal(user.fiscal);
-        setPagamentoRh(user.pagamento_rh);
-        setPagamentoImpostos(user.pagamento_impostos);
-        setUserRdv(user.rdv);
-        setUserFinanceiro(user.financeiro);
-        setUserDocusign(user.docusign);
-        setUserProjetos(user.projetos);
-        setUserUnidade(String(user.unidade ?? ""));
-        setUserReceitas(user.receitas);
-        setUserExtratoGestor(Boolean(user.extrato_gestor));
-        setUserControleMedicao(Boolean(user.controle_medicao));
-        // setUserAdministrativo(user.administrativo);
-      } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
-      }
+    if (!storedUser) return;
+    try {
+      const user = JSON.parse(storedUser);
+      setUserName(user.nome);
+      setUserEmail(user.email);
+      setUserAdmin(user.admin);
+      setUserDocumentos(user.documentos);
+      setUserRestrito(user.restrito);
+      setUserBordero(user.bordero);
+      setUserExterno(user.externo);
+      setUserComunicados(user.comunicados);
+      setUserFiscal(user.fiscal);
+      setPagamentoRh(user.pagamento_rh);
+      setPagamentoImpostos(user.pagamento_impostos);
+      setUserRdv(user.rdv);
+      setUserFinanceiro(user.financeiro);
+      setUserDocusign(user.docusign);
+      setUserProjetos(user.projetos);
+      setUserUnidade(String(user.unidade ?? ""));
+      setUserReceitas(user.receitas);
+      setUserExtratoGestor(Boolean(user.extrato_gestor));
+      setUserControleMedicao(Boolean(user.controle_medicao));
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
     }
+  };
+
+  useEffect(() => {
+    applyUserFromSession();
+    const onUserUpdated = () => applyUserFromSession();
+    window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+    return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
   }, []);
 
   // Trava o scroll do body quando o sidebar mobile está aberto
@@ -356,7 +363,7 @@ export default function AppSidebar({ navMain, isMobileOpen: externalMobileOpen, 
                     })}
                   </div>
                 ))}
-                {userAdmin && (
+                {userAdmin && showPapersignAdmin && (
                   <SidebarMenuItem>
                     <details className="group">
                       <summary

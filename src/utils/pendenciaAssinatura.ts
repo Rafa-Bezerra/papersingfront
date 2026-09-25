@@ -15,6 +15,7 @@ export type PendenciaAssinaturaTipo = "plugsign" | "documento" | "projeto";
 
 type AssinaturaApi = {
   getAll: () => Promise<Documento[]>;
+  getById?: (id: number) => Promise<Documento>;
   getAnexo: (caminho: string, idAnexo?: number) => Promise<string>;
   assinar: (data: DocumentoAnexoAssinar) => Promise<string>;
   aprovar: (id: number, aprovado: number) => Promise<void>;
@@ -126,8 +127,12 @@ export async function carregarDocumentoPendencia(
     throw new Error("Pendência inválida para assinatura.");
   }
 
-  const lista = await api.getAll();
-  let documento = lista.find((d) => d.id === id);
+  let documento: Documento | undefined;
+  if (api.getById) {
+    documento = await api.getById(id);
+  } else {
+    documento = (await api.getAll()).find((d) => d.id === id);
+  }
   if (!documento) {
     throw new Error("Documento não encontrado nesta unidade.");
   }

@@ -10,9 +10,10 @@ const caminho = "Anexos";
 const elemento_singular = "anexo";
 const elemento_plural = "anexos";
 
-export async function getAll(idmov: number): Promise<Anexo[]> {
+export async function getAll(idmov: number, unidade?: string): Promise<Anexo[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
-    if (idmov) url.searchParams.append('idmov', idmov.toString());        
+    if (idmov) url.searchParams.append('idmov', idmov.toString());
+    if (unidade?.trim()) url.searchParams.append('unidade', unidade.trim());
     const res = await fetch(url.toString(), {
         headers: headers(),
     });

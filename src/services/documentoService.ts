@@ -6,15 +6,22 @@ const elemento_plural = "documentos";
 
 export async function getAll(): Promise<Documento[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);       
-    const res = await fetch(url.toString(), {
-        headers: headers(),
-    });
+    const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao buscar ${elemento_plural}: ${msg}`);
     }
     const list: Documento[] = await res.json();
     return list;
+}
+
+export async function getById(id: number): Promise<Documento> {
+    const res = await apiFetch(`${API_BASE}/api/${caminho}/${id}`, { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar ${elemento_singular}: ${msg}`);
+    }
+    return res.json() as Promise<Documento>;
 }
 
 export async function createElement(data: Documento): Promise<void> {
