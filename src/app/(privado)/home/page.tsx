@@ -91,17 +91,19 @@ export default function HomePage() {
     async function loadStats() {
       try {
         const data = await getDashboardStats();
-        console.log(data);
-
         setStats(data);
       } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
+        console.warn('Erro ao carregar estatísticas:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    loadStats();
+    if (sessionStorage.getItem('authToken')) {
+      void loadStats();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {

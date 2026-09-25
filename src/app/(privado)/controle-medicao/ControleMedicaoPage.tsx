@@ -289,7 +289,7 @@ export default function ControleMedicaoPage() {
     setCarregandoAnexos(true);
     setAnexos([]);
     try {
-      const dados = await getAllAnexos(item.idmov);
+      const dados = await getAllAnexos(item.idmov, unidade);
       setAnexos(dados);
     } catch (err) {
       toast.error((err as Error).message);

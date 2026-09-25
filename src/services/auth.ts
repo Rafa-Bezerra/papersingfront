@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, headers } from "@/utils/constants";
+import { readControleMedicaoFromApi } from "@/utils/sessionUser";
 
 
 export interface LoginPayload {
@@ -113,7 +114,7 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     ),
     receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
     extrato_gestor: Boolean(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false),
-    controle_medicao: Boolean(apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false),
+    controle_medicao: readControleMedicaoFromApi(apiData),
 
     pagamento_impostos: Boolean(
       apiData.pagamento_impostos ??
@@ -215,7 +216,7 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
     financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
     receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
     extrato_gestor: apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false,
-    controle_medicao: apiData.controle_medicao ?? apiData.CONTROLE_MEDICAO ?? false,
+    controle_medicao: readControleMedicaoFromApi(apiData),
   };
 }
 

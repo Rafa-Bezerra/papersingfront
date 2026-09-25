@@ -42,6 +42,7 @@ import {
     Documento,
     DocumentoAprovacao,
     getAll,
+    getById,
     getAnexo,
     base64PdfEhValido,
     normalizarPdfDataUrl,
@@ -234,7 +235,10 @@ export default function Page() {
             setResults(filtrados)
             return filtrados
         } catch (err) {
-            setError((err as Error).message)
+            const msg = (err as Error).message
+            setError(msg === 'Failed to fetch'
+                ? 'Não foi possível carregar os documentos. Verifique se a API está no ar ou tente novamente em instantes.'
+                : msg)
             setResults([])
             return []
         } finally {
@@ -265,8 +269,49 @@ export default function Page() {
     }
 
     async function handleAnexos(requisicao: Documento) {
-        setIsModalAnexosOpen(true)
-        atualizarListaAnexosModal(requisicao)
+        setIsLoading(true)
+        setError(null)
+        try {
+            const completo = await getById(requisicao.id)
+            setIsModalAnexosOpen(true)
+            atualizarListaAnexosModal(completo)
+        } catch (err) {
+            const msg = (err as Error).message
+            setError(msg === 'Failed to fetch'
+                ? 'Não foi possível carregar os anexos do documento.'
+                : msg)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    async function handleDocumentoPrincipal(requisicao: Documento) {
+        const principal = resolverAnexoDocumento(requisicao.anexos)
+        if (principal) {
+            setRequisicaoSelecionada(requisicao)
+            handleVisualizarAnexo(principal)
+            return
+        }
+
+        setIsLoading(true)
+        setError(null)
+        try {
+            const completo = await getById(requisicao.id)
+            const anexo = resolverAnexoDocumento(completo.anexos)
+            if (!anexo) {
+                setError('Nenhum documento principal encontrado para este registro.')
+                return
+            }
+            setRequisicaoSelecionada(completo)
+            handleVisualizarAnexo(anexo)
+        } catch (err) {
+            const msg = (err as Error).message
+            setError(msg === 'Failed to fetch'
+                ? 'Não foi possível carregar o documento.'
+                : msg)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     usePendenciaDeepLink(
@@ -506,7 +551,10 @@ export default function Page() {
                     );
 
                     const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
-                    const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
+                    const qtdAnexos = row.original.quantidade_anexos ?? row.original.anexos?.length ?? 0
+                    const assinouOuSemAnexos = qtdAnexos === 0
+                        || row.original.usuario_assinou_anexo === 1
+                        || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
                     const podeExcluir = podeExcluirDocumentoCriador({
                         usuario_criacao: row.original.usuario_criacao,
@@ -517,20 +565,19 @@ export default function Page() {
                     });
 
                     const anexoPrincipal = resolverAnexoDocumento(row.original.anexos);
+                    const assinouPrincipal = anexoPrincipal?.documento_assinado === 1
+                        || row.original.usuario_assinou_anexo === 1;
 
                     return (
                         <div className="flex gap-2">
-                            {anexoPrincipal && (<Button size="sm" variant="outline" onClick={() => {
-                                setRequisicaoSelecionada(row.original)
-                                handleVisualizarAnexo(anexoPrincipal)
-                            }}>
-                                Documento {anexoPrincipal.documento_assinado == 1 && (
+                            {qtdAnexos > 0 && (<Button size="sm" variant="outline" onClick={() => handleDocumentoPrincipal(row.original)}>
+                                Documento {assinouPrincipal && (
                                     <Check className="w-4 h-4 text-green-500" />
                                 )}
                             </Button>)}
 
                             <Button size="sm" variant="outline" onClick={() => handleAnexos(row.original)}>
-                                Anexos {(row.original.anexos?.length ?? 0) > 0 ? `(${row.original.anexos.length})` : ''}
+                                Anexos {qtdAnexos > 0 ? `(${qtdAnexos})` : ''}
                             </Button>
 
                             <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>

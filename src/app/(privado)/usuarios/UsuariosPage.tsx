@@ -40,6 +40,11 @@ import {
 
 import { stripDiacritics } from '@/utils/functions'
 import {
+  isWayCscSession,
+  syncSessionUserFromUsuario,
+  USERDATA_UPDATED_EVENT,
+} from '@/utils/sessionUser'
+import {
   Usuario,
   getAll as getAllUsuarios,
   getElementById as getUsuarioById,
@@ -70,8 +75,30 @@ const BASES_LABEL: { empresa: string; unidade: string }[] = [
   { empresa: '57.582.342', unidade: 'WAY CSC' },
 ]
 
-/** Destinos da cópia — bases operacionais + MIGRA (CSC fica de fora: é a origem da cópia). */
-const BASES_COPIA = BASES_LABEL.filter(b => b.unidade !== 'WAY CSC')
+/** Destinos da cópia (inclui CSC: cria o login lá se ainda não existir). */
+const BASES_COPIA = BASES_LABEL
+
+function normalizeEmpresaForSelect(empresa: string, unidade?: string): string {
+  const e = (empresa ?? '').trim()
+  if (BASES_LABEL.some(b => b.empresa === e)) return e
+  const byUnit = BASES_LABEL.find(b => b.unidade === (unidade ?? '').trim())?.empresa
+  return byUnit ?? e
+}
+
+function PermissionCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean | undefined
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <Checkbox
+      checked={checked === true}
+      onCheckedChange={v => onChange(v === true)}
+    />
+  )
+}
 
 export default function PageUsuarios() {
   const titulo = 'Usuários'
@@ -99,14 +126,10 @@ export default function PageUsuarios() {
   const loading = isPending
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('userData')
-      if (!raw) return
-      const u = JSON.parse(raw)
-      setEhCsc(String(u.unidade ?? u.UNIDADE ?? '').trim().toUpperCase() === 'WAY CSC')
-    } catch {
-      setEhCsc(false)
-    }
+    const refreshCsc = () => setEhCsc(isWayCscSession())
+    refreshCsc()
+    window.addEventListener(USERDATA_UPDATED_EVENT, refreshCsc)
+    return () => window.removeEventListener(USERDATA_UPDATED_EVENT, refreshCsc)
   }, [])
 
   const [aba, setAba] = useState(() => {
@@ -254,14 +277,13 @@ export default function PageUsuarios() {
     setUpdateMode(true)
     try {
       const response = await getUsuarioById(id)
-      console.log(response);
 
       setResultById(response)
       form.reset({
         sequencial: response.sequencial,
         codusuario: response.codusuario,
         nome: response.nome,
-        empresa: response.empresa,
+        empresa: normalizeEmpresaForSelect(response.empresa, response.unidade),
         codperfil: response.codperfil,
         diretoria: response.diretoria,
         email: response.email,
@@ -382,8 +404,14 @@ export default function PageUsuarios() {
     setError(null)
     try {
       if (data.sequencial && data.sequencial !== 0) {
+        if (!data.empresa || data.empresa === '0') {
+          toast.error('Selecione uma empresa válida antes de salvar.')
+          return
+        }
         await updateUsuario(data)
-        toast.success('Registro enviado')
+        const fresh = await getUsuarioById(data.sequencial)
+        syncSessionUserFromUsuario(fresh)
+        toast.success('Permissões salvas')
       } else {
         if (!data.replicar_todas_unidades && (!data.empresa || data.empresa === '0')) {
           toast.error('Selecione uma empresa antes de salvar.')
@@ -420,12 +448,11 @@ export default function PageUsuarios() {
           toast.success('Registro enviado')
         }
       }
+      form.reset()
+      setIsModalOpen(false)
+      await handleSearchClick()
     } catch (err) {
       toast.error((err as Error).message)
-    } finally {
-      form.reset()
-      await handleSearchClick()
-      setIsModalOpen(false)
     }
   }
 
@@ -657,9 +684,9 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center gap-2 space-y-0">
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormLabel className="!mt-0">
@@ -705,9 +732,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Admin</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -721,9 +748,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Documentos</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -737,9 +764,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Borderô</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -753,9 +780,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Pagamentos</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -769,9 +796,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>RDV</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -785,9 +812,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Centros de custo</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -801,9 +828,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Restrito</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -817,9 +844,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Pag. Impostos</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -833,9 +860,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Pag. RH</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -849,9 +876,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>P. Fiscal</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -865,9 +892,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Doc. Externo</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -881,9 +908,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Administrativo</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -897,9 +924,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Financeiro</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -913,9 +940,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>WaySign</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -947,9 +974,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Receitas</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -963,9 +990,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Extrato gestor</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -979,9 +1006,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Controle medição</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -995,9 +1022,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Contratos</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1011,9 +1038,9 @@ export default function PageUsuarios() {
                     <FormItem>
                       <FormLabel>Financeiro TOTVS</FormLabel>
                       <FormControl>
-                        <Checkbox
+                        <PermissionCheckbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1065,8 +1092,9 @@ export default function PageUsuarios() {
               Cópia de usuário
             </DialogTitle>
             <DialogDescription className="text-center text-sm text-muted-foreground">
-              Se o login ainda não existir na base, cria com as mesmas permissões.
-              Se já existir, alinha as permissões com a origem. A senha atual é mantida.
+              Se o login ainda não existir na base de destino (incluindo WAY CSC), cria com as
+              mesmas permissões. Se já existir, alinha as permissões com a origem. A senha atual
+              é mantida.
             </DialogDescription>
           </DialogHeader>
 

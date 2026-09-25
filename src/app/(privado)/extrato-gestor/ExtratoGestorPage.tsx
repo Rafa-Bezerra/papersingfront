@@ -359,7 +359,7 @@ export default function ExtratoGestorPage() {
 
     try {
 
-      const dados = await getAllAnexos(item.idmov)
+      const dados = await getAllAnexos(item.idmov, unidade)
 
       setAnexos(dados)
 

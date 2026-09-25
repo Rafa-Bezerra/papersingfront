@@ -5,6 +5,8 @@ export type Documento = {
     nome: string,
     usuario_criacao: string,
     usuario_nome: string,
+    quantidade_anexos?: number,
+    usuario_assinou_anexo?: number,
     anexos: DocumentoAnexo[],
     aprovadores: DocumentoAprovacao[],
 }

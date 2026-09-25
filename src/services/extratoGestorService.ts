@@ -6,6 +6,7 @@ export type ExtratoGestorItem = {
   numero_movimento: string;
   data_aprovacao?: string | null;
   valor_total?: number | null;
+  quantidade_aprovacoes?: number;
   quantidade_centros_custo?: number;
   quantidade_anexos?: number;
 };
