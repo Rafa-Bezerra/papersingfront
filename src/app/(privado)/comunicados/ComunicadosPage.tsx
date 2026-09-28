@@ -478,8 +478,10 @@ export default function Page() {
             data_emissao: '',
             numero_documento: '',
         })
-        // Fornecedor/Tipo de Documento são obrigatórios para todos os usuários na criação —
-        // carregamento não é mais restrito a quem detém a claim financeiro_totvs.
+        // Fornecedor/Tipo de Documento só são exibidos/obrigatórios para quem tem a claim
+        // financeiro_totvs (ver Card #tour-ci-financeiro-rm), mas o carregamento aqui é sempre
+        // disparado — aprovadoresFinanceiro é necessário para todos (assinaturas no PDF), e
+        // pré-carregar fornecedores/tipos evita um flash de loading para quem tem a claim.
         if (fornecedores.length === 0) {
             getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
         }
@@ -1289,13 +1291,14 @@ ${html}
                                     setOpenCcustoRateioIndex={setOpenCcustoRateioIndex}
                                     openCodcontaIndex={openCodcontaIndex}
                                     setOpenCodcontaIndex={setOpenCodcontaIndex}
-                                    mostrarNaturezaFinanceira={true}
+                                    mostrarNaturezaFinanceira={userFinanceiroTotvs}
                                 />
 
-                                {/* Criação do financeiro (FLAN) — obrigatório para todos os usuários na
-                                    criação do comunicado. O lançamento é criado automaticamente quando o
-                                    comunicado for totalmente aprovado (ver ComunicadosController.Aprovar);
-                                    não há mais botão manual "Criar Financeiro" nesse ponto do fluxo. */}
+                                {/* Criação do financeiro (FLAN) — visível e obrigatório apenas para quem
+                                    tem a claim financeiro_totvs. Quem não tem cria o comunicado sem esses
+                                    dados; após aprovação total, qualquer usuário com a claim pode
+                                    preenchê-los via o botão "Criar Financeiro" (POST criarfinanceiro/{id}). */}
+                                {userFinanceiroTotvs && (
                                 <Card id="tour-ci-financeiro-rm">
                                         <CardHeader>
                                             <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
@@ -1433,6 +1436,7 @@ ${html}
                                             />
                                         </CardContent>
                                     </Card>
+                                )}
 
                                 {/** rodapé */}
                                 <FormField
@@ -1762,9 +1766,10 @@ export function gerarTemplateHTML(
     const aprovadoresManuaisSemCriador = (data.aprovadores ?? []).filter(a => a.usuario !== usuarioCriacaoCodigo);
 
     // Aprovadores financeiros (FINANCEIRO_APROVADORES) cujo valor_inicial qualifica pelo valor
-    // total do comunicado (cumulativo — ver AprovadoresFinanceiroController). Os de nível 2
-    // assinam junto do "Atenciosamente" em vez do "De acordo".
-    const aprovadoresFinanceiroQualificados = aprovadoresFinanceiro.filter((fa) => totalValue >= fa.valor_inicial);
+    // total do comunicado (cumulativo — ver AprovadoresFinanceiroController). Nível 2 e 3 sempre
+    // qualificam, independente do valor. Os de nível 2 assinam junto do "Atenciosamente" em vez
+    // do "De acordo".
+    const aprovadoresFinanceiroQualificados = aprovadoresFinanceiro.filter((fa) => fa.nivel === 2 || fa.nivel === 3 || totalValue >= fa.valor_inicial);
 
     const nivel2Aprovadores: ComunicadoAprovacao[] = aprovadoresFinanceiroQualificados
         .filter((fa) => fa.nivel === 2)
