@@ -11,7 +11,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyIcon, Copy, ClipboardList, FileSpreadsheet, SearchIcon, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
+import { KeyIcon, Copy, ClipboardList, FileSpreadsheet, SearchIcon, ShieldOff, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
 import RelatorioPermissoesUsuariosPanel from '@/components/RelatorioPermissoesUsuariosPanel'
 import UnificacaoUsuarioPanel from '@/components/UnificacaoUsuarioPanel'
+import RemoverConfigLotePanel from '@/components/RemoverConfigLotePanel'
+import { CONFIG_MENU_FORM_FIELDS } from '@/lib/configuracoes-permissoes'
 import { empresaPermiteProjetos } from '@/utils/projetosModulo'
 import {
   Dialog,
@@ -138,6 +140,7 @@ export default function PageUsuarios() {
     if (t === 'auditoria') return 'auditoria'
     if (t === 'relatorio') return 'relatorio'
     if (t === 'unificacao') return 'unificacao'
+    if (t === 'remover-acesso' || t === 'config-lote' || t === 'remover-admin') return 'remover-acesso'
     return 'lista'
   })
 
@@ -175,9 +178,25 @@ export default function PageUsuarios() {
       receitas: false,
       extrato_gestor: false,
       controle_medicao: false,
+      config_alcadas: false,
+      config_usuarios: false,
+      config_bordero_aprovadores: false,
+      config_restrito_aprovadores: false,
+      config_fornecedores_restritos: false,
+      config_impostos_aprovadores: false,
+      config_financeiro_aprovadores: false,
+      config_fiscal_aprovadores: false,
+      config_rh_aprovadores: false,
+      config_disparos: false,
+      config_cadastro_externos: false,
+      config_status_pedido: false,
       replicar_todas_unidades: false,
     }
   })
+
+  const empresaSelecionada = form.watch('empresa')
+  const unidadeDoFormulario =
+    BASES_LABEL.find((b) => b.empresa === (empresaSelecionada ?? '').trim())?.unidade ?? ''
 
   function clearQuery() {
     setQuery('')
@@ -314,6 +333,18 @@ export default function PageUsuarios() {
         receitas: response.receitas,
         extrato_gestor: response.extrato_gestor,
         controle_medicao: response.controle_medicao,
+        config_alcadas: response.config_alcadas ?? false,
+        config_usuarios: response.config_usuarios ?? false,
+        config_bordero_aprovadores: response.config_bordero_aprovadores ?? false,
+        config_restrito_aprovadores: response.config_restrito_aprovadores ?? false,
+        config_fornecedores_restritos: response.config_fornecedores_restritos ?? false,
+        config_impostos_aprovadores: response.config_impostos_aprovadores ?? false,
+        config_financeiro_aprovadores: response.config_financeiro_aprovadores ?? false,
+        config_fiscal_aprovadores: response.config_fiscal_aprovadores ?? false,
+        config_rh_aprovadores: response.config_rh_aprovadores ?? false,
+        config_disparos: response.config_disparos ?? false,
+        config_cadastro_externos: response.config_cadastro_externos ?? false,
+        config_status_pedido: response.config_status_pedido ?? false,
       })
       setIsModalOpen(true)
     } catch (err) {
@@ -354,6 +385,18 @@ export default function PageUsuarios() {
       receitas: false,
       extrato_gestor: false,
       controle_medicao: false,
+      config_alcadas: false,
+      config_usuarios: false,
+      config_bordero_aprovadores: false,
+      config_restrito_aprovadores: false,
+      config_fornecedores_restritos: false,
+      config_impostos_aprovadores: false,
+      config_financeiro_aprovadores: false,
+      config_fiscal_aprovadores: false,
+      config_rh_aprovadores: false,
+      config_disparos: false,
+      config_cadastro_externos: false,
+      config_status_pedido: false,
       replicar_todas_unidades: false,
     })
     setUpdateMode(false)
@@ -809,22 +852,6 @@ export default function PageUsuarios() {
                 />
                 <FormField
                   control={form.control}
-                  name="ccusto"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Centros de custo</FormLabel>
-                      <FormControl>
-                        <PermissionCheckbox
-                          checked={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="restrito"
                   render={({ field }) => (
                     <FormItem>
@@ -1050,6 +1077,38 @@ export default function PageUsuarios() {
                   )}
                 />
               </div>
+              <div className="mt-6 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Configurações (menu)</p>
+                <p className="text-xs text-muted-foreground">
+                  Cada item libera apenas a tela correspondente no menu Configurações (admin continua com acesso total).
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {CONFIG_MENU_FORM_FIELDS.map((item) => {
+                    const hideStatusPedido =
+                      item.name === 'config_status_pedido' &&
+                      unidadeDoFormulario.trim().toUpperCase() !== 'WAY CSC'
+                    return (
+                    <FormField
+                      key={item.name}
+                      control={form.control}
+                      name={item.name}
+                      render={({ field }) => (
+                        <FormItem className={hideStatusPedido ? 'hidden' : undefined}>
+                          <FormLabel>{item.label}</FormLabel>
+                          <FormControl>
+                            <PermissionCheckbox
+                              checked={Boolean(field.value)}
+                              onChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    )
+                  })}
+                </div>
+              </div>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Salvando…' : 'Salvar'}
               </Button>
@@ -1216,6 +1275,7 @@ export default function PageUsuarios() {
             if (v === 'auditoria') sp.set('tab', 'auditoria')
             else if (v === 'relatorio') sp.set('tab', 'relatorio')
             else if (v === 'unificacao') sp.set('tab', 'unificacao')
+            else if (v === 'remover-acesso') sp.set('tab', 'remover-acesso')
             else sp.delete('tab')
             const qs = sp.toString()
             router.replace(qs ? `?${qs}` : '?', { scroll: false })
@@ -1235,6 +1295,10 @@ export default function PageUsuarios() {
             <TabsTrigger value="unificacao" className="gap-1.5">
               <UserRound className="h-4 w-4" />
               Unificação
+            </TabsTrigger>
+            <TabsTrigger value="remover-acesso" className="gap-1.5">
+              <ShieldOff className="h-4 w-4" />
+              Remover acesso
             </TabsTrigger>
           </TabsList>
           <TabsContent value="lista" className="mt-0">
@@ -1260,6 +1324,16 @@ export default function PageUsuarios() {
               </p>
             </div>
             <UnificacaoUsuarioPanel />
+          </TabsContent>
+          <TabsContent value="remover-acesso" className="mt-0">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Remover acesso em lote</h2>
+              <p className="text-sm text-muted-foreground">
+                Retire acessos ao menu Configurações (Alçadas, Centros de custos, Usuários, etc.) — ou Admin — de uma ou
+                várias pessoas/bases (CSC).
+              </p>
+            </div>
+            <RemoverConfigLotePanel />
           </TabsContent>
         </Tabs>
       ) : (

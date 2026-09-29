@@ -1,3 +1,4 @@
+import { configMenuPayloadFromUsuario } from '@/lib/configuracoes-permissoes'
 import type { Usuario } from '@/types/Usuario'
 
 /** Evento disparado após atualizar `userData` na sessão (menu lateral reage). */
@@ -110,6 +111,7 @@ export function syncSessionUserFromUsuario(saved: Usuario): void {
       receitas: saved.receitas,
       extrato_gestor: saved.extrato_gestor,
       controle_medicao: saved.controle_medicao,
+      ...configMenuPayloadFromUsuario(saved),
     }
     sessionStorage.setItem('userData', JSON.stringify(merged))
     window.dispatchEvent(new Event(USERDATA_UPDATED_EVENT))

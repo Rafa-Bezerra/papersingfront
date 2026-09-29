@@ -1,3 +1,4 @@
+import { configMenuPayloadFromUsuario, mapConfigMenuFromApi } from "@/lib/configuracoes-permissoes";
 import { API_BASE, headers } from "@/utils/constants";
 import { apiBool, readControleMedicaoFromApi } from "@/utils/sessionUser";
 import { Usuario, CreateUsuarioResultado, CopiarUsuarioResultado, UnidadeResultado } from "@/types/Usuario";
@@ -59,6 +60,7 @@ export async function getAll(unidadeFiltro?: string): Promise<Usuario[]> {
             receitas: apiBool(apiData.receitas ?? apiData.RECEITAS),
             extrato_gestor: apiBool(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR),
             controle_medicao: readControleMedicaoFromApi(apiData),
+            ...mapConfigMenuFromApi(apiData),
         } as Usuario;
     });
 }
@@ -127,6 +129,7 @@ export async function getElementById(id: number): Promise<Usuario> {
       receitas: apiBool(apiData.receitas ?? apiData.RECEITAS),
       extrato_gestor: apiBool(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR),
       controle_medicao: readControleMedicaoFromApi(apiData),
+      ...mapConfigMenuFromApi(apiData as Record<string, unknown>),
     }
 
     return normalized
@@ -176,6 +179,7 @@ export async function updateElement(data: Usuario): Promise<void> {
         EXTRATO_GESTOR: !!data.extrato_gestor,
         CONTROLE_MEDICAO: !!data.controle_medicao,
         controle_medicao: !!data.controle_medicao,
+        ...configMenuPayloadFromUsuario(data),
     }
 
     const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.sequencial}`, { method: "POST", headers: headers(), body: JSON.stringify(payload) });
@@ -239,6 +243,57 @@ export type UsuarioPermAuditItem = {
     detalhe?: string;
     ipOrigem?: string;
 };
+
+export type RemoverAdminLoteResultado = {
+    atualizados: number;
+    ignorados: number;
+    itens: {
+        sequencial: number;
+        codusuario: string;
+        nome: string;
+        unidade: string;
+        status: string;
+        mensagem?: string;
+    }[];
+};
+
+export async function removerConfigLote(payload: {
+    sequenciais?: number[];
+    todos?: boolean;
+    unidade?: string;
+    busca?: string;
+    permissoes: string[];
+}): Promise<RemoverAdminLoteResultado> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/remover-config-lote`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+            sequenciais: payload.sequenciais ?? [],
+            todos: !!payload.todos,
+            unidade: payload.unidade ?? "",
+            busca: payload.busca ?? "",
+            permissoes: payload.permissoes ?? [],
+        }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(text?.trim() || `Erro ${res.status}`);
+    }
+    const data = JSON.parse(text) as Record<string, unknown>;
+    const itensRaw = (data.itens ?? data.Itens ?? []) as Record<string, unknown>[];
+    return {
+        atualizados: Number(data.atualizados ?? data.Atualizados ?? 0),
+        ignorados: Number(data.ignorados ?? data.Ignorados ?? 0),
+        itens: itensRaw.map((r) => ({
+            sequencial: Number(r.sequencial ?? r.Sequencial ?? 0),
+            codusuario: String(r.codusuario ?? r.Codusuario ?? ""),
+            nome: String(r.nome ?? r.Nome ?? ""),
+            unidade: String(r.unidade ?? r.Unidade ?? ""),
+            status: String(r.status ?? r.Status ?? ""),
+            mensagem: (r.mensagem ?? r.Mensagem) as string | undefined,
+        })),
+    };
+}
 
 export async function listarAuditoriaPermissoes(params?: {
     de?: string;

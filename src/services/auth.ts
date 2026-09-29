@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, headers } from "@/utils/constants";
+import { mapConfigMenuFromApi } from "@/lib/configuracoes-permissoes";
 import { readControleMedicaoFromApi } from "@/utils/sessionUser";
 
 
@@ -42,6 +43,18 @@ export interface LoginResponse {
   receitas: boolean;
   extrato_gestor: boolean;
   controle_medicao: boolean;
+  config_alcadas: boolean;
+  config_usuarios: boolean;
+  config_bordero_aprovadores: boolean;
+  config_restrito_aprovadores: boolean;
+  config_fornecedores_restritos: boolean;
+  config_impostos_aprovadores: boolean;
+  config_financeiro_aprovadores: boolean;
+  config_fiscal_aprovadores: boolean;
+  config_rh_aprovadores: boolean;
+  config_disparos: boolean;
+  config_cadastro_externos: boolean;
+  config_status_pedido: boolean;
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -125,6 +138,7 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     pagamento_rh: Boolean(
       apiData.pagamento_rh ?? apiData.PAGAMENTO_RH ?? apiData.pagamentO_RH
     ),
+    ...mapConfigMenuFromApi(apiData),
   };
 
   return normalized;
@@ -187,37 +201,11 @@ export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse>
   });
   const text = await res.text();
   if (!res.ok) throw new Error(text || 'Erro ao trocar unidade');
-  const apiData = JSON.parse(text);
-  return {
-    sequencial: apiData.sequencial ?? apiData.SEQUENCIAL,
-    codusuario: apiData.codusuario ?? apiData.CODUSUARIO,
-    email: apiData.email ?? apiData.EMAIL,
-    unidade: apiData.unidade ?? apiData.UNIDADE,
-    nome: apiData.nome ?? apiData.NOME,
+  const apiData = JSON.parse(text) as Record<string, unknown>;
+  return normalizeLoginResponse({
+    ...apiData,
     token: apiData.token ?? apiData.TOKEN,
-    admin: apiData.admin ?? apiData.ADMIN,
-    documentos: apiData.documentos ?? apiData.DOCUMENTOS,
-    rdv: apiData.rdv ?? apiData.RDV,
-    bordero: apiData.bordero ?? apiData.BORDERO,
-    comunicados: apiData.comunicados ?? apiData.COMUNICADOS,
-    administrativo: apiData.administrativo ?? apiData.ADMINISTRATIVO,
-    solicitante: apiData.solicitante ?? apiData.SOLICITANTE,
-    ccusto: apiData.ccusto ?? apiData.CCUSTO,
-    fiscal: apiData.fiscal ?? apiData.FISCAL,
-    restrito: apiData.restrito ?? apiData.RESTRITO,
-    externo: apiData.externo ?? apiData.EXTERNO,
-    pagamento_impostos: apiData.pagamento_impostos ?? apiData.PAGAMENTO_IMPOSTOS,
-    pagamento_rh: apiData.pagamento_rh ?? apiData.PAGAMENTO_RH,
-    gestao_pessoas: apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false,
-    financeiro: apiData.financeiro ?? apiData.FINANCEIRO ?? false,
-    docusign: apiData.docusign ?? apiData.DOCUSIGN ?? false,
-    projetos: apiData.projetos ?? apiData.PROJETOS ?? false,
-    contratos: apiData.contratos ?? apiData.CONTRATOS ?? false,
-    financeiro_totvs: apiData.financeiro_totvs ?? apiData.FINANCEIRO_TOTVS ?? apiData.financeirO_TOTVS ?? false,
-    receitas: apiData.receitas ?? apiData.RECEITAS ?? false,
-    extrato_gestor: apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false,
-    controle_medicao: readControleMedicaoFromApi(apiData),
-  };
+  });
 }
 
 export async function loginExterno(payload: LoginExternoPayload): Promise<LoginResponse> {

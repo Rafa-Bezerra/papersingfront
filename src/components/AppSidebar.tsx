@@ -34,6 +34,13 @@ import {
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
+import {
+  type ConfigMenuSession,
+  filterConfigNavItems,
+  hasAnyConfigMenuAccess,
+  mapConfigMenuFromApi,
+} from '@/lib/configuracoes-permissoes'
+import { buildPapersignConfigNav } from '@/lib/papersign-config-nav'
 import { USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
 
 interface AppSidebarProps {
@@ -70,6 +77,8 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
   const [userReceitas, setUserReceitas] = useState(false)
   const [userExtratoGestor, setUserExtratoGestor] = useState(false)
   const [userControleMedicao, setUserControleMedicao] = useState(false)
+  const [configSession, setConfigSession] = useState<ConfigMenuSession>({ admin: false })
+  const [configOpen, setConfigOpen] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
   // const [userSolicitante, setUserSolicitante] = useState(false)
   const isMobileDevice = useIsMobile()
@@ -105,6 +114,11 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
       setUserReceitas(user.receitas);
       setUserExtratoGestor(Boolean(user.extrato_gestor));
       setUserControleMedicao(Boolean(user.controle_medicao));
+      setConfigSession({
+        admin: Boolean(user.admin),
+        unidade: String(user.unidade ?? ''),
+        ...mapConfigMenuFromApi(user as Record<string, unknown>),
+      });
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error);
     }
@@ -173,25 +187,22 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
   }
 
   const configItems = useMemo(() => {
-    const items = [
-      { title: 'Alçadas', url: '/alcadas' },
-      { title: 'Usuários', url: '/usuarios' },
-      { title: 'Aprovadores Borderô', url: '/borderoaprovadores' },
-      { title: 'Aprovadores Restritos', url: '/restritoaprovadores' },
-      { title: 'Fornecedores Restritos', url: '/fornecedores-restritos' },
-      { title: 'Aprovadores Impostos', url: '/impostosaprovadores' },
-      { title: 'Aprovadores Financeiro', url: '/financeiroaprovadores' },
-      { title: 'Aprovadores Fiscal', url: '/fiscalaprovadores' },
-      { title: 'Aprovadores RH', url: '/rhaprovadores' },
-      { title: 'Centros de custos', url: '/centros-custos' },
-      { title: 'Disparos', url: '/disparos' },
-      { title: 'Cadastro de externos', url: '/cadastro-externos' },
-    ]
-    if (userUnidade.trim().toUpperCase() === 'WAY CSC') {
-      items.push({ title: 'Status do pedido', url: '/status-pedido' })
+    const items = buildPapersignConfigNav(userUnidade)
+    return filterConfigNavItems(items, configSession)
+  }, [userUnidade, configSession])
+
+  const showConfigMenu = showPapersignAdmin && hasAnyConfigMenuAccess(configSession)
+
+  useEffect(() => {
+    if (collapsed) {
+      setConfigOpen(false)
+      return
     }
-    return items
-  }, [userUnidade])
+    const onConfigRoute = configItems.some(
+      (c) => path === c.url || path.startsWith(`${c.url}/`)
+    )
+    if (onConfigRoute) setConfigOpen(true)
+  }, [path, configItems, collapsed])
 
   return (
     <>
@@ -363,52 +374,60 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                     })}
                   </div>
                 ))}
-                {userAdmin && showPapersignAdmin && (
+                {showConfigMenu && configItems.length > 0 && (
                   <SidebarMenuItem>
-                    <details className="group">
-                      <summary
-                        className={`w-full list-none cursor-pointer transition-all duration-200 ${collapsed
-                            ? 'flex justify-center px-2 py-2.5 rounded-md'
-                            : 'flex items-center justify-between px-3 py-2'
-                          } hover:bg-primary/10`}
-                      >
-                        <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'}`}>
-                          <span className="flex-shrink-0">
-                            {iconMap['Configurações']}
-                          </span>
-
-                          {!collapsed && (
-                            <span className="text-sm font-medium text-foreground">
-                              Configurações
-                            </span>
-                          )}
-                        </div>
-
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!collapsed) setConfigOpen((v) => !v)
+                      }}
+                      className={`w-full transition-all duration-200 ${collapsed
+                          ? 'flex justify-center px-2 py-2.5 rounded-md'
+                          : 'flex items-center justify-between px-3 py-2'
+                        } hover:bg-primary/10`}
+                      title={collapsed ? 'Configurações' : undefined}
+                      aria-expanded={!collapsed && configOpen}
+                    >
+                      <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'}`}>
+                        <span className="flex-shrink-0">
+                          {iconMap['Configurações']}
+                        </span>
                         {!collapsed && (
-                          <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                          <span className="text-sm font-medium text-foreground">
+                            Configurações
+                          </span>
                         )}
-                      </summary>
-
+                      </div>
                       {!collapsed && (
-                        <div className="mt-1 space-y-1">
-                          {configItems.map(item => (
-                            <SidebarMenuButton
-                              key={item.url}
-                              asChild
-                              isActive={path === item.url || path.startsWith(item.url + '/')}
-                              className={`ml-6 justify-start text-sm transition-colors ${path === item.url || path.startsWith(item.url + '/')
-                                  ? 'bg-slate-100 dark:bg-slate-700 font-semibold'
-                                  : 'hover:bg-primary/10'
-                                }`}
-                            >
-                              <Link href={item.url.endsWith('/') ? item.url : `${item.url}/`} onClick={() => { if (isMobileDevice && mobileOpen) toggleMobile() }}>
-                                {item.title}
-                              </Link>
-                            </SidebarMenuButton>
-                          ))}
-                        </div>
+                        <ChevronRight
+                          className={`h-4 w-4 transition-transform ${configOpen ? 'rotate-90' : ''}`}
+                        />
                       )}
-                    </details>
+                    </button>
+                    {!collapsed && configOpen && (
+                      <div className="mt-1 space-y-1">
+                        {configItems.map((item) => (
+                          <SidebarMenuButton
+                            key={item.url}
+                            asChild
+                            isActive={path === item.url || path.startsWith(item.url + '/')}
+                            className={`ml-6 justify-start text-sm transition-colors ${path === item.url || path.startsWith(item.url + '/')
+                                ? 'bg-slate-100 dark:bg-slate-700 font-semibold'
+                                : 'hover:bg-primary/10'
+                              }`}
+                          >
+                            <Link
+                              href={item.url.endsWith('/') ? item.url : `${item.url}/`}
+                              onClick={() => {
+                                if (isMobileDevice && mobileOpen) toggleMobile()
+                              }}
+                            >
+                              {item.title}
+                            </Link>
+                          </SidebarMenuButton>
+                        ))}
+                      </div>
+                    )}
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>

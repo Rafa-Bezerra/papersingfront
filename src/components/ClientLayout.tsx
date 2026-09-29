@@ -8,6 +8,7 @@ import TopNav from "./TopNav";
 import RafaelaTour from "./RafaelaTour";
 import PendenciasLoginModal from "./PendenciasLoginModal";
 import GestorUnidadeBanner from "./GestorUnidadeBanner";
+import { canAccessConfigRoute, isConfigMenuRoute } from "@/lib/configuracoes-permissoes";
 import { data } from "@/lib/data";
 import { toast } from "sonner";
 
@@ -93,7 +94,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           try {
             const parsedUser = JSON.parse(userData);
             const isAdmin = Boolean(parsedUser?.admin);
-            const canCentrosCustos = Boolean(parsedUser?.centros_custos);
             const isFinanceiro = Boolean(parsedUser?.financeiro);
             const canDocusign = Boolean(parsedUser?.docusign);
             const canProjetos = Boolean(parsedUser?.projetos);
@@ -103,24 +103,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             const canExtratoGestor = Boolean(parsedUser?.extrato_gestor);
             const canControleMedicao = Boolean(parsedUser?.controle_medicao);
 
-            // Bloqueia acesso direto a centros de custos / cadastros RM sem permissão.
             if (
-              (normalizedPath === "/centros-custos" ||
-                normalizedPath === "/cadastro-centro-custo" ||
-                normalizedPath === "/cadastro-conta-contabil") &&
-              !isAdmin &&
-              !canCentrosCustos
+              isConfigMenuRoute(normalizedPath) &&
+              !canAccessConfigRoute(normalizedPath, parsedUser)
             ) {
-              setIsAuthorized(false);
-            }
-
-            // Bloqueia acesso direto a fornecedores restritos (só admin).
-            if (normalizedPath === "/fornecedores-restritos" && !isAdmin) {
-              setIsAuthorized(false);
-            }
-
-            // Painel de disparos: só administrador.
-            if (normalizedPath === "/disparos" && !isAdmin) {
               setIsAuthorized(false);
             }
 
@@ -129,14 +115,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             }
 
             if (normalizedPath === "/controle-medicao" && !isAdmin && !canControleMedicao) {
-              setIsAuthorized(false);
-            }
-
-            // Status do pedido (RM): admin + WAY CSC.
-            if (
-              normalizedPath === "/status-pedido" &&
-              (!isAdmin || String(parsedUser?.unidade ?? "").trim().toUpperCase() !== "WAY CSC")
-            ) {
               setIsAuthorized(false);
             }
 
