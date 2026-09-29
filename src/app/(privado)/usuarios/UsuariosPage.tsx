@@ -11,7 +11,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyIcon, Copy, ClipboardList, SearchIcon, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
+import { KeyIcon, Copy, ClipboardList, FileSpreadsheet, SearchIcon, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
+import RelatorioPermissoesUsuariosPanel from '@/components/RelatorioPermissoesUsuariosPanel'
 import UnificacaoUsuarioPanel from '@/components/UnificacaoUsuarioPanel'
 import { empresaPermiteProjetos } from '@/utils/projetosModulo'
 import {
@@ -135,6 +136,7 @@ export default function PageUsuarios() {
   const [aba, setAba] = useState(() => {
     const t = searchParams.get('tab')
     if (t === 'auditoria') return 'auditoria'
+    if (t === 'relatorio') return 'relatorio'
     if (t === 'unificacao') return 'unificacao'
     return 'lista'
   })
@@ -1212,6 +1214,7 @@ export default function PageUsuarios() {
             setAba(v)
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (v === 'auditoria') sp.set('tab', 'auditoria')
+            else if (v === 'relatorio') sp.set('tab', 'relatorio')
             else if (v === 'unificacao') sp.set('tab', 'unificacao')
             else sp.delete('tab')
             const qs = sp.toString()
@@ -1224,6 +1227,10 @@ export default function PageUsuarios() {
             <TabsTrigger value="auditoria" className="gap-1.5">
               <ClipboardList className="h-4 w-4" />
               Auditoria
+            </TabsTrigger>
+            <TabsTrigger value="relatorio" className="gap-1.5">
+              <FileSpreadsheet className="h-4 w-4" />
+              Relatório
             </TabsTrigger>
             <TabsTrigger value="unificacao" className="gap-1.5">
               <UserRound className="h-4 w-4" />
@@ -1241,6 +1248,9 @@ export default function PageUsuarios() {
               </p>
             </div>
             <AuditoriaUsuariosPanel compact />
+          </TabsContent>
+          <TabsContent value="relatorio" className="mt-0">
+            <RelatorioPermissoesUsuariosPanel />
           </TabsContent>
           <TabsContent value="unificacao" className="mt-0">
             <div className="mb-4">

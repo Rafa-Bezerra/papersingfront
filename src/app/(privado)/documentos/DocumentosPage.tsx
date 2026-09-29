@@ -77,6 +77,15 @@ import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 
+function usuarioPodeAssinarDocumento(doc: Documento | undefined, userCodusuario: string): boolean {
+    if (!doc || !userCodusuario.trim()) return false
+    const cod = stripDiacritics(userCodusuario.toLowerCase().trim())
+    const criador = stripDiacritics(String(doc.usuario_criacao ?? '').toLowerCase().trim())
+    if (criador && cod === criador) return true
+    return (doc.aprovadores ?? []).some(
+        (ap) => stripDiacritics(ap.usuario.toLowerCase().trim()) === cod
+    )
+}
 
 export default function Page() {
     const titulo = 'Documentos para Assinatura'
@@ -204,7 +213,17 @@ export default function Page() {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAll()
+            const qTrim = q.trim()
+            const idBusca = /^\d+$/.test(qTrim) ? Number(qTrim) : undefined
+            const situacaoNormFiltro = stripDiacritics(String(situacaoFiltrada ?? '').toUpperCase().trim())
+            const podeFiltrarDataNaApi =
+                situacaoNormFiltro === "APROVADO" || situacaoNormFiltro === "REPROVADO"
+            const dados = await getAll({
+                ...(podeFiltrarDataNaApi && dateFrom && dateTo
+                    ? { dateFrom, dateTo }
+                    : {}),
+                ...(idBusca != null ? { id: idBusca } : {}),
+            })
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -1115,7 +1134,10 @@ export default function Page() {
                     onOpenChange={(open) => { if (!open) setAnexoPdfBase64ParaAssinatura(null); setIsModalVisualizarAnexoOpen(open); }}
                     title={`Anexo ${anexoSelecionado.nome}`}
                     pdfBase64={anexoPdfBase64ParaAssinatura}
-                    canSign={anexoSelecionado.documento_assinado == 0}
+                    canSign={
+                        anexoSelecionado.documento_assinado == 0
+                        && usuarioPodeAssinarDocumento(requisicaoSelecionada, userCodusuario)
+                    }
                     onSign={confirmarAssinaturaAnexo}
                     onPrint={handleImprimirAnexo}
                     isLoading={isLoading}

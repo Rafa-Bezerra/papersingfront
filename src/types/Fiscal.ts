@@ -4,6 +4,7 @@ export interface FiscalGetAll {
     status: string,
     solicitante: string,
     tipo_movimento: string,
+    idmov?: number,
 }
 
 export interface FiscalGetDocumento {

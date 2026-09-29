@@ -4,8 +4,17 @@ const caminho = "Documentos";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
 
-export async function getAll(): Promise<Documento[]> {
-    const url = new URL(`${API_BASE}/api/${caminho}`);       
+export type DocumentoListarFiltro = {
+    dateFrom?: string;
+    dateTo?: string;
+    id?: number;
+};
+
+export async function getAll(filtro?: DocumentoListarFiltro): Promise<Documento[]> {
+    const url = new URL(`${API_BASE}/api/${caminho}`);
+    if (filtro?.dateFrom) url.searchParams.set("dateFrom", filtro.dateFrom);
+    if (filtro?.dateTo) url.searchParams.set("dateTo", filtro.dateTo);
+    if (filtro?.id != null && filtro.id > 0) url.searchParams.set("id", String(filtro.id));
     const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
     if (!res.ok) {
         const msg = await res.text();
