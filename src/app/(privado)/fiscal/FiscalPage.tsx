@@ -199,13 +199,15 @@ export default function Page() {
             // Regra global: pendências ("Em Andamento") não limitam por período.
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
+            const idBusca = /^\d+$/.test(q.trim()) ? parseInt(q.trim(), 10) : 0
 
             const data: FiscalGetAll = {
-                dateFrom: fromApi,
+                dateFrom: idBusca > 0 ? "1900-01-01" : fromApi,
                 dateTo: to,
                 status: situacaoFiltrada,
                 solicitante: solicitanteFiltrado,
                 tipo_movimento: tipoMovimentoFiltrado,
+                ...(idBusca > 0 ? { idmov: idBusca } : {}),
             };
 
             const dados = await getAll(data, controller.signal)
