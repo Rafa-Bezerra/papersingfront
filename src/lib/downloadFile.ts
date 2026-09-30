@@ -1,10 +1,33 @@
+export function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  )
+}
+
 function isIos(): boolean {
   if (typeof navigator === 'undefined') return false
   return /iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
+function triggerAnchorDownload(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
 /**
- * Dispara download ou compartilhamento de arquivo (PDF, CSV, etc.) em desktop e mobile.
+ * Dispara download ou compartilhamento de arquivo (PDF, CSV, etc.).
+ * Desktop: sempre pasta de Downloads do navegador. Mobile: compartilhar ou abrir quando necessário.
  */
 export async function downloadBlobFile(
   blob: Blob,
@@ -14,6 +37,11 @@ export async function downloadBlobFile(
   const name = (fileName || 'arquivo').trim()
   const type = mimeType || blob.type || 'application/octet-stream'
   const file = new File([blob], name, { type })
+
+  if (!isMobileDevice()) {
+    triggerAnchorDownload(blob, name)
+    return 'download'
+  }
 
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
@@ -43,14 +71,6 @@ export async function downloadBlobFile(
     return 'opened'
   }
 
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.rel = 'noopener'
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  triggerAnchorDownload(blob, name)
   return 'download'
 }
