@@ -1,4 +1,4 @@
-import { configMenuPayloadFromUsuario } from '@/lib/configuracoes-permissoes'
+import { mapConfigMenuFromApi } from '@/lib/configuracoes-permissoes'
 import type { Usuario } from '@/types/Usuario'
 
 /** Evento disparado após atualizar `userData` na sessão (menu lateral reage). */
@@ -100,6 +100,7 @@ export function syncSessionUserFromUsuario(saved: Usuario): void {
         .toLowerCase() === String(saved.codusuario ?? '').trim().toLowerCase()
     if (!same) return
 
+    const configFlags = mapConfigMenuFromApi(saved as unknown as Record<string, unknown>)
     const merged = {
       ...session,
       admin: saved.admin,
@@ -109,7 +110,6 @@ export function syncSessionUserFromUsuario(saved: Usuario): void {
       rdv: saved.rdv,
       externo: saved.externo,
       restrito: saved.restrito,
-      ccusto: saved.ccusto,
       administrativo: saved.administrativo,
       solicitante: saved.solicitante,
       fiscal: saved.fiscal,
@@ -124,12 +124,31 @@ export function syncSessionUserFromUsuario(saved: Usuario): void {
       receitas: saved.receitas,
       extrato_gestor: saved.extrato_gestor,
       controle_medicao: saved.controle_medicao,
-      ...configMenuPayloadFromUsuario(saved),
+      relatorio_mensal: (saved as Usuario & { relatorio_mensal?: boolean }).relatorio_mensal,
+      ...configFlags,
+      ccusto: configFlags.ccusto || saved.ccusto,
     }
     sessionStorage.setItem('userData', JSON.stringify(merged))
     window.dispatchEvent(new Event(USERDATA_UPDATED_EVENT))
   } catch {
     /* ignore */
+  }
+}
+
+/** Recarrega permissões do usuário logado (menu Configurações / Alçadas) sem novo login. */
+export async function refreshCurrentUserSessionFromApi(): Promise<void> {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = sessionStorage.getItem('userData')
+    if (!raw) return
+    const session = JSON.parse(raw) as Record<string, unknown>
+    const id = Number(session.sequencial ?? session.SEQUENCIAL)
+    if (!Number.isFinite(id) || id <= 0) return
+    const { getElementById } = await import('@/services/usuariosService')
+    const fresh = await getElementById(id)
+    syncSessionUserFromUsuario(fresh)
+  } catch {
+    /* sessão antiga ou API indisponível */
   }
 }
 

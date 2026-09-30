@@ -40,7 +40,7 @@ import {
   mapConfigMenuFromApi,
 } from '@/lib/configuracoes-permissoes'
 import { buildPapersignConfigNav } from '@/lib/papersign-config-nav'
-import { USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
+import { refreshCurrentUserSessionFromApi, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
 
 interface AppSidebarProps {
   navMain: NavSection[]
@@ -125,6 +125,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
 
   useEffect(() => {
     applyUserFromSession();
+    void refreshCurrentUserSessionFromApi().then(() => applyUserFromSession());
     const onUserUpdated = () => applyUserFromSession();
     window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
     return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);

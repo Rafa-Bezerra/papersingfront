@@ -10,6 +10,13 @@ export function stripDiacritics(s: string) {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 }
 
+/** Filtro do cmdk: busca no texto completo do CommandItem (código + nome). */
+export function commandItemFilter(value: string, search: string): number {
+  const term = stripDiacritics(search.trim().toLowerCase())
+  if (!term) return 1
+  return stripDiacritics(value.toLowerCase()).includes(term) ? 1 : 0
+}
+
 /**
  * Extrai uma mensagem de erro legível do body de uma resposta da API.
  * O backend responde ora texto puro, ora string JSON-encoded (StatusCode(500, msg)),
