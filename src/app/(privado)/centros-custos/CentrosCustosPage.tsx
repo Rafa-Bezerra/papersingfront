@@ -31,7 +31,8 @@ import {
   CommandItem,
   CommandList
 } from '@/components/ui/command'
-import { stripDiacritics } from '@/utils/functions'
+import { commandItemFilter, stripDiacritics } from '@/utils/functions'
+import { PopoverPortal } from '@radix-ui/react-popover'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -76,6 +77,11 @@ export default function Page() {
   const [isModalUsuarioOpen, setIsModalUsuarioOpen] = useState(false)
   const [isModalUsuarioFormOpen, setIsModalUsuarioFormOpen] = useState(false)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+
+  const usuariosAtivos = useMemo(
+    () => usuarios.filter((u) => u.ativo !== false),
+    [usuarios]
+  )
 
   const form = useForm<MgoFinanceiro>({
     defaultValues: {
@@ -780,40 +786,33 @@ export default function Page() {
                             <ChevronsUpDown className="opacity-50 size-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="p-0 w-[600px] z-[200] pointer-events-auto">
-                          <Command
-                            className="max-h-[320px] overflow-hidden"
-                            filter={(value, search) => {
-                              const label = usuarios.find(m => m.codusuario === value)?.nome || ''
-                              const searchLower = search.toLowerCase()
-                              return (
-                                label.toLowerCase().includes(searchLower) ||
-                                value.toLowerCase().includes(searchLower)
-                              )
-                                ? 1
-                                : 0
-                            }}
+                        <PopoverPortal>
+                          <PopoverContent
+                            className="p-0 w-[min(600px,95vw)] z-[9999] pointer-events-auto"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <CommandInput placeholder="Buscar usuário..." />
-                            <CommandList className="max-h-[280px] overflow-y-auto">
-                              <CommandEmpty>Nenhum encontrado</CommandEmpty>
-                              <CommandGroup>
-                                {usuarios.map(u => (
-                                  <CommandItem
-                                    key={u.codusuario}
-                                    value={`${u.codusuario} - ${u.nome}`}
-                                    onSelect={() => {
-                                      field.onChange(u.codusuario)
-                                      setOpenUsuarioSearch(false)
-                                    }}
-                                  >
-                                    {u.codusuario} - {u.nome}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
+                            <Command className="max-h-[320px] overflow-hidden" filter={commandItemFilter}>
+                              <CommandInput placeholder="Buscar usuário..." />
+                              <CommandList className="max-h-[280px] overflow-y-auto">
+                                <CommandEmpty>Nenhum encontrado</CommandEmpty>
+                                <CommandGroup>
+                                  {usuariosAtivos.map((u) => (
+                                    <CommandItem
+                                      key={u.codusuario}
+                                      value={`${u.codusuario} - ${u.nome}`}
+                                      onSelect={() => {
+                                        field.onChange(u.codusuario)
+                                        setOpenUsuarioSearch(false)
+                                      }}
+                                    >
+                                      {u.codusuario} - {u.nome}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </PopoverPortal>
                       </Popover>
                     </FormControl>
                     <FormMessage />
