@@ -482,12 +482,12 @@ export default function Page() {
         // financeiro_totvs (ver Card #tour-ci-financeiro-rm), mas o carregamento aqui é sempre
         // disparado — aprovadoresFinanceiro é necessário para todos (assinaturas no PDF), e
         // pré-carregar fornecedores/tipos evita um flash de loading para quem tem a claim.
-        if (fornecedores.length === 0) {
-            getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
-        }
-        if (tiposDocumento.length === 0) {
-            getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
-        }
+            if (fornecedores.length === 0) {
+                getAllFornecedores().then(setFornecedores).catch((err) => toast.error((err as Error).message))
+            }
+            if (tiposDocumento.length === 0) {
+                getAllTiposDocumento().then(setTiposDocumento).catch((err) => toast.error((err as Error).message))
+            }
         if (aprovadoresFinanceiro.length === 0) {
             getAllAprovadoresFinanceiro().then(setAprovadoresFinanceiro).catch((err) => toast.error((err as Error).message))
         }
@@ -1299,7 +1299,7 @@ ${html}
                                     dados; após aprovação total, qualquer usuário com a claim pode
                                     preenchê-los via o botão "Criar Financeiro" (POST criarfinanceiro/{id}). */}
                                 {userFinanceiroTotvs && (
-                                <Card id="tour-ci-financeiro-rm">
+                                    <Card id="tour-ci-financeiro-rm">
                                         <CardHeader>
                                             <CardTitle className="text-base">Criação do Financeiro (ao aprovar)</CardTitle>
                                         </CardHeader>

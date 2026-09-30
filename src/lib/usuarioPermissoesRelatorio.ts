@@ -92,6 +92,38 @@ function normLogin(s: string) {
   return stripDiacritics(s.toLowerCase().trim())
 }
 
+/** Logins equivalentes (mesma pessoa em várias bases). */
+export function loginsChaveColaborador(login: string, cadastros: Usuario[]): Set<string> {
+  const keys = new Set<string>()
+  const add = (s: string) => {
+    const n = normLogin(s)
+    if (n) keys.add(n)
+  }
+  add(login)
+  for (const u of cadastros) add(u.codusuario)
+  return keys
+}
+
+export function auditoriaAlvoColaborador(item: UsuarioPermAuditItem, logins: Set<string>): boolean {
+  return logins.has(normLogin(item.targetCodusuario))
+}
+
+/** Alterações que a pessoa fez em cadastros de outras pessoas (ou em outro login). */
+export function auditoriaAutorColaborador(item: UsuarioPermAuditItem, logins: Set<string>): boolean {
+  return logins.has(normLogin(item.actorCodusuario)) && !auditoriaAlvoColaborador(item, logins)
+}
+
+export function dedupeAuditoriaPorId(items: UsuarioPermAuditItem[]): UsuarioPermAuditItem[] {
+  const seen = new Set<number>()
+  const out: UsuarioPermAuditItem[] = []
+  for (const item of items) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    out.push(item)
+  }
+  return out
+}
+
 export type CadastrosUsuarioResolvido =
   | { ok: true; login: string; nome: string; cadastros: Usuario[] }
   | { ok: false; motivo: 'vazio' | 'nao_encontrado' | 'ambiguo'; logins?: string[] }
@@ -265,11 +297,11 @@ export function agruparEventosAuditoria(eventos: UsuarioPermAuditItem[]): Evento
         dataHora: ev.dataHora,
         acao: ev.acao,
         actorCodusuario: ev.actorCodusuario,
-        actorNome: ev.actorNome,
+        actorNome: ev.actorNome ?? null,
         targetCodusuario: ev.targetCodusuario,
-        targetNome: ev.targetNome,
+        targetNome: ev.targetNome ?? null,
         bases: [ev.targetUnidade],
-        detalhe: ev.detalhe,
+        detalhe: ev.detalhe ?? null,
       })
     } else if (!existente.bases.includes(ev.targetUnidade)) {
       existente.bases.push(ev.targetUnidade)
@@ -303,6 +335,17 @@ export function labelMesReferencia(anoMes: string): string {
   if (!m) return anoMes
   const d = new Date(Number(m[1]), Number(m[2]) - 1, 1)
   return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+}
+
+/** ISO yyyy-mm-dd → dd/mm/aaaa (textos de PDF e tela). */
+export function formatarDataIsoParaBr(dataIso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((dataIso ?? '').trim())
+  if (!m) return dataIso
+  return `${m[3]}/${m[2]}/${m[1]}`
+}
+
+export function formatarPeriodoBr(de: string, ate: string): string {
+  return `${formatarDataIsoParaBr(de)} a ${formatarDataIsoParaBr(ate)}`
 }
 
 export function buildCsvMatrizPermissoes(usuarios: Usuario[]): string {
@@ -393,12 +436,8 @@ export function buildCsvAuditoriaMensal(itens: UsuarioPermAuditItem[]): string {
   return '\uFEFF' + lines.join('\r\n')
 }
 
-export function downloadTextFile(content: string, fileName: string) {
+export async function downloadTextFile(content: string, fileName: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = fileName
-  a.click()
-  URL.revokeObjectURL(url)
+  const { downloadBlobFile } = await import('@/lib/downloadFile')
+  await downloadBlobFile(blob, fileName, 'text/csv;charset=utf-8')
 }

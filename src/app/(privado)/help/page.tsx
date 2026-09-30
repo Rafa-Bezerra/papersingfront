@@ -24,7 +24,6 @@ const MODULES: TrainingModule[] = [
   { id: "controle-imobilizado", url: "/controle", title: "Controle imobilizado", description: "Cadastro e movimentação de ativos.", status: "Em breve" },
   { id: "ordem-compra", url: "/ordens", title: "Ordem de compra", description: "Listagem, filtros e ações (documento, anexos, itens).", status: "Em breve" },
   { id: "aquisicao-servicos", url: "/aquisicoes", title: "Aquisição de serviços", description: "Processo de contratação e aprovações.", status: "Em breve" },
-  { id: "outras-movimentacoes", url: "/outras", title: "Outras movimentações", description: "Movimentos adicionais e suas etapas.", status: "Em breve" },
   { id: "documentos", url: "/documentos", title: "Documentos", description: "Consulta, assinatura e histórico.", status: "Disponível", videoUrl: "/trainings/documentos.mp4" },
   { id: "pagamentos-ci", url: "/comunicados", title: "Pagamentos CI", description: "Cadastro e validações de pagamentos.", status: "Disponível", videoUrl: "/trainings/CI-%20TREINAMENTO%20.mp4" },
   { id: "bordero", url: "/bordero", title: "Borderô", description: "Envio, acompanhamento e aprovação.", status: "Em breve" },

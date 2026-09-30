@@ -37,6 +37,7 @@ import {
   labelPermissaoRelatorio,
   limitesMesReferencia,
   mesReferenciaAtual,
+  dedupeAuditoriaPorId,
   resolverCadastrosDoUsuario,
 } from '@/lib/usuarioPermissoesRelatorio'
 import {
@@ -235,15 +236,21 @@ export default function RelatorioPermissoesUsuariosPanel() {
 
       const { login, nome, cadastros } = resolvido
 
-      const [historicoUsuario, alteracoesMes] = await Promise.all([
-        listarAuditoriaPermissoes({ q: login, top: 5000 }),
-        listarAuditoriaPermissoes({
-          de: limites.de,
-          ate: limites.ate,
-          q: login,
-          top: 5000,
-        }),
-      ])
+      const loginsBusca = [...new Set(cadastros.map(c => c.codusuario.trim()).filter(Boolean))]
+      const buscas = loginsBusca.map(l =>
+        Promise.all([
+          listarAuditoriaPermissoes({ q: l, top: 5000 }),
+          listarAuditoriaPermissoes({
+            de: limites.de,
+            ate: limites.ate,
+            q: l,
+            top: 5000,
+          }),
+        ])
+      )
+      const resultados = await Promise.all(buscas)
+      const historicoUsuario = dedupeAuditoriaPorId(resultados.flatMap(r => r[0]))
+      const alteracoesMes = dedupeAuditoriaPorId(resultados.flatMap(r => r[1]))
 
       const doc = gerarPdfRelatorioUsuario({
         login,
@@ -526,9 +533,9 @@ export default function RelatorioPermissoesUsuariosPanel() {
             PDF de um colaborador (bases + permissões + histórico)
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Exemplo: login <strong>eubertson</strong> — o PDF traz <strong>uma pessoa só</strong>: em quais bases ele
-            tem cadastro, quais permissões em cada base e todo o histórico na auditoria (quem alterou e o que mudou).
-            O mês acima só entra no resumo de quantas alterações houve no período.
+            Exemplo: login <strong>eubertson</strong> — o PDF traz <strong>uma pessoa só</strong>: bases, permissões
+            atuais, alterações <strong>no cadastro dele</strong> (quem mudou e o que mudou) e alterações{' '}
+            <strong>que ele fez em outros usuários</strong>, se houver. O mês acima entra no resumo por seção.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

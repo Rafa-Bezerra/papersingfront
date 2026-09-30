@@ -10,7 +10,6 @@ const ROTAS_COM_STATUS = new Set([
   "/controle",
   "/ordens",
   "/aquisicoes",
-  "/outras",
 ]);
 
 const ROTAS_COM_FILTRO = new Set([
