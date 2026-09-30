@@ -16,7 +16,7 @@ import {
   type EventoAuditoriaAgrupado,
   type UsuarioAgrupadoPorLogin,
 } from '@/lib/usuarioPermissoesRelatorio'
-import { downloadBlobFile } from '@/lib/downloadFile'
+import { downloadBlobFile, isMobileDevice } from '@/lib/downloadFile'
 
 const PAGE_W = 210
 const MARGIN = 16
@@ -948,7 +948,7 @@ export function gerarPdfHistoricoUsuario(input: {
 export async function salvarPdf(doc: jsPDF, fileName: string): Promise<'shared' | 'download' | 'opened'> {
   const name = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`
 
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !isMobileDevice()) {
     doc.save(name)
     return 'download'
   }
