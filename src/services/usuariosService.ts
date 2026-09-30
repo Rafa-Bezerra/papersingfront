@@ -37,7 +37,6 @@ export async function getAll(unidadeFiltro?: string): Promise<Usuario[]> {
             rdv: apiBool(apiData.rdv ?? apiData.RDV),
             externo: apiBool(apiData.externo ?? apiData.EXTERNO),
             restrito: apiBool(apiData.restrito ?? apiData.RESTRITO),
-            ccusto: apiBool(apiData.ccusto ?? apiData.CCUSTO),
             administrativo: apiBool(apiData.administrativo ?? apiData.ADMINISTRATIVO),
             solicitante: apiBool(apiData.solicitante ?? apiData.SOLICITANTE),
             fiscal: apiBool(apiData.fiscal ?? apiData.FISCAL),
@@ -98,7 +97,6 @@ export async function getElementById(id: number): Promise<Usuario> {
       rdv: apiBool(apiData.rdv ?? apiData.RDV),
       externo: apiBool(apiData.externo ?? apiData.EXTERNO),
       restrito: apiBool(apiData.restrito ?? apiData.RESTRITO),
-      ccusto: apiBool(apiData.ccusto ?? apiData.CCUSTO),
       administrativo: apiBool(apiData.administrativo ?? apiData.ADMINISTRATIVO),
       solicitante: apiBool(apiData.solicitante ?? apiData.SOLICITANTE),
       fiscal: apiBool(apiData.fiscal ?? apiData.FISCAL),
@@ -294,6 +292,8 @@ export async function removerConfigLote(payload: {
         })),
     };
 }
+
+export { enviarRelatorioMensalEmail as enviarRelatorioMensalSetorEmail } from "@/services/relatorioMensalSetorService";
 
 export async function listarAuditoriaPermissoes(params?: {
     de?: string;

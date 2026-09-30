@@ -40,6 +40,19 @@ export function readControleMedicaoFromApi(apiData: Record<string, unknown>): bo
 const CSC_EMPRESA = '57.582.342'
 
 /** CSC: menu de cópia de permissões e listagem multi-base. */
+export function canRelatorioMensalSession(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = sessionStorage.getItem('userData')
+    if (!raw) return false
+    const u = JSON.parse(raw) as Record<string, unknown>
+    if (apiBool(u.admin ?? u.ADMIN)) return true
+    return apiBool(u.relatorio_mensal ?? u.RELATORIO_MENSAL ?? u.relatorio_MENSAL)
+  } catch {
+    return false
+  }
+}
+
 export function isWayCscSession(): boolean {
   if (typeof window === 'undefined') return false
   try {

@@ -21,7 +21,6 @@ export const data = {
         { title: "Controle imobilizado", url: "/controle" },
         { title: "Ordem de compra", url: "/ordens" },
         { title: "Aquisição de serviços", url: "/aquisicoes" },
-        { title: "Outras movimentações", url: "/outras" },
         { title: "Documentos", url: "/documentos" },
         { title: "WaySign", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },

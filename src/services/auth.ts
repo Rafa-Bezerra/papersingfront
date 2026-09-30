@@ -43,6 +43,7 @@ export interface LoginResponse {
   receitas: boolean;
   extrato_gestor: boolean;
   controle_medicao: boolean;
+  relatorio_mensal: boolean;
   config_alcadas: boolean;
   config_usuarios: boolean;
   config_bordero_aprovadores: boolean;
@@ -112,7 +113,6 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     comunicados: Boolean(apiData.comunicados ?? apiData.COMUNICADOS),
     administrativo: Boolean(apiData.administrativo ?? apiData.ADMINISTRATIVO),
     solicitante: Boolean(apiData.solicitante ?? apiData.SOLICITANTE),
-    ccusto: Boolean(apiData.ccusto ?? apiData.CCUSTO),
     fiscal: Boolean(apiData.fiscal ?? apiData.FISCAL),
     restrito: Boolean(apiData.restrito ?? apiData.RESTRITO),
     externo: Boolean(apiData.externo ?? apiData.EXTERNO),
@@ -128,6 +128,9 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     receitas: Boolean(apiData.receitas ?? apiData.RECEITAS ?? false),
     extrato_gestor: Boolean(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false),
     controle_medicao: readControleMedicaoFromApi(apiData),
+    relatorio_mensal: Boolean(
+      apiData.relatorio_mensal ?? apiData.RELATORIO_MENSAL ?? apiData.admin ?? apiData.ADMIN
+    ),
 
     pagamento_impostos: Boolean(
       apiData.pagamento_impostos ??

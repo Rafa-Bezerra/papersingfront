@@ -140,7 +140,8 @@ function ItemFinanceiroFields<T extends FieldValues & FormComItensFinanceiros>({
     const restante = Math.round((valorTotal - somaRateio) * 100) / 100;
 
     function recalcularRateioPorValorTotal(novoTotal: number) {
-        const linhas = getValues(`itensFinanceiros.${itemIndex}.rateio` as never) as ComunicadoItemFinanceiro['rateio'] ?? [];
+        const linhas =
+            (getValues(`itensFinanceiros.${itemIndex}.rateio` as never) as unknown as ComunicadoItemFinanceiro['rateio']) ?? [];
         linhas.forEach((linha, ri) => {
             if (linha.modo === 'percentual') {
                 const novoValor = Math.round((Number(linha.percentual) || 0) / 100 * novoTotal * 100) / 100;
@@ -151,14 +152,14 @@ function ItemFinanceiroFields<T extends FieldValues & FormComItensFinanceiros>({
 
     function onChangeValorLinha(ri: number, novoValor: number) {
         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor` as never, novoValor as never);
-        const total = (getValues(`itensFinanceiros.${itemIndex}.valor_total` as never) as number) || 0;
+        const total = (getValues(`itensFinanceiros.${itemIndex}.valor_total` as never) as unknown as number) || 0;
         const novoPercentual = total > 0 ? Math.round((novoValor / total) * 100 * 100) / 100 : 0;
         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual` as never, novoPercentual as never);
     }
 
     function onChangePercentualLinha(ri: number, novoPercentual: number) {
         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.percentual` as never, novoPercentual as never);
-        const total = (getValues(`itensFinanceiros.${itemIndex}.valor_total` as never) as number) || 0;
+        const total = (getValues(`itensFinanceiros.${itemIndex}.valor_total` as never) as unknown as number) || 0;
         const novoValor = Math.round((novoPercentual / 100) * total * 100) / 100;
         setValue(`itensFinanceiros.${itemIndex}.rateio.${ri}.valor` as never, novoValor as never);
     }
@@ -267,7 +268,7 @@ function ItemFinanceiroFields<T extends FieldValues & FormComItensFinanceiros>({
                         variant="outline"
                         size="sm"
                         onClick={() => appendRateio({
-                            ccusto: (getValues(`itensFinanceiros.${itemIndex}.ccusto` as never) as string) || '',
+                            ccusto: (getValues(`itensFinanceiros.${itemIndex}.ccusto` as never) as unknown as string) || '',
                             codconta: '', modo: 'valor', percentual: 0, valor: 0, codigo_natureza_financeira: '',
                         } as never)}
                     >

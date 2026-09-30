@@ -5,13 +5,18 @@ import { stripDiacritics } from '@/utils/functions'
 import {
   agruparEventosAuditoria,
   agruparUsuariosPorLogin,
+  auditoriaAlvoColaborador,
+  auditoriaAutorColaborador,
   basesAgrupadasLabel,
   COLUNAS_PERMISSAO,
   formatarDetalheAuditoria,
+  formatarPeriodoBr,
   labelMesReferencia,
+  loginsChaveColaborador,
   type EventoAuditoriaAgrupado,
   type UsuarioAgrupadoPorLogin,
 } from '@/lib/usuarioPermissoesRelatorio'
+import { downloadBlobFile } from '@/lib/downloadFile'
 
 const PAGE_W = 210
 const MARGIN = 16
@@ -50,9 +55,13 @@ export function usuarioCorrespondeBusca(u: Usuario, termo: string): boolean {
 export function auditoriaCorrespondeUsuario(item: UsuarioPermAuditItem, termo: string): boolean {
   const t = norm(termo)
   if (!t) return false
+  const keys = loginsChaveColaborador(termo, [])
+  if (keys.has(norm(item.targetCodusuario)) || keys.has(norm(item.actorCodusuario))) return true
   return (
     norm(item.targetCodusuario).includes(t)
     || norm(item.targetNome ?? '').includes(t)
+    || norm(item.actorCodusuario).includes(t)
+    || norm(item.actorNome ?? '').includes(t)
     || norm(item.detalhe ?? '').includes(t)
   )
 }
@@ -175,7 +184,7 @@ function drawReportHeader(
     const gap = 4
     const boxW = (CONTENT_W - gap * (cols - 1)) / cols
     const boxH = 16
-    let rowY = y
+    const rowY = y
     meta.forEach((item, i) => {
       const col = i % cols
       const row = Math.floor(i / cols)
@@ -522,7 +531,7 @@ export function gerarPdfRelatorioUsuario(input: PdfRelatorioUsuarioInput): jsPDF
   let y = drawReportHeader(
     doc,
     'Bases e permissões do usuário',
-    'Uma pessoa: cadastro em cada base, permissões atuais e histórico completo na auditoria.',
+    'Cadastro por base, permissões atuais e auditoria (no cadastro dele e alterações que ele fez em terceiros).',
     [
       { label: 'Login', value: input.login },
       { label: 'Nome', value: input.nome },
@@ -542,35 +551,56 @@ export function gerarPdfRelatorioUsuario(input: PdfRelatorioUsuarioInput): jsPDF
     })
   }
 
-  const loginNorm = norm(input.login)
-  const historico = input.historicoUsuario
-    .filter(a => norm(a.targetCodusuario) === loginNorm)
-    .sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime())
+  const logins = loginsChaveColaborador(input.login, input.cadastrosPorBase)
+  const sortAudit = (a: UsuarioPermAuditItem, b: UsuarioPermAuditItem) =>
+    new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime()
 
-  const mesFiltrado = input.alteracoesNoMes.filter(a => norm(a.targetCodusuario) === loginNorm)
+  const historicoAlvo = input.historicoUsuario.filter(a => auditoriaAlvoColaborador(a, logins)).sort(sortAudit)
+  const historicoAutor = input.historicoUsuario.filter(a => auditoriaAutorColaborador(a, logins)).sort(sortAudit)
 
-  y = drawSectionTitle(doc, y, 2, 'Histórico de permissões (auditoria)')
+  const mesAlvo = input.alteracoesNoMes.filter(a => auditoriaAlvoColaborador(a, logins))
+  const mesAutor = input.alteracoesNoMes.filter(a => auditoriaAutorColaborador(a, logins))
+  const mesTotal = mesAlvo.length + mesAutor.length
+
+  y = drawSectionTitle(doc, y, 2, 'Histórico no cadastro desta pessoa')
   y = ensureY(doc, y, 14)
   doc.setFillColor(...C.surface)
   doc.roundedRect(MARGIN, y, CONTENT_W, 14, 2, 2, 'F')
   rgb(doc, C.ink)
   doc.setFontSize(8.5)
   doc.text(
-    `${historico.length} registro(s) no total · ${mesFiltrado.length} em ${labelMesReferencia(input.mesRef)} ` +
-      `(${input.periodoDe} a ${input.periodoAte})`,
+    `${historicoAlvo.length} registro(s) · ${mesAlvo.length} em ${labelMesReferencia(input.mesRef)} ` +
+      `(${formatarPeriodoBr(input.periodoDe, input.periodoAte)}) · total no mês (incl. alterações em terceiros): ${mesTotal}`,
     MARGIN + 5,
     y + 9
   )
   y += 18
 
-  if (historico.length === 0) {
+  if (historicoAlvo.length === 0) {
     y = drawEmptyState(
       doc,
       y,
-      'Nenhuma alteração de permissão registrada na auditoria para este login (criação, edição, cópia ou unificação).'
+      'Nenhuma alteração registrada no cadastro desta pessoa (criação, edição, cópia ou unificação feita por outro usuário).'
     )
   } else {
-    for (const ev of agruparEventosAuditoria(historico)) y = drawAuditEvent(doc, y, ev)
+    for (const ev of agruparEventosAuditoria(historicoAlvo)) y = drawAuditEvent(doc, y, ev)
+  }
+
+  y = drawSectionTitle(doc, y, 3, 'Alterações que esta pessoa fez em outros usuários')
+  y = ensureY(doc, y, 10)
+  rgb(doc, C.muted)
+  doc.setFontSize(8)
+  doc.text(
+    `${historicoAutor.length} registro(s) · ${mesAutor.length} em ${labelMesReferencia(input.mesRef)}`,
+    MARGIN,
+    y + 4
+  )
+  y += 10
+
+  if (historicoAutor.length === 0) {
+    y = drawEmptyState(doc, y, 'Nenhuma alteração de permissão feita por esta pessoa em cadastros de terceiros.')
+  } else {
+    for (const ev of agruparEventosAuditoria(historicoAutor)) y = drawAuditEvent(doc, y, ev)
   }
 
   drawFooters(doc, docTitle)
@@ -667,6 +697,135 @@ export type PdfAlteracoesMesInput = {
   itens: UsuarioPermAuditItem[]
 }
 
+export type PdfColaboradorSetor = {
+  login: string
+  nome: string
+  email: string
+  cadastros: Usuario[]
+}
+
+export type PdfRelatorioMensalSetorInput = {
+  mesRef: string
+  periodoDe: string
+  periodoAte: string
+  nomeSetor: string
+  assinanteNome: string
+  assinanteLogin?: string
+  assinanteCargo?: string
+  colaboradores: PdfColaboradorSetor[]
+}
+
+function drawDeclaracaoSetor(doc: jsPDF, y: number, input: PdfRelatorioMensalSetorInput): number {
+  const cargo = (input.assinanteCargo ?? 'Gestor(a) da área').trim()
+  const texto =
+    `Este relatório consolida os acessos ativos no PaperSign dos colaboradores do setor ` +
+    `"${input.nomeSetor}", com referência ao mês de ${labelMesReferencia(input.mesRef)} ` +
+    `(período ${formatarPeriodoBr(input.periodoDe, input.periodoAte)}). ` +
+    `O(A) ${cargo} abaixo identificado(a) declara ter revisado a lista e atesta que reflete ` +
+    `o conhecimento da equipe quanto às permissões concedidas em cada base.`
+  y = ensureY(doc, y, 28)
+  doc.setFillColor(...C.surface)
+  doc.setDrawColor(...C.line)
+  const lines = doc.splitTextToSize(texto, CONTENT_W - 10) as string[]
+  const boxH = 8 + lines.length * 4.2
+  doc.roundedRect(MARGIN, y, CONTENT_W, boxH, 2, 2, 'FD')
+  rgb(doc, C.ink)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(lines, MARGIN + 5, y + 7)
+  return y + boxH + 8
+}
+
+function drawAssinaturaGestor(doc: jsPDF, y: number, input: PdfRelatorioMensalSetorInput): number {
+  const blockH = 52
+  y = ensureY(doc, y, blockH + 4)
+  doc.setFillColor(...C.white)
+  doc.setDrawColor(...C.line)
+  doc.roundedRect(MARGIN, y, CONTENT_W, blockH, 2, 2, 'S')
+
+  rgb(doc, C.brand)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('Assinatura do gestor da área', MARGIN + 5, y + 9)
+
+  rgb(doc, C.muted)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  const sub =
+    input.assinanteLogin
+      ? `${input.assinanteNome} (${input.assinanteLogin})`
+      : input.assinanteNome
+  doc.text(sub, MARGIN + 5, y + 15)
+  doc.text(
+    `${(input.assinanteCargo ?? 'Gestor(a) da área').trim()} · Setor: ${input.nomeSetor}`,
+    MARGIN + 5,
+    y + 20
+  )
+
+  const lineY = y + 36
+  doc.setDrawColor(...C.ink)
+  doc.setLineWidth(0.2)
+  doc.line(MARGIN + 5, lineY, MARGIN + CONTENT_W - 5, lineY)
+  rgb(doc, C.muted)
+  doc.setFontSize(8)
+  doc.text('Assinatura', MARGIN + 5, lineY + 5)
+
+  const dataY = lineY + 12
+  doc.text('Data: ____/____/________', MARGIN + 5, dataY)
+
+  return y + blockH + 10
+}
+
+/** Relatório mensal por setor: colaboradores selecionados + bloco para assinatura do gestor. */
+export function gerarPdfRelatorioMensalSetor(input: PdfRelatorioMensalSetorInput): jsPDF {
+  const doc = newReportDoc()
+  const docTitle = `Mensal · ${input.nomeSetor}`
+
+  let y = drawReportHeader(
+    doc,
+    'Relatório mensal de acessos',
+    'Permissões atuais por colaborador, para revisão e assinatura do gestor da área.',
+    [
+      { label: 'Setor / área', value: input.nomeSetor },
+      { label: 'Mês de referência', value: labelMesReferencia(input.mesRef) },
+      { label: 'Colaboradores', value: String(input.colaboradores.length) },
+      { label: 'Gestor (assinatura)', value: input.assinanteNome },
+    ]
+  )
+
+  y = drawDeclaracaoSetor(doc, y, input)
+  y = drawSectionTitle(doc, y, 1, 'Colaboradores e permissões por base')
+
+  if (input.colaboradores.length === 0) {
+    y = drawEmptyState(doc, y, 'Nenhum colaborador selecionado.')
+  } else {
+    const total = input.colaboradores.length
+    input.colaboradores.forEach((c, idx) => {
+      y = ensureY(doc, y, 36)
+      rgb(doc, C.brandMid)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(`Colaborador ${idx + 1} de ${total}`, MARGIN, y)
+      y += 6
+      y = drawIdentityCard(doc, y, c.login, c.nome, c.email, c.cadastros.length)
+      if (c.cadastros.length === 0) {
+        y = drawEmptyState(doc, y, 'Sem cadastro em base.')
+      } else {
+        c.cadastros.forEach((u, i) => {
+          y = drawBasePermissaoCard(doc, y, u, i + 1, c.cadastros.length)
+        })
+      }
+      y += 4
+    })
+  }
+
+  y = drawSectionTitle(doc, y, 2, 'Ciência e assinatura')
+  drawAssinaturaGestor(doc, y, input)
+
+  drawFooters(doc, docTitle)
+  return doc
+}
+
 export function gerarPdfAlteracoesMes(input: PdfAlteracoesMesInput): jsPDF {
   const doc = newReportDoc()
   const docTitle = `Alterações · ${labelMesReferencia(input.mesRef)}`
@@ -676,7 +835,7 @@ export function gerarPdfAlteracoesMes(input: PdfAlteracoesMesInput): jsPDF {
     'Alterações de permissão no mês',
     'Eventos de criação, edição, cópia entre bases e unificação.',
     [
-      { label: 'Período', value: `${input.periodoDe} a ${input.periodoAte}` },
+      { label: 'Período', value: formatarPeriodoBr(input.periodoDe, input.periodoAte) },
       { label: 'Base', value: input.unidadeLabel },
       { label: 'Registros', value: String(input.itens.length) },
       { label: 'Gerado em', value: new Date().toLocaleString('pt-BR') },
@@ -694,8 +853,125 @@ export function gerarPdfAlteracoesMes(input: PdfAlteracoesMesInput): jsPDF {
   return doc
 }
 
-export function salvarPdf(doc: jsPDF, fileName: string) {
-  doc.save(fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`)
+export type PdfHistoricoUsuarioEvento = {
+  categoria: string
+  modulo: string
+  unidade: string
+  dataHora: string
+  titulo: string
+  detalhe: string
+}
+
+const LABEL_CATEGORIA_HIST: Record<string, string> = {
+  permissoes: 'Permissões de usuários',
+  configuracao: 'Configuração (alçadas, CC, aprovadores)',
+  aprovacao: 'Aprovações / decisões',
+  assinatura: 'Assinaturas',
+  rdv: 'RDV',
+  receitas: 'Receitas',
+}
+
+function drawHistoricoEvento(doc: jsPDF, y: number, ev: PdfHistoricoUsuarioEvento): number {
+  const detLines = doc.splitTextToSize(ev.detalhe || '—', CONTENT_W - 12) as string[]
+  const cardH = 18 + detLines.length * 4
+  y = ensureY(doc, y, cardH + 4)
+
+  doc.setFillColor(...C.surface)
+  doc.setDrawColor(...C.line)
+  doc.roundedRect(MARGIN, y, CONTENT_W, cardH, 2, 2, 'FD')
+
+  rgb(doc, C.brandMid)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.text((LABEL_CATEGORIA_HIST[ev.categoria] ?? ev.categoria).toUpperCase(), MARGIN + 5, y + 7)
+  rgb(doc, C.muted)
+  doc.setFont('helvetica', 'normal')
+  doc.text(formatDh(ev.dataHora), PAGE_W - MARGIN - 5, y + 7, { align: 'right' })
+
+  rgb(doc, C.ink)
+  doc.setFontSize(8)
+  doc.text(`${ev.modulo}${ev.unidade ? ` · ${ev.unidade}` : ''}`, MARGIN + 5, y + 12)
+  doc.setFont('helvetica', 'bold')
+  doc.text(truncate(doc, ev.titulo, CONTENT_W - 10), MARGIN + 5, y + 16)
+  doc.setFont('helvetica', 'normal')
+  rgb(doc, C.ink)
+  doc.text(detLines, MARGIN + 5, y + 20)
+
+  return y + cardH + 4
+}
+
+export function gerarPdfHistoricoUsuario(input: {
+  login: string
+  nome: string
+  periodoDe: string
+  periodoAte: string
+  eventos: PdfHistoricoUsuarioEvento[]
+  contagemPorCategoria: Record<string, number>
+}): jsPDF {
+  const doc = newReportDoc()
+  const docTitle = `Histórico · ${input.login}`
+
+  const resumo = Object.entries(input.contagemPorCategoria)
+    .map(([k, n]) => `${LABEL_CATEGORIA_HIST[k] ?? k}: ${n}`)
+    .join(' · ')
+
+  let y = drawReportHeader(
+    doc,
+    'Histórico de atividades do usuário',
+    'Tudo que esta pessoa fez no PaperSign: permissões, configurações, aprovações e assinaturas.',
+    [
+      { label: 'Login', value: input.login },
+      { label: 'Nome', value: input.nome },
+      { label: 'Período', value: formatarPeriodoBr(input.periodoDe, input.periodoAte) },
+      { label: 'Total', value: String(input.eventos.length) },
+    ]
+  )
+
+  y = ensureY(doc, y, 12)
+  rgb(doc, C.muted)
+  doc.setFontSize(8)
+  doc.text(truncate(doc, resumo || 'Nenhum evento no período.', CONTENT_W), MARGIN, y + 4)
+  y += 10
+
+  y = drawSectionTitle(doc, y, 1, 'Linha do tempo')
+  if (input.eventos.length === 0) {
+    y = drawEmptyState(doc, y, 'Nenhuma atividade encontrada para este colaborador no período.')
+  } else {
+    for (const ev of input.eventos) y = drawHistoricoEvento(doc, y, ev)
+  }
+
+  drawFooters(doc, docTitle)
+  return doc
+}
+
+/** Salva o PDF no dispositivo (desktop) ou abre/compartilha no mobile (iOS/Android). */
+export async function salvarPdf(doc: jsPDF, fileName: string): Promise<'shared' | 'download' | 'opened'> {
+  const name = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`
+
+  if (typeof window === 'undefined') {
+    doc.save(name)
+    return 'download'
+  }
+
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (ios) {
+    doc.output('dataurlnewwindow')
+    return 'opened'
+  }
+
+  const blob = doc.output('blob') as Blob
+  return downloadBlobFile(blob, name, 'application/pdf')
+}
+
+export function pdfParaBase64(doc: jsPDF): string {
+  const buf = doc.output('arraybuffer') as ArrayBuffer
+  const u8 = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < u8.length; i += chunk) {
+    binary += String.fromCharCode(...u8.subarray(i, i + chunk))
+  }
+  return btoa(binary)
 }
 
 export function slugArquivo(s: string) {

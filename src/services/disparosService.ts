@@ -53,6 +53,12 @@ export async function getDisparos(q = "", status = ""): Promise<DisparoEmail[]> 
   return fetchJson<DisparoEmail[]>(url.toString());
 }
 
+export async function buscarUsuariosDisparo(q: string): Promise<DisparoDestinatario[]> {
+  const url = new URL(`${API_BASE}/api/Disparos/usuarios`);
+  url.searchParams.set("q", q.trim());
+  return fetchJson<DisparoDestinatario[]>(url.toString());
+}
+
 export async function getDestinatariosDisparo(perfis: string[]): Promise<DisparoDestinatario[]> {
   const url = new URL(`${API_BASE}/api/Disparos/destinatarios`);
   url.searchParams.set("perfis", perfis.join(","));

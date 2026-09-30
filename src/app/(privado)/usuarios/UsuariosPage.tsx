@@ -11,7 +11,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
-import { KeyIcon, Copy, ClipboardList, FileSpreadsheet, SearchIcon, ShieldOff, SquarePlus, Trash2, X, UserRound } from 'lucide-react'
+import { KeyIcon, Copy, ClipboardList, FileSpreadsheet, FileText, Bookmark, SearchIcon, ShieldOff, SquarePlus, Trash2, X, UserRound, History } from 'lucide-react'
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,9 @@ import { DataTable } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AuditoriaUsuariosPanel from '@/components/AuditoriaUsuariosPanel'
 import RelatorioPermissoesUsuariosPanel from '@/components/RelatorioPermissoesUsuariosPanel'
+import RelatorioMensalSetorPanel from '@/components/RelatorioMensalSetorPanel'
+import RelatorioMensalPreferenciasEnvioPanel from '@/components/RelatorioMensalPreferenciasEnvioPanel'
+import HistoricoUsuarioPanel from '@/components/HistoricoUsuarioPanel'
 import UnificacaoUsuarioPanel from '@/components/UnificacaoUsuarioPanel'
 import RemoverConfigLotePanel from '@/components/RemoverConfigLotePanel'
 import { CONFIG_MENU_FORM_FIELDS } from '@/lib/configuracoes-permissoes'
@@ -43,6 +46,7 @@ import {
 
 import { stripDiacritics } from '@/utils/functions'
 import {
+  canRelatorioMensalSession,
   isWayCscSession,
   syncSessionUserFromUsuario,
   USERDATA_UPDATED_EVENT,
@@ -124,25 +128,44 @@ export default function PageUsuarios() {
   const [copiaEmpresas, setCopiaEmpresas] = useState<string[]>([])
   const [copiaLoading, setCopiaLoading] = useState(false)
   const [ehCsc, setEhCsc] = useState(false)
+  const [podeRelatorioMensal, setPodeRelatorioMensal] = useState(false)
   const [filtroUnidade, setFiltroUnidade] = useState<string>('todas')
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const loading = isPending
 
   useEffect(() => {
-    const refreshCsc = () => setEhCsc(isWayCscSession())
+    const refreshCsc = () => {
+      setEhCsc(isWayCscSession())
+      setPodeRelatorioMensal(canRelatorioMensalSession())
+    }
     refreshCsc()
     window.addEventListener(USERDATA_UPDATED_EVENT, refreshCsc)
     return () => window.removeEventListener(USERDATA_UPDATED_EVENT, refreshCsc)
   }, [])
 
-  const [aba, setAba] = useState(() => {
-    const t = searchParams.get('tab')
+  const prefRelatorioMensalId = useMemo(() => {
+    const raw = searchParams.get('pref')
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [searchParams])
+
+  const abaFromQuery = useCallback((t: string | null) => {
     if (t === 'auditoria') return 'auditoria'
     if (t === 'relatorio') return 'relatorio'
+    if (t === 'historico-usuario') return 'historico-usuario'
+    if (t === 'relatorio-mensal') return 'relatorio-mensal'
+    if (t === 'preferencias-envio') return 'preferencias-envio'
     if (t === 'unificacao') return 'unificacao'
     if (t === 'remover-acesso' || t === 'config-lote' || t === 'remover-admin') return 'remover-acesso'
     return 'lista'
-  })
+  }, [])
+
+  const [aba, setAba] = useState(() => abaFromQuery(searchParams.get('tab')))
+
+  useEffect(() => {
+    setAba(abaFromQuery(searchParams.get('tab')))
+  }, [searchParams, abaFromQuery])
 
   const form = useForm<Usuario>({
     defaultValues: {
@@ -1274,6 +1297,14 @@ export default function PageUsuarios() {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (v === 'auditoria') sp.set('tab', 'auditoria')
             else if (v === 'relatorio') sp.set('tab', 'relatorio')
+            else if (v === 'historico-usuario') sp.set('tab', 'historico-usuario')
+            else if (v === 'relatorio-mensal') {
+              sp.set('tab', 'relatorio-mensal')
+            }
+            else if (v === 'preferencias-envio') {
+              sp.set('tab', 'preferencias-envio')
+              sp.delete('pref')
+            }
             else if (v === 'unificacao') sp.set('tab', 'unificacao')
             else if (v === 'remover-acesso') sp.set('tab', 'remover-acesso')
             else sp.delete('tab')
@@ -1292,6 +1323,22 @@ export default function PageUsuarios() {
               <FileSpreadsheet className="h-4 w-4" />
               Relatório
             </TabsTrigger>
+            <TabsTrigger value="historico-usuario" className="gap-1.5">
+              <History className="h-4 w-4" />
+              Histórico do usuário
+            </TabsTrigger>
+            {podeRelatorioMensal && (
+              <TabsTrigger value="relatorio-mensal" className="gap-1.5">
+                <FileText className="h-4 w-4" />
+                Relatório mensal
+              </TabsTrigger>
+            )}
+            {podeRelatorioMensal && (
+              <TabsTrigger value="preferencias-envio" className="gap-1.5">
+                <Bookmark className="h-4 w-4" />
+                Preferências de envio
+              </TabsTrigger>
+            )}
             <TabsTrigger value="unificacao" className="gap-1.5">
               <UserRound className="h-4 w-4" />
               Unificação
@@ -1316,6 +1363,35 @@ export default function PageUsuarios() {
           <TabsContent value="relatorio" className="mt-0">
             <RelatorioPermissoesUsuariosPanel />
           </TabsContent>
+          <TabsContent value="historico-usuario" className="mt-0">
+            <HistoricoUsuarioPanel />
+          </TabsContent>
+          {podeRelatorioMensal && (
+          <TabsContent value="relatorio-mensal" className="mt-0">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Relatório mensal por setor</h2>
+              <p className="text-sm text-muted-foreground">
+                Gere o PDF de acessos do setor, baixe ou envie por e-mail ao gestor (com anexo). Campo de assinatura no
+                PDF para ciência da área (CSC).
+              </p>
+            </div>
+            <RelatorioMensalSetorPanel
+              key={prefRelatorioMensalId ?? 'relatorio-mensal-livre'}
+              prefCarregarId={prefRelatorioMensalId}
+            />
+          </TabsContent>
+          )}
+          {podeRelatorioMensal && (
+          <TabsContent value="preferencias-envio" className="mt-0">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Preferências de envio</h2>
+              <p className="text-sm text-muted-foreground">
+                Modelos salvos do relatório mensal por setor: destinatários, colaboradores e envio automático.
+              </p>
+            </div>
+            <RelatorioMensalPreferenciasEnvioPanel />
+          </TabsContent>
+          )}
           <TabsContent value="unificacao" className="mt-0">
             <div className="mb-4">
               <h2 className="text-xl font-semibold">Unificação de usuário</h2>

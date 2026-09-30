@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -21,6 +21,7 @@ import {
   listarAuditoriaPermissoes,
   type UsuarioPermAuditItem,
 } from '@/services/usuariosService'
+import { stripDiacritics } from '@/utils/functions'
 
 const UNIDADES = [
   'WAY 112',
@@ -65,29 +66,68 @@ export default function AuditoriaUsuariosPanel({ compact = false }: { compact?: 
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
+    const termo = q.trim()
     setLoading(true)
     try {
       const data = await listarAuditoriaPermissoes({
-        q: q.trim() || undefined,
+        q: termo || undefined,
         unidade: unidade === 'todas' ? undefined : unidade,
         de: de || undefined,
         ate: ate || undefined,
         top: 500,
       })
       setItens(data)
+      if (termo && data.length === 0) {
+        toast.message(`Nenhum registro para “${termo}”.`)
+      }
     } catch (err) {
       toast.error((err as Error).message)
       setItens([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [q, unidade, de, ate])
 
   useEffect(() => {
-    void carregar()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void (async () => {
+      setLoading(true)
+      try {
+        const data = await listarAuditoriaPermissoes({ top: 500 })
+        setItens(data)
+      } catch (err) {
+        toast.error((err as Error).message)
+        setItens([])
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
+
+  const itensNaTela = useMemo(() => {
+    const termo = stripDiacritics(q.trim().toLowerCase())
+    if (!termo) return itens
+    return itens.filter(item => {
+      const blob = stripDiacritics(
+        [
+          item.acao,
+          item.actorCodusuario,
+          item.actorNome,
+          item.actorUnidade,
+          item.targetCodusuario,
+          item.targetNome,
+          item.targetUnidade,
+          item.targetEmpresa,
+          item.detalhe,
+          item.targetSequencial != null ? String(item.targetSequencial) : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+      )
+      return blob.includes(termo)
+    })
+  }, [itens, q])
 
   const colunas = useMemo<ColumnDef<UsuarioPermAuditItem>[]>(
     () => [
@@ -189,7 +229,7 @@ export default function AuditoriaUsuariosPanel({ compact = false }: { compact?: 
             <Label htmlFor="audQ">Busca</Label>
             <Input
               id="audQ"
-              placeholder="Nome, matrícula ou detalhe…"
+              placeholder="Login, nome, base ou detalhe…"
               value={q}
               onChange={e => setQ(e.target.value)}
               onKeyDown={e => {
@@ -200,7 +240,7 @@ export default function AuditoriaUsuariosPanel({ compact = false }: { compact?: 
               }}
             />
           </div>
-          <Button onClick={() => void carregar()} disabled={loading} className="flex items-center">
+          <Button type="button" onClick={() => void carregar()} disabled={loading} className="flex items-center">
             <SearchIcon className="mr-1 h-4 w-4" />
             {loading ? 'Buscando…' : 'Buscar'}
           </Button>
@@ -209,8 +249,8 @@ export default function AuditoriaUsuariosPanel({ compact = false }: { compact?: 
 
       <Card>
         <CardContent className="pt-6">
-          <DataTable columns={colunas} data={itens} loading={loading} />
-          {!loading && itens.length === 0 && (
+          <DataTable columns={colunas} data={itensNaTela} loading={loading} hideSearch />
+          {!loading && itensNaTela.length === 0 && (
             <p className="mt-4 text-center text-sm text-muted-foreground">
               Nenhum registro de auditoria encontrado. Os eventos passam a ser gravados
               após criação, alteração de permissão ou cópia de usuário.

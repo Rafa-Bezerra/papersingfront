@@ -144,7 +144,7 @@ export function mapConfigMenuFromApi(
 }
 
 export function configMenuPayloadFromUsuario(
-  data: Record<ConfigMenuPermKey, boolean | undefined>
+  data: Partial<Record<ConfigMenuPermKey, boolean | undefined>>
 ): Record<string, boolean> {
   return {
     config_alcadas: !!data.config_alcadas,
