@@ -9,7 +9,12 @@ import {
   reprovar,
 } from "@/services/requisicoesService";
 import type { PendenciaAnexoListaItem } from "@/types/PendenciaAnexo";
-import { normalizeUserCode } from "@/utils/functions";
+import {
+  aprovadorEhUsuarioLogado,
+  buildCodigosAprovacaoFromSession,
+  nivelUsuarioNaLista,
+  usuarioEhAprovadorNaLista,
+} from "@/utils/usuarioAprovacaoMovimento";
 
 export function normalizarPdfMovimento(valor: string): string {
   let pdf = valor.trim();
@@ -113,27 +118,13 @@ export function pdfAnexoMovimentoPorIndice(
   return normalizarPdfMovimento(anexo.anexo);
 }
 
-function getUserCodusuario(): string {
-  try {
-    const raw = sessionStorage.getItem("userData");
-    if (!raw) return "";
-    const user = JSON.parse(raw);
-    return String(user.codusuario ?? user.Codusuario ?? "");
-  } catch {
-    return "";
-  }
-}
-
 export function podeAssinarMovimento(requisicao: RequisicaoDto): boolean {
-  const login = normalizeUserCode(getUserCodusuario());
-  if (!login) return false;
+  const logados = buildCodigosAprovacaoFromSession();
+  if (logados.size === 0) return false;
 
   const aprovacoes = requisicao.requisicao_aprovacoes ?? [];
-  const usuarioAprovador = aprovacoes.some(
-    (ap) => normalizeUserCode(ap.usuario) === login
-  );
-  const nivelUsuario =
-    aprovacoes.find((ap) => normalizeUserCode(ap.usuario) === login)?.nivel ?? 1;
+  const usuarioAprovador = usuarioEhAprovadorNaLista(aprovacoes, logados);
+  const nivelUsuario = nivelUsuarioNaLista(aprovacoes, logados);
   const todasInferioresAprovadas =
     nivelUsuario === 1 ||
     aprovacoes
@@ -150,28 +141,25 @@ export function podeAssinarMovimento(requisicao: RequisicaoDto): boolean {
 }
 
 function contextoAprovadorMovimento(requisicao: RequisicaoDto) {
-  const login = normalizeUserCode(getUserCodusuario());
+  const logados = buildCodigosAprovacaoFromSession();
   const aprovacoes = requisicao.requisicao_aprovacoes ?? [];
-  const usuarioAprovador = aprovacoes.some(
-    (ap) => normalizeUserCode(ap.usuario) === login
-  );
-  const nivelUsuario =
-    aprovacoes.find((ap) => normalizeUserCode(ap.usuario) === login)?.nivel ?? 1;
+  const usuarioAprovador = usuarioEhAprovadorNaLista(aprovacoes, logados);
+  const nivelUsuario = nivelUsuarioNaLista(aprovacoes, logados);
   const todasInferioresAprovadas =
     nivelUsuario === 1 ||
     aprovacoes
       .filter((ap) => ap.nivel < nivelUsuario)
       .every((ap) => ap.situacao === "A");
   const usuarioAprovou = aprovacoes.some(
-    (ap) => normalizeUserCode(ap.usuario) === login && ap.situacao === "A"
+    (ap) => aprovadorEhUsuarioLogado(ap, logados) && ap.situacao === "A"
   );
   const usuarioReprovou = aprovacoes.some(
-    (ap) => normalizeUserCode(ap.usuario) === login && ap.situacao === "R"
+    (ap) => aprovadorEhUsuarioLogado(ap, logados) && ap.situacao === "R"
   );
   const statusLiberado = requisicao.requisicao.status_movimento === "Em Andamento";
 
   return {
-    login,
+    logados,
     usuarioAprovador,
     todasInferioresAprovadas,
     usuarioAprovou,
@@ -182,7 +170,7 @@ function contextoAprovadorMovimento(requisicao: RequisicaoDto) {
 
 export function podeAprovarMovimento(requisicao: RequisicaoDto): boolean {
   const ctx = contextoAprovadorMovimento(requisicao);
-  if (!ctx.login) return false;
+  if (ctx.logados.size === 0) return false;
 
   return (
     ctx.todasInferioresAprovadas &&
@@ -195,7 +183,7 @@ export function podeAprovarMovimento(requisicao: RequisicaoDto): boolean {
 
 export function podeReprovarMovimento(requisicao: RequisicaoDto): boolean {
   const ctx = contextoAprovadorMovimento(requisicao);
-  if (!ctx.login) return false;
+  if (ctx.logados.size === 0) return false;
 
   return (
     ctx.todasInferioresAprovadas &&

@@ -38,6 +38,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { dateToIso, imprimirPdfBase64, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64, toMoney, TIPOS_MOVIMENTO_CONTRATO } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, codigosUsuarioParaAprovacao, nivelUsuarioNaLista } from '@/utils/usuarioAprovacaoMovimento'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -133,9 +134,17 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
     // Filtro independente: somente movimentos com nota fiscal anexada (anexo com NOME contendo "NF").
     const [apenasComNF, setApenasComNF] = useState<boolean>(false)
+    const [codigosVinculados, setCodigosVinculados] = useState<string[]>([])
 
-    const normalizeUserCode = (value: string) =>
-        stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
+    const codigosAprovacao = useMemo(
+        () =>
+            codigosUsuarioParaAprovacao({
+                codusuario: userCodusuario,
+                nome: userName,
+                codusuarios_vinculados: codigosVinculados,
+            }),
+        [userCodusuario, userName, codigosVinculados]
+    )
 
     const podeExcluirAnexo = (anexo: Anexo) =>
         podeExcluirAnexoMovimento({
@@ -184,6 +193,9 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 setUserContratos(Boolean(user.contratos));
                 setUserName(String(user.nome ?? "").toUpperCase());
                 setCodusuario(String(user.codusuario ?? "").toUpperCase());
+                setCodigosVinculados(
+                    Array.isArray(user.codusuarios_vinculados) ? user.codusuarios_vinculados : []
+                );
             } catch (parseError) {
                 console.error("Erro ao carregar dados do usuário:", parseError);
             }
@@ -260,15 +272,14 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
                 const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
-                const userNorm = normalizeUserCode(userCodusuario)
                 const usuarioAprovador = (userAdmin || userAdministrativo)
                     ? true
-                    : d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === userNorm);
+                    : d.requisicao_aprovacoes.some(ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao));
 
                 const usuarioAprovouOuReprovou = (userAdmin || userAdministrativo)
                     ? false
                     : d.requisicao_aprovacoes.some(ap =>
-                        normalizeUserCode(ap.usuario) === userNorm &&
+                        aprovadorEhUsuarioLogado(ap, codigosAprovacao) &&
                         (ap.situacao === 'A' || ap.situacao === 'R')
                     );
 
@@ -310,13 +321,10 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
         // Limpa o documento anterior para nunca exibir (nem assinar) o arquivo de outra requisição em caso de erro.
         setRequisicaoDocumentoSelecionada("")
         setPodeAssinar(false);
-        const userNorm = normalizeUserCode(userCodusuario)
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
-            ap => normalizeUserCode(ap.usuario) === userNorm
+            ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
         );
-        const nivelUsuario = requisicao.requisicao_aprovacoes.find(
-            ap => normalizeUserCode(ap.usuario) === userNorm
-        )?.nivel ?? 1;
+        const nivelUsuario = nivelUsuarioNaLista(requisicao.requisicao_aprovacoes, codigosAprovacao);
 
         const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
@@ -627,22 +635,19 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 header: 'Ações',
                 cell: ({ row }) => {
                     const { requisicao, requisicao_aprovacoes } = row.original;
-                    const userNorm = normalizeUserCode(userCodusuario)
                     const usuarioAprovador = requisicao_aprovacoes.some(
-                        ap => normalizeUserCode(ap.usuario) === userNorm
+                        ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
                     );
 
-                    const nivelUsuario = row.original.requisicao_aprovacoes.find(
-                        ap => normalizeUserCode(ap.usuario) === userNorm
-                    )?.nivel ?? 1;
+                    const nivelUsuario = nivelUsuarioNaLista(requisicao_aprovacoes, codigosAprovacao);
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
                     const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                        normalizeUserCode(ap.usuario) === userNorm && (ap.situacao === 'A')
+                        aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'A')
                     );
                     const usuarioReprovou = requisicao_aprovacoes.some(ap =>
-                        normalizeUserCode(ap.usuario) === userNorm && (ap.situacao === 'R')
+                        aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'R')
                     );
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
@@ -716,7 +721,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                 }
             }
         ],
-        [userName]
+        [userName, userCodusuario, codigosVinculados, userContratos, userAdmin]
     )
 
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(

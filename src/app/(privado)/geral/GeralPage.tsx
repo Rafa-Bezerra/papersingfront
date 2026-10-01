@@ -30,6 +30,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, rotinaTipoMovimento, safeDateLabel, stripDiacritics, toBase64, TIPOS_MOVIMENTO_CONTRATO, podeExcluirAnexoMovimento } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, codigosUsuarioParaAprovacao } from '@/utils/usuarioAprovacaoMovimento'
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
 import {
     RequisicaoDto,
@@ -101,6 +102,8 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    const searchGenRef = useRef(0)
+    const abortSearchRef = useRef<AbortController | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const loading = isPending
     const [anexos, setAnexos] = useState<Anexo[]>([])
@@ -128,8 +131,17 @@ export default function Page() {
     const [entregaFiltrada, setEntregaFiltrada] = useState<string>("")
     // Filtro independente: somente movimentos com nota fiscal anexada (anexo com NOME contendo "NF").
     const [apenasComNF, setApenasComNF] = useState<boolean>(false)
-    const normalizeUserCode = (value: string) =>
-        stripDiacritics(String(value ?? "").toLowerCase().trim()).replace(/[^a-z0-9]/g, "");
+    const [codigosVinculados, setCodigosVinculados] = useState<string[]>([])
+
+    const codigosAprovacao = useMemo(
+        () =>
+            codigosUsuarioParaAprovacao({
+                codusuario: userCodusuario,
+                nome: userName,
+                codusuarios_vinculados: codigosVinculados,
+            }),
+        [userCodusuario, userName, codigosVinculados]
+    )
 
     const podeExcluirAnexo = (anexo: Anexo) =>
         podeExcluirAnexoMovimento({
@@ -172,6 +184,9 @@ export default function Page() {
             setUserContratos(user.contratos);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
+            setCodigosVinculados(
+                Array.isArray(user.codusuarios_vinculados) ? user.codusuarios_vinculados : []
+            );
         }
 
         switch (status) {
@@ -272,6 +287,11 @@ export default function Page() {
     }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada]);
 
     async function handleSearch(q: string) {
+        abortSearchRef.current?.abort();
+        const ac = new AbortController();
+        abortSearchRef.current = ac;
+        const gen = ++searchGenRef.current;
+
         setIsLoading(true);
         setError(null);
 
@@ -285,7 +305,8 @@ export default function Page() {
             const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const isPendenteDashboard = filtroDashboard === "Pendentes"
             const fromApi = ((isPendenteStatus || isPendenteDashboard) && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF, false, undefined, q);
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF, false, ac.signal, q);
+            if (ac.signal.aborted || gen !== searchGenRef.current) return;
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -315,7 +336,6 @@ export default function Page() {
             setTiposDeMovimento(tiposDeMovimentoUnicos)
 
             const qNorm = stripDiacritics(q.toLowerCase().trim());
-            const usuarioLogado = normalizeUserCode(userCodusuario ?? "");
             // Modo "Pendentes" (botão da home): alinhar com o contador do dashboard,
             // que filtra por usuário incondicionalmente — sem bypass de admin.
             const modoPendentesHome = filtroDashboard === "Pendentes";
@@ -326,12 +346,12 @@ export default function Page() {
                 const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
                 const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
                 const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
-                const usuarioAprovador = (!modoPendentesHome && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
+                const usuarioAprovador = (!modoPendentesHome && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao));
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
                 const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
                 let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
-                    normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario) && (ap.situacao === 'A' || ap.situacao === 'R')
+                    aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'A' || ap.situacao === 'R')
                 );
                 if ((userAdmin || userAdministrativo) && !modoPendentesHome) {
                     usuarioAprovou = false;
@@ -342,22 +362,22 @@ export default function Page() {
             const fitradosStatus = filtrados.filter(d => {
                 if (userAdmin == false || modoPendentesHome) {
                     const nivelUsuario = d.requisicao_aprovacoes.find(
-                        ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
+                        ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
                     )?.nivel ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                     const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
-                    const usuarioAprovador = (!modoPendentesHome && userAdmin) || d.requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === usuarioLogado);
+                    const usuarioAprovador = (!modoPendentesHome && userAdmin) || d.requisicao_aprovacoes.some(ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao));
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                     switch (filtroDashboard) {
                         case "Aprovados":
                             return d.requisicao_aprovacoes.some(a =>
-                                normalizeUserCode(a.usuario) === usuarioLogado &&
+                                aprovadorEhUsuarioLogado(a, codigosAprovacao) &&
                                 a.situacao === "A"
                             );
 
                         case "Pendentes":
-                            return d.requisicao_aprovacoes.some(a => normalizeUserCode(a.usuario) === usuarioLogado && a.situacao === "P" && podeAprovar);
+                            return d.requisicao_aprovacoes.some(a => aprovadorEhUsuarioLogado(a, codigosAprovacao) && a.situacao === "P" && podeAprovar);
                         default:
                             return true;
                     };
@@ -367,15 +387,19 @@ export default function Page() {
             });
             setResults(fitradosStatus);
         } catch (err) {
+            if (ac.signal.aborted || (err as Error).name === 'AbortError') return;
             const msg = (err as Error).message;
             const mensagemAmigavel = msg === 'Failed to fetch'
                 ? 'Não foi possível conectar ao servidor. Verifique se a API está rodando e se a URL está correta (ex: http://localhost:5170 em desenvolvimento).'
                 : msg;
             setError(mensagemAmigavel);
+            toast.error(mensagemAmigavel);
             setResults([]);
         } finally {
-            setSearched(true);
-            setIsLoading(false);
+            if (!ac.signal.aborted && gen === searchGenRef.current) {
+                setSearched(true);
+                setIsLoading(false);
+            }
         }
     }
 
@@ -395,10 +419,10 @@ export default function Page() {
         setIsProcessing(true)
         setPodeAssinar(false);
         const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
-            ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
+            ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
         );
         const nivelUsuario = requisicao.requisicao_aprovacoes.find(
-            ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
+            ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
         )?.nivel ?? 1;
 
         const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
@@ -702,19 +726,19 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => {
                     const { requisicao, requisicao_aprovacoes } = row.original;
-                    const usuarioAprovador = requisicao_aprovacoes.some(ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario));
+                    const usuarioAprovador = requisicao_aprovacoes.some(ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao));
 
                     const nivelUsuario = row.original.requisicao_aprovacoes.find(
-                        ap => normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario)
+                        ap => aprovadorEhUsuarioLogado(ap, codigosAprovacao)
                     )?.nivel ?? 1;
 
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
 
                     const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                        normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario) && (ap.situacao === 'A')
+                        aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'A')
                     );
                     const usuarioReprovou = requisicao_aprovacoes.some(ap =>
-                        normalizeUserCode(ap.usuario) === normalizeUserCode(userCodusuario) && (ap.situacao === 'R')
+                        aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'R')
                     );
 
                     // const status_bloqueado = ['Cancelado', 'Concluído confirmado'].includes(requisicao.status_movimento);
@@ -788,7 +812,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userContratos]
+        [userName, userContratos, codigosVinculados, userCodusuario]
     )
 
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(
@@ -1411,7 +1435,7 @@ export default function Page() {
                 </div>
             )}
 
-            {searched && results.length === 0 && !loading && !error && (
+            {searched && results.length === 0 && !isLoading && !loading && !error && (
                 <p className="text-center text-sm text-muted-foreground">
                     Nenhum registro encontrado.
                 </p>
