@@ -54,7 +54,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { baixarAnexo, getAll as getAllAnexos } from '@/services/anexoService';
+import { baixarAnexo } from '@/services/anexoService';
+import { listarAnexosMovimentoComPrincipal } from '@/lib/anexosMovimento';
 import {
   ControleMedicaoAprovacao,
   ControleMedicaoAprovador,
@@ -289,7 +290,11 @@ export default function ControleMedicaoPage() {
     setCarregandoAnexos(true);
     setAnexos([]);
     try {
-      const dados = await getAllAnexos(item.idmov, unidade);
+      const dados = await listarAnexosMovimentoComPrincipal(
+        item.idmov,
+        item.codigo_atendimento,
+        unidade
+      );
       setAnexos(dados);
     } catch (err) {
       toast.error((err as Error).message);

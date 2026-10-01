@@ -31,6 +31,8 @@ export interface LoginResponse {
   ccusto: boolean;
   fiscal: boolean;
   restrito: boolean;
+  /** Logins/chapas com o mesmo e-mail (alinhado às pendências do gestor). */
+  codusuarios_vinculados?: string[];
   pagamento_rh: boolean;
   pagamento_impostos: boolean;
   externo: boolean;
@@ -115,6 +117,11 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     solicitante: Boolean(apiData.solicitante ?? apiData.SOLICITANTE),
     fiscal: Boolean(apiData.fiscal ?? apiData.FISCAL),
     restrito: Boolean(apiData.restrito ?? apiData.RESTRITO),
+    codusuarios_vinculados: Array.isArray(apiData.codusuarios_vinculados)
+      ? (apiData.codusuarios_vinculados as string[])
+      : Array.isArray(apiData.CODUSUARIOS_VINCULADOS)
+        ? (apiData.CODUSUARIOS_VINCULADOS as string[])
+        : undefined,
     externo: Boolean(apiData.externo ?? apiData.EXTERNO),
 
     gestao_pessoas: Boolean(apiData.gestao_pessoas ?? apiData.GESTAO_PESSOAS ?? false),

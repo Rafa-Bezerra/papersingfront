@@ -29,6 +29,7 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, rotinaTipoMovimento, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, codigosUsuarioParaAprovacao } from '@/utils/usuarioAprovacaoMovimento'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -121,6 +122,20 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [tiposDeMovimento, setTiposDeMovimento] = useState<string[]>([])
+    const [codigosVinculados, setCodigosVinculados] = useState<string[]>([])
+
+    const codigosAprovacao = useMemo(
+        () =>
+            codigosUsuarioParaAprovacao({
+                codusuario: userCodusuario,
+                nome: userName,
+                codusuarios_vinculados: codigosVinculados,
+            }),
+        [userCodusuario, userName, codigosVinculados]
+    )
+
+    const euNaAprovacao = (ap: Pick<Requisicao_aprovacao, 'usuario' | 'nome'>) =>
+        aprovadorEhUsuarioLogado(ap, codigosAprovacao)
 
     const podeExcluirAnexo = (anexo: Anexo) =>
         podeExcluirAnexoMovimento({
@@ -158,6 +173,9 @@ export default function Page() {
             setUserAdministrativo(user.administrativo);
             setUserName(user.nome?.toUpperCase() ?? "");
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
+            setCodigosVinculados(
+                Array.isArray(user.codusuarios_vinculados) ? user.codusuarios_vinculados : []
+            );
         }
 
 
@@ -300,15 +318,13 @@ export default function Page() {
             setTiposDeMovimento(tiposDeMovimentoUnicos)
 
             const qNorm = stripDiacritics(q.toLowerCase().trim());
-            const usuarioLogado = stripDiacritics((userCodusuario ?? "").toLowerCase().trim());
-
             const filtrados = dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? "").toLowerCase());
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? "").includes(qNorm);
                 const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
                 const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
                 const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
-                const usuarioAprovador = (userAdmin || userAdministrativo) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const usuarioAprovador = (userAdmin || userAdministrativo) || d.requisicao_aprovacoes.some(ap => euNaAprovacao(ap));
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 
@@ -316,24 +332,22 @@ export default function Page() {
             });
 
             const fitradosStatus = filtrados.filter(d => {
-                const nivelUsuario = d.requisicao_aprovacoes.find(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                )?.nivel ?? 1;
+                const nivelUsuario = d.requisicao_aprovacoes.find(ap => euNaAprovacao(ap))?.nivel ?? 1;
                 const todasInferioresAprovadas = nivelUsuario == 1 || (d.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                 const status_liberado = ['Em Andamento'].includes(d.requisicao.status_movimento);
                 // No modo "Pendentes" (botão da home) não há bypass de admin — alinhado ao contador do dashboard.
-                const usuarioAprovador = (filtroDashboard !== "Pendentes" && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioLogado);
+                const usuarioAprovador = (filtroDashboard !== "Pendentes" && (userAdmin || userAdministrativo)) || d.requisicao_aprovacoes.some(ap => euNaAprovacao(ap));
                 const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado;
 
                 switch (filtroDashboard) {
                     case "Aprovados":
                         return d.requisicao_aprovacoes.some(a =>
-                            stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado &&
+                            euNaAprovacao(a) &&
                             a.situacao === "A"
                         );
 
                     case "Pendentes":
-                        return d.requisicao_aprovacoes.some(a => stripDiacritics(a.usuario.toLowerCase()) === usuarioLogado && a.situacao === "P" && podeAprovar);
+                        return d.requisicao_aprovacoes.some(a => euNaAprovacao(a) && a.situacao === "P" && podeAprovar);
                     default:
                         return true;
                 };
@@ -372,12 +386,8 @@ export default function Page() {
     async function handleDocumento(requisicao: RequisicaoDto) {
         setIsLoading(true)
         setPodeAssinar(false);
-        const usuarioAprovador = requisicao.requisicao_aprovacoes.some(
-            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-        );
-        const nivelUsuario = requisicao.requisicao_aprovacoes.find(
-            ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-        )?.nivel ?? 1;
+        const usuarioAprovador = requisicao.requisicao_aprovacoes.some(ap => euNaAprovacao(ap));
+        const nivelUsuario = requisicao.requisicao_aprovacoes.find(ap => euNaAprovacao(ap))?.nivel ?? 1;
 
         const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao.requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
         const status_liberado = ['Em Andamento'].includes(requisicao.requisicao.status_movimento);
@@ -640,19 +650,15 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => {
                     const { requisicao, requisicao_aprovacoes } = row.original;
-                    const usuarioAprovador = requisicao_aprovacoes.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                    );
-                    const nivelUsuario = row.original.requisicao_aprovacoes.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
-                    )?.nivel ?? 1;
+                    const usuarioAprovador = requisicao_aprovacoes.some(ap => euNaAprovacao(ap));
+                    const nivelUsuario = row.original.requisicao_aprovacoes.find(ap => euNaAprovacao(ap))?.nivel ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (requisicao_aprovacoes.filter(ap => ap.nivel < (nivelUsuario)).every(ap => ap.situacao === 'A'));
                     const status_liberado = ['Em Andamento'].includes(requisicao.status_movimento);
                     const usuarioAprovou = requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && ap.situacao === 'A'
+                        euNaAprovacao(ap) && ap.situacao === 'A'
                     );
                     const usuarioReprovou = requisicao_aprovacoes.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && ap.situacao === 'R'
+                        euNaAprovacao(ap) && ap.situacao === 'R'
                     );
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioAprovou;
                     const podeReprovar = todasInferioresAprovadas && usuarioAprovador && status_liberado && !usuarioReprovou;
@@ -676,11 +682,16 @@ export default function Page() {
                                 Aprovações
                             </Button>
 
-                            {podeAprovar && requisicao.documento_assinado == 1 && (
+                            {podeAprovar && (
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
                                     onClick={() => handleAprovar(requisicao.idmov, requisicao.codigo_atendimento)}
+                                    title={
+                                        requisicao.documento_assinado == 1
+                                            ? undefined
+                                            : 'Fluxo restrito: aprovação pela fila RESTRITO_APROVADORES (não usa alçada do centro de custo).'
+                                    }
                                 >
                                     Aprovar
                                 </Button>
@@ -710,7 +721,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName]
+        [userName, userCodusuario, codigosVinculados]
     )
 
     const colunasItens = useMemo<ColumnDef<Requisicao_item>[]>(

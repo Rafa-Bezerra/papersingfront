@@ -9,7 +9,17 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
+import { ChevronsUpDown, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { PopoverPortal } from '@radix-ui/react-popover'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -88,6 +98,7 @@ export default function Page() {
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null)
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const [comboUsuarioAberto, setComboUsuarioAberto] = useState(false)
     const carregouUsuarios = useRef(false)
 
     const form = useForm<Alcada>({
@@ -150,10 +161,24 @@ export default function Page() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    function unidadeDaSessao(): string {
+        try {
+            const raw = sessionStorage.getItem('userData')
+            if (!raw) return ''
+            const u = JSON.parse(raw)
+            return String(u.unidade ?? u.UNIDADE ?? '').trim()
+        } catch {
+            return ''
+        }
+    }
+
     async function buscaUsuarios() {
         try {
-            const dados = await getAllUsuarios()
-            setUsuarios(dados)
+            const unidade = unidadeDaSessao()
+            const unidadeFiltro =
+                unidade.toUpperCase() === 'WAY CSC' ? undefined : unidade || undefined
+            const dados = await getAllUsuarios(unidadeFiltro)
+            setUsuarios(dados.filter((u) => u.ativo !== false))
             carregouUsuarios.current = true
         } catch {
             setUsuarios([])
@@ -275,6 +300,7 @@ export default function Page() {
     }
 
     async function handleInserirAprovador () {
+        await buscaUsuarios()
         formAprovadores.reset({
             id: 0,
             id_alcada: alcadaSelecionada?.id ?? 0,
@@ -285,10 +311,12 @@ export default function Page() {
             nivel: 1
         })
         setUpdateAprovadoresMode(false)
+        setComboUsuarioAberto(false)
         setIsFormAprovadoresOpen(true)
     }
 
     async function handleEditarAprovador (aprovador: Aprovadores) {
+        await buscaUsuarios()
         formAprovadores.reset({
             id: aprovador.id,
             id_alcada: aprovador.id_alcada,
@@ -299,7 +327,8 @@ export default function Page() {
             nivel: aprovador.nivel
         })
         setAprovadorSelecionado(aprovador)
-        setUpdateAprovadoresMode(false)
+        setUpdateAprovadoresMode(true)
+        setComboUsuarioAberto(false)
         setIsFormAprovadoresOpen(true)
     }
 
@@ -319,20 +348,24 @@ export default function Page() {
 
     async function submitAprovador (data: Aprovadores) {
         setError(null)
+        const codigo = String(data.usuario ?? '').trim()
+        if (!codigo || !usuarios.some((u) => u.codusuario === codigo)) {
+            toast.error('Selecione um usuário cadastrado no PaperSign (GUSUARIO).')
+            return
+        }
         try {
             if (data.id && data.id !== 0) {
-                await updateAprovador(data)        
+                await updateAprovador({ ...data, usuario: codigo })
             } else {
-                await createAprovador(data)
+                await createAprovador({ ...data, usuario: codigo })
             }
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
-            toast.success(`Registro enviado`)
+            toast.success('Aprovador salvo.')
             formAprovadores.reset()
             setIsFormAprovadoresOpen(false)
             setIsModalAprovadoresOpen(false)
             await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
     
@@ -635,17 +668,64 @@ export default function Page() {
                         </DialogTitle>
                     </DialogHeader>
 
-                    <Form {...form}>
+                    <Form {...formAprovadores}>
                         <form onSubmit={formAprovadores.handleSubmit(submitAprovador)} className="grid gap-4">
                             <FormField
                                 control={formAprovadores.control}
                                 name="usuario"
-                                rules={{ required: 'usuário é obrigatório' }}
+                                rules={{
+                                    required: 'Usuário é obrigatório',
+                                    validate: (v) =>
+                                        usuarios.some((u) => u.codusuario === String(v ?? '').trim())
+                                            ? true
+                                            : 'Escolha um usuário da lista (GUSUARIO).',
+                                }}
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Usuário</FormLabel>
                                     <FormControl>
-                                    <Input {...field} />
+                                    <Popover modal open={comboUsuarioAberto} onOpenChange={setComboUsuarioAberto}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full justify-between font-normal"
+                                            >
+                                                {usuarios.find(u => u.codusuario === field.value)?.nome
+                                                    ? `${field.value} — ${usuarios.find(u => u.codusuario === field.value)?.nome}`
+                                                    : field.value || 'Selecione o usuário'}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverPortal>
+                                            <PopoverContent
+                                                className="p-0 w-[min(100vw-2rem,28rem)] pointer-events-auto z-[9999]"
+                                                align="start"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Command>
+                                                    <CommandInput placeholder="Buscar usuário..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {usuarios.map((u) => (
+                                                                <CommandItem
+                                                                    key={u.codusuario}
+                                                                    value={`${u.codusuario} - ${u.nome}`}
+                                                                    onSelect={() => {
+                                                                        field.onChange(u.codusuario)
+                                                                        setComboUsuarioAberto(false)
+                                                                    }}
+                                                                >
+                                                                    {`${u.codusuario} - ${u.nome}`}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </PopoverPortal>
+                                    </Popover>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
