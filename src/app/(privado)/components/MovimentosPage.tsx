@@ -108,6 +108,11 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    type RawDados = Awaited<ReturnType<typeof getAllRequisicoes>>
+    const rawDadosRef = useRef<RawDados | null>(null)
+    const lastQRef = useRef("")
+    const searchGenRef = useRef(0)
+    const abortSearchRef = useRef<AbortController | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const loading = isPending
     const [anexos, setAnexos] = useState<Anexo[]>([])
@@ -209,18 +214,31 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada, apenasComNF])
+    }, [dateFrom, dateTo, situacaoFiltrada, entregaFiltrada, apenasComNF])
+
+    // Solicitante/fornecedor/tipo são filtros só do cliente: reaplica sobre o último resultado, sem novo fetch.
+    useEffect(() => {
+        if (rawDadosRef.current) setResults(applyFilters(rawDadosRef.current, lastQRef.current))
+    }, [solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado])
 
     // Auto-refresh: atualiza a lista a cada 60s quando a aba está visível.
+    // Usa refs para não recriar o intervalo a cada tecla/filtro e não sobrepor buscas em andamento.
+    const handleSearchRef = useRef(handleSearch)
+    handleSearchRef.current = handleSearch
     useEffect(() => {
         if (!searched || !dateFrom || !dateTo) return
         const timer = setInterval(() => {
-            if (document.visibilityState === "visible") handleSearch(query)
+            if (document.visibilityState === "visible") handleSearchRef.current(lastQRef.current)
         }, 60000)
         return () => clearInterval(timer)
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
+    }, [searched, dateFrom, dateTo])
 
     async function handleSearch(q: string) {
+        abortSearchRef.current?.abort()
+        const ac = new AbortController()
+        abortSearchRef.current = ac
+        const gen = ++searchGenRef.current
+
         setIsLoading(true)
         setError(null)
         try {
@@ -236,7 +254,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, undefined, q)
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, ac.signal, q)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -258,10 +276,28 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
 
             setFornecedores(fornecedoresUnicos)
 
+            if (ac.signal.aborted || gen !== searchGenRef.current) return
+            rawDadosRef.current = dados
+            lastQRef.current = q
+            setResults(applyFilters(dados, q))
+        } catch (err) {
+            if (ac.signal.aborted || gen !== searchGenRef.current) return
+            setError((err as Error).message)
+            setResults([])
+        } finally {
+            if (!ac.signal.aborted && gen === searchGenRef.current) {
+                setSearched(true)
+                setIsLoading(false)
+            }
+        }
+    }
+
+    // Filtros aplicados apenas no cliente, sobre o último resultado carregado (sem novo fetch).
+    function applyFilters(dados: RawDados, q: string) {
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const normTipoMov = (t: string | null | undefined) =>
                 stripDiacritics((t ?? '').trim()).replace(/,/g, '.')
-            const filtrados = dados.filter(d => {
+            return dados.filter(d => {
                 const movimento = stripDiacritics((d.requisicao.movimento ?? '').toLowerCase())
                 const matchQuery = qNorm === "" || movimento.includes(qNorm) || String(d.requisicao.idmov ?? '').includes(qNorm)
                 const matchTipos = tipos_movimento.some((tm) => normTipoMov(tm) === normTipoMov(d.requisicao.tipo_movimento))
@@ -294,14 +330,6 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
 
                 return matchQuery && matchTipos && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && !usuarioAprovouOuReprovou
             })
-            setResults(filtrados)
-        } catch (err) {
-            setError((err as Error).message)
-            setResults([])
-        } finally {
-            setSearched(true)
-            setIsLoading(false)
-        }
     }
 
     async function handleSearchClick() {

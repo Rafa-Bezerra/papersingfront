@@ -102,6 +102,9 @@ export default function Page() {
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
+    type RawDados = Awaited<ReturnType<typeof getAllRequisicoes>>
+    const rawDadosRef = useRef<RawDados | null>(null)
+    const lastQRef = useRef("")
     const searchGenRef = useRef(0)
     const abortSearchRef = useRef<AbortController | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -268,23 +271,27 @@ export default function Page() {
         filtroDashboard,
         userAdmin,
         userCodusuario,
-        solicitanteFiltrado,
-        fornecedorFiltrado,
-        tipoMovimentoFiltrado,
         entregaFiltrada,
         apenasComNF
     ]);
 
+    // Solicitante/fornecedor/tipo são filtros só do cliente: reaplica sobre o último resultado, sem novo fetch.
+    useEffect(() => {
+        if (rawDadosRef.current) setResults(applyFilters(rawDadosRef.current, lastQRef.current));
+    }, [solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado]);
+
+    // Auto-refresh a cada 60s; refs evitam recriar o intervalo a cada mudança de filtro/tecla.
+    const handleSearchRef = useRef(handleSearch);
+    handleSearchRef.current = handleSearch;
     useEffect(() => {
         if (!searched || !dateFrom || !dateTo) return;
-        const interval = 60000; // 60 segundos
         const timer = setInterval(() => {
             if (document.visibilityState === "visible") {
-                handleSearch(query);
+                handleSearchRef.current(lastQRef.current);
             }
-        }, interval);
+        }, 60000);
         return () => clearInterval(timer);
-    }, [searched, query, dateFrom, dateTo, situacaoFiltrada, filtroDashboard, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada]);
+    }, [searched, dateFrom, dateTo]);
 
     async function handleSearch(q: string) {
         abortSearchRef.current?.abort();
@@ -335,6 +342,28 @@ export default function Page() {
             ).sort((a, b) => a.localeCompare(b))
             setTiposDeMovimento(tiposDeMovimentoUnicos)
 
+            rawDadosRef.current = dados;
+            lastQRef.current = q;
+            setResults(applyFilters(dados, q));
+        } catch (err) {
+            if (ac.signal.aborted || (err as Error).name === 'AbortError') return;
+            const msg = (err as Error).message;
+            const mensagemAmigavel = msg === 'Failed to fetch'
+                ? 'Não foi possível conectar ao servidor. Verifique se a API está rodando e se a URL está correta (ex: http://localhost:5170 em desenvolvimento).'
+                : msg;
+            setError(mensagemAmigavel);
+            toast.error(mensagemAmigavel);
+            setResults([]);
+        } finally {
+            if (!ac.signal.aborted && gen === searchGenRef.current) {
+                setSearched(true);
+                setIsLoading(false);
+            }
+        }
+    }
+
+    // Filtros aplicados apenas no cliente, sobre o último resultado carregado (sem novo fetch).
+    function applyFilters(dados: RawDados, q: string) {
             const qNorm = stripDiacritics(q.toLowerCase().trim());
             // Modo "Pendentes" (botão da home): alinhar com o contador do dashboard,
             // que filtra por usuário incondicionalmente — sem bypass de admin.
@@ -385,22 +414,7 @@ export default function Page() {
                     return true
                 }
             });
-            setResults(fitradosStatus);
-        } catch (err) {
-            if (ac.signal.aborted || (err as Error).name === 'AbortError') return;
-            const msg = (err as Error).message;
-            const mensagemAmigavel = msg === 'Failed to fetch'
-                ? 'Não foi possível conectar ao servidor. Verifique se a API está rodando e se a URL está correta (ex: http://localhost:5170 em desenvolvimento).'
-                : msg;
-            setError(mensagemAmigavel);
-            toast.error(mensagemAmigavel);
-            setResults([]);
-        } finally {
-            if (!ac.signal.aborted && gen === searchGenRef.current) {
-                setSearched(true);
-                setIsLoading(false);
-            }
-        }
+            return fitradosStatus;
     }
 
     async function handleSearchClick() {
