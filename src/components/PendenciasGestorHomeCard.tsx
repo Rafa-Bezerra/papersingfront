@@ -138,16 +138,20 @@ export default function PendenciasGestorHomeCard() {
               <h3 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">
                 {loading
                   ? "Carregando pendências…"
-                  : total === 0
-                    ? "Nenhuma pendência no momento"
-                    : total === 1
-                      ? "1 pendência aguardando você"
-                      : `${total} pendências aguardando você`}
+                  : erro
+                    ? "Não foi possível carregar as pendências agora"
+                    : total === 0
+                      ? "Nenhuma pendência no momento"
+                      : total === 1
+                        ? "1 pendência aguardando você"
+                        : `${total} pendências aguardando você`}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {total > 0
-                  ? "Movimentos, documentos, RDV, fiscal, C.I., projetos e WaySign em todas as WAY"
-                  : "Todas as pendências de aprovação e assinatura em um só lugar"}
+                {erro
+                  ? null
+                  : total > 0
+                    ? "Movimentos, documentos, RDV, fiscal, C.I., projetos e WaySign em todas as WAY"
+                    : "Todas as pendências de aprovação e assinatura em um só lugar"}
               </p>
               {erro && (
                 <p className="mt-2 text-sm text-amber-700 dark:text-amber-200">{erro}</p>
