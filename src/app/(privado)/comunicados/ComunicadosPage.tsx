@@ -1049,7 +1049,10 @@ ${html}
                                                     <PopoverTrigger asChild>
                                                         <Button type="button" variant="outline" className="w-full justify-between" onClick={() => setOpenTipoDocumento(true)}>
                                                             <span className="truncate">
-                                                                {tiposDocumento.find(t => t.codtdo === field.value)?.descricao ?? 'Selecione o tipo de documento'}
+                                                                {(() => {
+                                                                    const t = tiposDocumento.find(t => t.codtdo === field.value)
+                                                                    return t ? `${t.codtdo} - ${t.descricao}` : 'Selecione o tipo de documento'
+                                                                })()}
                                                             </span>
                                                             <ChevronsUpDown className="opacity-50 size-4 shrink-0" />
                                                         </Button>
@@ -1065,7 +1068,7 @@ ${html}
                                                                 <CommandGroup>
                                                                     {tiposDocumento.map(t => (
                                                                         <CommandItem key={t.codtdo} value={t.codtdo} onSelect={() => { field.onChange(t.codtdo); setOpenTipoDocumento(false) }}>
-                                                                            {t.descricao}
+                                                                            {t.codtdo} - {t.descricao}
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
