@@ -305,7 +305,7 @@ export default function Page() {
             const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const isPendenteDashboard = filtroDashboard === "Pendentes"
             const fromApi = ((isPendenteStatus || isPendenteDashboard) && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF, false, ac.signal, q);
+            const dados = await getAllRequisicoes(fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF, false, ac.signal, q, true);
             if (ac.signal.aborted || gen !== searchGenRef.current) return;
 
             const solicitantesUnicos = Array.from(
@@ -493,8 +493,31 @@ export default function Page() {
         setIsProcessing(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
-        setRequisicaoItensSelecionada(requisicao.requisicao_itens)
-        setIsProcessing(false)
+        try {
+            let itens = requisicao.requisicao_itens ?? []
+            if (itens.length === 0) {
+                const today = new Date()
+                const fiveDaysAgo = new Date()
+                fiveDaysAgo.setDate(today.getDate() - 5)
+                const from = dateFrom && dateFrom !== "" ? dateFrom : fiveDaysAgo.toISOString().substring(0, 10)
+                const to = dateTo && dateTo !== "" ? dateTo : today.toISOString().substring(0, 10)
+                const isPendenteStatus = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+                const isPendenteDashboard = filtroDashboard === "Pendentes"
+                const fromApi = ((isPendenteStatus || isPendenteDashboard) && !datasManuais) ? "1900-01-01" : from
+                const full = await getAllRequisicoes(
+                    fromApi, to, [], situacaoFiltrada, "", entregaFiltrada, apenasComNF, false,
+                    undefined, String(requisicao.requisicao.idmov), false
+                )
+                const hit = full.find(d => d.requisicao.idmov === requisicao.requisicao.idmov)
+                if (hit?.requisicao_itens?.length) itens = hit.requisicao_itens
+            }
+            setRequisicaoItensSelecionada(itens)
+        } catch (err) {
+            toast.error((err as Error).message)
+            setRequisicaoItensSelecionada([])
+        } finally {
+            setIsProcessing(false)
+        }
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {

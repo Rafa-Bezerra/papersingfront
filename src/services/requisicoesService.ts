@@ -4,8 +4,8 @@ const caminho = "Requisicoes";
 const elemento_singular = "requisição";
 const elemento_plural = "requisições";
 
-export async function getAll(dateFrom: string, dateTo: string, movimentos: string[], situacao: string, restrito: string, situacaoEntrega: string = "", apenasComNF: boolean = false, materiais: boolean = false, signal?: AbortSignal, q: string = ""): Promise<RequisicaoDto[]> {
-    const body = { dateFrom, dateTo, movimentos, situacao, restrito, situacao_entrega: situacaoEntrega, apenasComNF, materiais, q: q.trim() || undefined };
+export async function getAll(dateFrom: string, dateTo: string, movimentos: string[], situacao: string, restrito: string, situacaoEntrega: string = "", apenasComNF: boolean = false, materiais: boolean = false, signal?: AbortSignal, q: string = "", semItens: boolean = false): Promise<RequisicaoDto[]> {
+    const body = { dateFrom, dateTo, movimentos, situacao, restrito, situacao_entrega: situacaoEntrega, apenasComNF, materiais, q: q.trim() || undefined, semItens: semItens || undefined };
 
     // Listagem pode cobrir meses (início do ano) — 30s era curto demais.
     const list = await fetchJson<RequisicaoDto[]>(
