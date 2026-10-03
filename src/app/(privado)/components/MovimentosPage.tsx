@@ -216,7 +216,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
         if (!searched || !dateFrom || !dateTo) return
         const timer = setInterval(() => {
             if (document.visibilityState === "visible") handleSearch(query)
-        }, 60000)
+        }, 120000)
         return () => clearInterval(timer)
     }, [searched, query, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, entregaFiltrada])
 
@@ -236,7 +236,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, undefined, q)
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, undefined, q, true)
 
             const solicitantesUnicos = Array.from(
                 new Set(
@@ -395,8 +395,31 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
         setIsProcessing(true)
         setIsModalItensOpen(true)
         setRequisicaoSelecionada(requisicao)
-        setRequisicaoItensSelecionada(requisicao.requisicao_itens)
-        setIsProcessing(false)
+        try {
+            let itens = requisicao.requisicao_itens ?? []
+            if (itens.length === 0) {
+                const today = new Date()
+                const fiveDaysAgo = new Date()
+                fiveDaysAgo.setDate(today.getDate() - 5)
+                const from = dateFrom ? dateFrom : dateToIso(fiveDaysAgo)
+                const to = dateTo ? dateTo : dateToIso(today)
+                const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
+                const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
+                const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
+                const full = await getAllRequisicoes(
+                    fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais,
+                    undefined, String(requisicao.requisicao.idmov), false
+                )
+                const hit = full.find(d => d.requisicao.idmov === requisicao.requisicao.idmov)
+                if (hit?.requisicao_itens?.length) itens = hit.requisicao_itens
+            }
+            setRequisicaoItensSelecionada(itens)
+        } catch (err) {
+            toast.error((err as Error).message)
+            setRequisicaoItensSelecionada([])
+        } finally {
+            setIsProcessing(false)
+        }
     }
 
     async function handleAprovacoes(requisicao: RequisicaoDto) {
