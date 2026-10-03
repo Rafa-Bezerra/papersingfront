@@ -4,7 +4,7 @@ import {
   PendenciasGestorResponse,
 } from "@/types/Pendencias";
 
-import { API_BASE, fetchJson, PENDENCIAS_TIMEOUT_MS } from "@/utils/constants";
+import { API_BASE, fetchJson, HOME_API_TIMEOUT_MS, PENDENCIAS_TIMEOUT_MS } from "@/utils/constants";
 
 import { deduplicarPendencias } from "@/utils/pendenciaItemKey";
 
@@ -18,6 +18,10 @@ const inflight = new Map<string, Promise<PendenciasGestorResponse>>();
 
 export const PENDENCIAS_ATUALIZADAS_EVENT = "papersign-pendencias-atualizadas";
 export const PENDENCIAS_INVALIDAR_EVENT = "papersign-pendencias-invalidar";
+/** Home: gestor resumo terminou (sucesso ou erro) — liberar /Dashboard/stats. */
+export const HOME_GESTOR_RESUMO_DONE_EVENT = "papersign-home-gestor-resumo-done";
+/** Home: recarregar só os cards de stats (sem abrir modal / gestor completo). */
+export const HOME_STATS_RETRY_EVENT = "papersign-home-stats-retry";
 
 function notificarPendenciasAtualizadas(data: PendenciasGestorResponse): void {
   if (typeof window === "undefined") return;
@@ -204,7 +208,15 @@ export async function getPendenciasGestor(
 
   limitePorTipo = 8,
 
-  opts?: { force?: boolean; unidade?: string | null; tipo?: string | null }
+  opts?: {
+    force?: boolean;
+    unidade?: string | null;
+    tipo?: string | null;
+    somenteUnidadeLogada?: boolean;
+    /** Só totais por tipo/unidade — home carrega em ~30 s. */
+    somenteResumo?: boolean;
+    timeoutMs?: number;
+  }
 
 ): Promise<PendenciasGestorResponse> {
 
@@ -212,7 +224,11 @@ export async function getPendenciasGestor(
 
   const unidade = opts?.unidade?.trim() || "";
   const tipo = opts?.tipo?.trim() || "";
-  const key = `${limite}:${unidade || "all"}:${tipo || "all"}`;
+  const somenteLogada = opts?.somenteUnidadeLogada ? "1" : "0";
+  const somenteResumo = opts?.somenteResumo ? "1" : "0";
+  const key = `${limite}:${unidade || "all"}:${tipo || "all"}:${somenteLogada}:${somenteResumo}`;
+  const timeoutMs =
+    opts?.timeoutMs ?? (opts?.somenteResumo ? HOME_API_TIMEOUT_MS : PENDENCIAS_TIMEOUT_MS);
 
 
 
@@ -229,6 +245,8 @@ export async function getPendenciasGestor(
   const qs = new URLSearchParams({ limitePorTipo: String(limite) });
   if (unidade) qs.set("unidade", unidade);
   if (tipo) qs.set("tipo", tipo);
+  if (opts?.somenteUnidadeLogada) qs.set("somenteUnidadeLogada", "true");
+  if (opts?.somenteResumo) qs.set("somenteResumo", "true");
 
   const request = fetchJson<Record<string, unknown>>(
 
@@ -238,7 +256,7 @@ export async function getPendenciasGestor(
 
     "Erro ao carregar pendências",
 
-    PENDENCIAS_TIMEOUT_MS
+    timeoutMs
 
   )
 

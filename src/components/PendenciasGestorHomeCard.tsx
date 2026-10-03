@@ -6,9 +6,11 @@ import {
   getPendenciasGestor,
   PENDENCIAS_ATUALIZADAS_EVENT,
   PENDENCIAS_INVALIDAR_EVENT,
+  HOME_GESTOR_RESUMO_DONE_EVENT,
   unidadesComPendencias,
 } from "@/services/pendenciasService";
 import type { PendenciasGestorResponse } from "@/types/Pendencias";
+import { HOME_API_TIMEOUT_MS } from "@/utils/constants";
 import { abrirModalPendencias, corUnidadePendencia } from "@/utils/pendenciaNavigation";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,7 @@ export default function PendenciasGestorHomeCard() {
   const [total, setTotal] = useState(0);
   const [totalExibidos, setTotalExibidos] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [porUnidade, setPorUnidade] = useState<{ unidade: string; total: number }[]>([]);
 
   const aplicarDados = useCallback((data: PendenciasGestorResponse) => {
@@ -36,14 +39,29 @@ export default function PendenciasGestorHomeCard() {
 
   const carregar = useCallback(async (force = false) => {
     setLoading(true);
+    setErro(null);
+    const opts = force ? { force: true } : {};
     try {
-      const data = await getPendenciasGestor(30, force ? { force: true } : undefined);
+      const data = await getPendenciasGestor(8, {
+        ...opts,
+        somenteResumo: true,
+        timeoutMs: HOME_API_TIMEOUT_MS,
+      });
       aplicarDados(data);
-    } catch {
+    } catch (e) {
       setTotal(0);
       setTotalExibidos(0);
       setPorUnidade([]);
       setLoading(false);
+      setErro(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível carregar pendências. Tente Atualizar."
+      );
+    } finally {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(HOME_GESTOR_RESUMO_DONE_EVENT));
+      }
     }
   }, [aplicarDados]);
 
@@ -131,7 +149,10 @@ export default function PendenciasGestorHomeCard() {
                   ? "Movimentos, documentos, RDV, fiscal, C.I., projetos e WaySign em todas as WAY"
                   : "Todas as pendências de aprovação e assinatura em um só lugar"}
               </p>
-              {total > 0 && totalExibidos < total && (
+              {erro && (
+                <p className="mt-2 text-sm text-amber-700 dark:text-amber-200">{erro}</p>
+              )}
+              {total > 0 && totalExibidos > 0 && totalExibidos < total && (
                 <p className="mt-1 text-[11px] text-muted-foreground/80">
                   Prévia com os {totalExibidos} itens mais recentes — o total inclui todas
                 </p>
