@@ -324,11 +324,12 @@ export default function Page() {
                 const statusNorm = stripDiacritics(String(d.requisicao.status_movimento ?? "").toUpperCase().trim())
                 const filtroStatusNorm = stripDiacritics(String(situacaoFiltrada ?? "").toUpperCase().trim())
                 const matchSituacao = !situacaoFiltrada || statusNorm === filtroStatusNorm;
-                const usuarioAprovador = (userAdmin || userAdministrativo) || d.requisicao_aprovacoes.some(ap => euNaAprovacao(ap));
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
 
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento;
+                // Quem tem o módulo Restrito vê os movimentos. Assinar/aprovar
+                // continua só para quem está em RESTRITO_APROVADORES.
+                return matchQuery && matchSituacao && matchSolicitante && matchTipoMovimento;
             });
 
             const fitradosStatus = filtrados.filter(d => {

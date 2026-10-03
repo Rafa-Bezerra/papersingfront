@@ -69,7 +69,6 @@ export default function Page() {
     const abortRef = useRef<AbortController | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
-    const [userAdmin, setUserAdmin] = useState(false);
     const [userCodusuario, setCodusuario] = useState("");
     const [userName, setUserName] = useState("");
     // Só liberamos a primeira busca depois de ler o usuário do sessionStorage; caso
@@ -133,7 +132,6 @@ export default function Page() {
         const storedUser = sessionStorage.getItem("userData");
         if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserAdmin(user.admin);
             setCodusuario((user.codusuario ?? "").toUpperCase());
             setUserName(String(user.nome ?? "").toUpperCase());
         }
@@ -160,7 +158,7 @@ export default function Page() {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userCarregado, userAdmin, userCodusuario, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard, apenasAssinados])
+    }, [userCarregado, userCodusuario, dateFrom, dateTo, situacaoFiltrada, solicitanteFiltrado, tipoMovimentoFiltrado, filtroDashboard, apenasAssinados])
 
     useEffect(() => {
         if (!results.length || !dateFrom || !dateTo) return
@@ -243,12 +241,8 @@ export default function Page() {
                 const matchSolicitante = solicitanteFiltrado === "" || d.fiscal.nome_solicitante == solicitanteFiltrado
                 const matchAssinado = !apenasAssinados || d.fiscal.documento_assinado == 1
 
-                let usuarioAprovador = d.fiscal_aprovacoes.some(
-                    ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === usuarioNorm
-                );
-
-                if (userAdmin && !modoPendentesHome) { usuarioAprovador = true; }
-
+                // Quem tem o módulo vê os movimentos. Assinar/aprovar continua
+                // restrito a quem está em FISCAL_APROVADORES (podeAssinar abaixo).
                 let matchMinhaVez = true
                 if (modoPendentesHome) {
                     const nivelUsuario = d.fiscal_aprovacoes.find(
@@ -261,7 +255,7 @@ export default function Page() {
                     ) && todasInferioresAprovadas && status_liberado;
                 }
 
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchTipoMovimento && matchMinhaVez && matchAssinado
+                return matchQuery && matchSituacao && matchSolicitante && matchTipoMovimento && matchMinhaVez && matchAssinado
             })
             setResults(filtrados)
         } catch (err) {
