@@ -54,6 +54,27 @@
         let currentPage = 1;
         let currentScale = 1.5;
         let loadingTask = null;
+        // O parent pode reenviar o mesmo PDF várias vezes; cada carga nova destrói a
+        // anterior, que rejeita com "Worker was destroyed". Só a última carga conta.
+        let loadSeq = 0;
+        // Comparação do base64 inteiro: tamanho + início/fim colide entre PDFs do mesmo
+        // gerador (mesmo tamanho e trailer) e mostraria o documento anterior.
+        let lastPdfBase64 = null;
+        let renderSeq = 0;
+        let currentRenderTask = null;
+
+        function isCancelamento(err) {
+            if (!err) return false;
+            if (err.name === 'RenderingCancelledException') return true;
+            return /Worker was destroyed/i.test(String(err.message || err));
+        }
+
+        function cancelarRender() {
+            if (currentRenderTask) {
+                try { currentRenderTask.cancel(); } catch (_) { /* ignore */ }
+                currentRenderTask = null;
+            }
+        }
 
         function showError(msg) {
             const box = document.getElementById('errorBox');
@@ -98,7 +119,11 @@
         function renderPage(pageNum, scale = currentScale) {
             if (!currentPdf) return;
 
+            const mySeq = ++renderSeq;
+            cancelarRender();
+
             currentPdf.getPage(pageNum).then(page => {
+                if (mySeq !== renderSeq) return;
                 const container = document.getElementById('pdfContainer');
                 container.innerHTML = '';
 
@@ -126,12 +151,17 @@
                     viewport: scaledViewport
                 };
 
-                page.render(renderContext).promise.then(() => {
+                const renderTask = page.render(renderContext);
+                currentRenderTask = renderTask;
+                renderTask.promise.then(() => {
+                    if (currentRenderTask === renderTask) currentRenderTask = null;
                 }).catch(err => {
+                    if (isCancelamento(err) || mySeq !== renderSeq) return;
                     console.error('Erro ao renderizar página:', err);
                     showError('Erro ao renderizar a página do PDF.');
                 });
             }).catch(err => {
+                if (isCancelamento(err) || mySeq !== renderSeq) return;
                 console.error('Erro ao obter página:', err);
                 showError('Erro ao abrir a página do PDF.');
             });
@@ -143,7 +173,12 @@
                 return;
             }
 
+            if (pdfBase64 === lastPdfBase64) return;
+            lastPdfBase64 = pdfBase64;
+            const seq = ++loadSeq;
+
             clearError();
+            cancelarRender();
             try {
                 if (loadingTask && loadingTask.destroy) {
                     try { loadingTask.destroy(); } catch (_) { /* ignore */ }
@@ -155,6 +190,7 @@
                 pdfData = base64ToUint8Array(pdfBase64);
             } catch (err) {
                 console.error(err);
+                lastPdfBase64 = null;
                 showError('Base64 do PDF inválido.');
                 return;
             }
@@ -166,10 +202,12 @@
             });
 
             loadingTask.promise.then(pdf => {
+                if (seq !== loadSeq) return;
                 currentPdf = pdf;
                 currentPage = 1;
                 window.parent.postMessage({ totalPages: pdf.numPages }, "*");
                 pdf.getPage(1).then(page => {
+                    if (seq !== loadSeq) return;
                     const naturalViewport = page.getViewport({ scale: 1 });
                     const containerWidth = document.getElementById('pdfContainer').clientWidth;
                     currentScale = containerWidth > 0
@@ -177,11 +215,14 @@
                         : 1.5;
                     renderPage(currentPage, currentScale);
                 }).catch(err => {
+                    if (seq !== loadSeq || isCancelamento(err)) return;
                     console.error(err);
                     showError('Não foi possível ler a primeira página.');
                 });
             }).catch(err => {
+                if (seq !== loadSeq || isCancelamento(err)) return;
                 console.error('Erro ao carregar PDF:', err);
+                lastPdfBase64 = null;
                 showError((err && err.message) ? err.message : 'Erro ao carregar PDF.');
             });
         }
