@@ -42,7 +42,10 @@ export const headersExterno = () => ({
 export const API_TIMEOUT_MS = 30_000;
 
 /** Timeout para agregação de pendências do gestor (várias unidades no SQL). */
-export const PENDENCIAS_TIMEOUT_MS = 90_000;
+export const PENDENCIAS_TIMEOUT_MS = 120_000;
+
+/** Home: card do gestor e stats da unidade (meta ~30 s). */
+export const HOME_API_TIMEOUT_MS = 30_000;
 
 /** Timeout para consultas pesadas de extrato/controle de medição. */
 export const EXTRATO_CONTROLE_TIMEOUT_MS = 180_000;

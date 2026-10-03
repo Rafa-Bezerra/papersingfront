@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, RefreshCw, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   tiposComPendencias,
   unidadesComPendencias,
 } from "@/services/pendenciasService";
+import { HOME_API_TIMEOUT_MS } from "@/utils/constants";
 import { PendenciaGestorItem, PendenciaGestorResumoUnidadeTipo } from "@/types/Pendencias";
 import {
   consumirAbrirPendenciasAposLogin,
@@ -71,6 +72,8 @@ function contagemEsperada(
 
 export default function PendenciasLoginModal() {
   const router = useRouter();
+  const pathname = usePathname();
+  const naHome = pathname === "/home" || pathname?.startsWith("/home/");
   const [open, setOpen] = useState(false);
   const [itensGeral, setItensGeral] = useState<PendenciaGestorItem[]>([]);
   const [itensExibidos, setItensExibidos] = useState<PendenciaGestorItem[]>([]);
@@ -79,6 +82,7 @@ export default function PendenciasLoginModal() {
   const [porUnidade, setPorUnidade] = useState<{ unidade: string; total: number }[]>([]);
   const [porUnidadeTipo, setPorUnidadeTipo] = useState<PendenciaGestorResumoUnidadeTipo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState<string | null>(null);
   const [avaliado, setAvaliado] = useState(false);
   const [recarregando, setRecarregando] = useState(false);
   const [abrindoId, setAbrindoId] = useState<string | null>(null);
@@ -126,14 +130,28 @@ export default function PendenciasLoginModal() {
 
     if (abrirPorLogin) setOpen(true);
     setLoading(true);
+    setErroCarregar(null);
 
     try {
-      const data = await getPendenciasGestor(30, opts?.forcarAbrir ? { force: true } : undefined);
+      const precisaListaCompleta = opts?.forcarAbrir || openRef.current;
+      const data = await getPendenciasGestor(
+        8,
+        precisaListaCompleta
+          ? opts?.forcarAbrir
+            ? { force: true }
+            : undefined
+          : { somenteResumo: true, timeoutMs: HOME_API_TIMEOUT_MS }
+      );
       if (reqId !== carregarReqRef.current) return;
 
-      setItensGeral(data.itens);
+      if (precisaListaCompleta) {
+        setItensGeral(data.itens);
+        setTotalExibidos(data.totalExibidos ?? data.itens.length);
+      } else {
+        setItensGeral([]);
+        setTotalExibidos(0);
+      }
       setTotal(data.total);
-      setTotalExibidos(data.totalExibidos ?? data.itens.length);
       setPorUnidade(normalizarPorUnidade(data.porUnidade, data.itens));
       setPorUnidadeTipo(data.porUnidadeTipo ?? []);
 
@@ -161,6 +179,7 @@ export default function PendenciasLoginModal() {
       console.warn("PendenciasLoginModal: falha ao carregar pendências", error);
       if (reqId !== carregarReqRef.current) return;
       setPorUnidade([]);
+      setErroCarregar((error as Error).message || "Não foi possível carregar as pendências.");
       if (abrirPorLogin && !manterAberto) setOpen(false);
       marcarResolvido();
     } finally {
@@ -172,11 +191,17 @@ export default function PendenciasLoginModal() {
   }, [marcarResolvido]);
 
   useEffect(() => {
+    if (naHome) {
+      setLoading(false);
+      setAvaliado(true);
+      marcarResolvido();
+      return;
+    }
     void carregar();
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [carregar]);
+  }, [carregar, naHome, marcarResolvido]);
 
   useEffect(() => {
     const onLogin = () => void carregar({ forcarAbrir: true });
@@ -195,6 +220,28 @@ export default function PendenciasLoginModal() {
   }, [carregar]);
 
   useEffect(() => {
+    if (!open || total <= 0) return;
+    if (itensGeral.length > 0) return;
+
+    let cancelled = false;
+    void getPendenciasGestor(8, { force: true })
+      .then((data) => {
+        if (cancelled) return;
+        setItensGeral(data.itens);
+        setTotalExibidos(data.totalExibidos ?? data.itens.length);
+        setPorUnidade(normalizarPorUnidade(data.porUnidade, data.itens));
+        setPorUnidadeTipo(data.porUnidadeTipo ?? []);
+      })
+      .catch((error) => {
+        console.warn("PendenciasLoginModal: falha ao carregar lista completa", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, total, itensGeral.length]);
+
+  useEffect(() => {
     if (!open) return;
 
     const local = filtrarItens(itensGeral, filtroUnidade, filtroTipo);
@@ -205,7 +252,7 @@ export default function PendenciasLoginModal() {
     const reqId = ++filtroReqRef.current;
     setRecarregando(true);
 
-    void getPendenciasGestor(30, {
+    void getPendenciasGestor(8, {
       unidade: filtroUnidade || null,
       tipo: filtroTipo || null,
       force: true,
@@ -433,8 +480,10 @@ export default function PendenciasLoginModal() {
             </div>
           ) : listaVazia ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              {total > 0 && itensGeral.length === 0
-                ? "Não foi possível carregar os itens. Clique em Atualizar."
+              {erroCarregar
+                ? erroCarregar
+                : total > 0 && itensGeral.length === 0
+                ? "A contagem chegou, mas a lista de itens não. Clique em Atualizar."
                 : esperado > 0
                   ? "Nenhum item carregado para este filtro. Clique em Atualizar."
                   : "Nenhum item com os filtros selecionados."}
