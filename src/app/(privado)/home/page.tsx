@@ -26,6 +26,8 @@ import { DashboardStats, getDashboardStats } from '@/services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import './home.css';
+import { USERDATA_UPDATED_EVENT } from '@/utils/sessionUser';
+import { HOME_GESTOR_RESUMO_DONE_EVENT, HOME_STATS_RETRY_EVENT } from '@/services/pendenciasService';
 
 function hrefResumoMovimento(status: string): string {
   const map: Record<string, string> = {
@@ -48,7 +50,7 @@ function hrefResumoMovimento(status: string): string {
 
 export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [userAdmin, setUserAdmin] = useState(false)
   const [userDocumentos, setUserDocumentos] = useState(false)
   const [userBordero, setUserBordero] = useState(false)
@@ -62,74 +64,85 @@ export default function HomePage() {
   const [userProjetos, setUserProjetos] = useState(false)
   const [userUnidade, setUserUnidade] = useState("")
   const [userDocusign, setUserDocusign] = useState(false)
+  const [statsErro, setStatsErro] = useState<string | null>(null)
+
+  const aplicarUsuarioDaSessao = () => {
+    const storedUser = sessionStorage.getItem("userData");
+    if (!storedUser) return;
+    try {
+      const user = JSON.parse(storedUser);
+      setUserAdmin(user.admin);
+      setUserDocumentos(user.documentos);
+      setUserRestrito(user.restrito);
+      setUserBordero(user.bordero);
+      setUserExterno(user.externo);
+      setUserComunicados(user.comunicados);
+      setUserFiscal(user.fiscal);
+      setPagamentoRh(user.pagamento_rh);
+      setPagamentoImpostos(user.pagamento_impostos);
+      setUserRdv(user.rdv);
+      setUserProjetos(Boolean(user.projetos || user.financeiro));
+      setUserUnidade(String(user.unidade ?? ""));
+      setUserDocusign(Boolean(user.docusign || user.financeiro));
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
+    }
+  };
 
   useEffect(() => {
-    const storedUser = sessionStorage.getItem("userData");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setUserAdmin(user.admin);
-        setUserDocumentos(user.documentos);
-        setUserRestrito(user.restrito);
-        setUserBordero(user.bordero);
-        setUserExterno(user.externo);
-        setUserComunicados(user.comunicados);
-        setUserFiscal(user.fiscal);
-        setPagamentoRh(user.pagamento_rh);
-        setPagamentoImpostos(user.pagamento_impostos);
-        setUserRdv(user.rdv);
-        setUserProjetos(Boolean(user.projetos || user.financeiro));
-        setUserUnidade(String(user.unidade ?? ""));
-        setUserDocusign(Boolean(user.docusign || user.financeiro));
-      } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
-      }
-    }
+    aplicarUsuarioDaSessao();
+    const onUserUpdated = () => aplicarUsuarioDaSessao();
+    window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+    window.addEventListener('papersign-login', onUserUpdated);
+    return () => {
+      window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+      window.removeEventListener('papersign-login', onUserUpdated);
+    };
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let statsInflight = false;
+
     async function loadStats() {
+      if (statsInflight || cancelled) return;
+      statsInflight = true;
+      setStatsErro(null);
+      if (!sessionStorage.getItem('authToken')) {
+        setStatsLoading(false);
+        setStats(null);
+        statsInflight = false;
+        return;
+      }
+      setStatsLoading(true);
       try {
         const data = await getDashboardStats();
+        if (cancelled) return;
         setStats(data);
+        if (!data) setStatsErro('Não foi possível carregar os indicadores desta unidade.');
       } catch (error) {
+        if (cancelled) return;
         console.warn('Erro ao carregar estatísticas:', error);
+        setStats(null);
+        setStatsErro(
+          error instanceof Error ? error.message : 'Erro ao carregar indicadores da unidade.'
+        );
       } finally {
-        setLoading(false);
+        statsInflight = false;
+        if (!cancelled) setStatsLoading(false);
       }
     }
 
-    if (sessionStorage.getItem('authToken')) {
-      void loadStats();
-    } else {
-      setLoading(false);
-    }
+    const onGestorResumoDone = () => void loadStats();
+    const onStatsRetry = () => void loadStats();
+    window.addEventListener(HOME_GESTOR_RESUMO_DONE_EVENT, onGestorResumoDone);
+    window.addEventListener(HOME_STATS_RETRY_EVENT, onStatsRetry);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HOME_GESTOR_RESUMO_DONE_EVENT, onGestorResumoDone);
+      window.removeEventListener(HOME_STATS_RETRY_EVENT, onStatsRetry);
+    };
   }, []);
-
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <header className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </header>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-32" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="home-page space-y-6 sm:space-y-8 w-full p-4 sm:p-6">
@@ -140,8 +153,8 @@ export default function HomePage() {
         </p>
       </header>
 
-      {/* Seção Pendentes do Gestor - em destaque */}
-      {stats && (<section className="space-y-4">
+      {/* Pendentes do gestor: não depende do /Dashboard/stats (evita home “vazia” ao trocar base). */}
+      <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Pendentes do Gestor</h2>
@@ -161,8 +174,36 @@ export default function HomePage() {
         <PendenciasGestorHomeCard />
 
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
-          Unidade atual
+          Unidade atual{userUnidade ? ` (${userUnidade})` : ''}
         </p>
+        {statsErro && !statsLoading && (
+          <p className="text-sm text-amber-700 dark:text-amber-200">
+            {statsErro}{' '}
+            <button
+              type="button"
+              className="font-medium underline"
+              onClick={() => window.dispatchEvent(new Event(HOME_STATS_RETRY_EVENT))}
+            >
+              Tentar de novo
+            </button>
+          </p>
+        )}
+        {statsLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-3 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+        {!statsLoading && stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <DashboardCard
             title="Movimentos"
@@ -261,7 +302,8 @@ export default function HomePage() {
             href="/docusign?filtro=pendentes"
           />)}
         </div>
-      </section>)}
+        )}
+      </section>
 
       {/* Cards de Acesso Rápido */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${userAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 sm:gap-6`} >
