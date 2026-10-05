@@ -18,6 +18,7 @@ import { Bell, Check, ChevronLeft, ChevronRight, Filter, Loader2, RefreshCwIcon 
 import { AnexoRdv, Rdv, ItemRdv, AprovadoresRdv, getAprovacoesRdv, aprovarRdv, AssinarRdv, assinar, getAnexoById, notificarAprovadorRdv } from '@/services/rdvService';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { AvisoApi, mostrarErro } from '@/utils/avisoApi';
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics } from '@/utils/functions';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
@@ -146,7 +147,8 @@ export default function Page() {
             buscaAprovacoesRdv();
         }
         catch (err) {
-            setError((err as Error).message)
+            if (err instanceof AvisoApi) mostrarErro(err)
+            else setError((err as Error).message)
         }
         finally {
             setIsLoading(false)
@@ -228,7 +230,7 @@ export default function Page() {
             await assinar(data)
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
-            toast.error((err as Error).message)
+            mostrarErro(err)
         } finally {
             setIsModalVisualizarDocumentoOpen(false)
             setIsLoading(false)
