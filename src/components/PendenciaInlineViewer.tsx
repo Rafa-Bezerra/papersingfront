@@ -6,6 +6,7 @@ import { PendenciaMovimentoViewer } from "@/components/PendenciaMovimentoViewer"
 import { PendenciaPagamentoViewer } from "@/components/PendenciaPagamentoViewer";
 import { PendenciaComunicadoViewer } from "@/components/PendenciaComunicadoViewer";
 import { PendenciaFiscalViewer } from "@/components/PendenciaFiscalViewer";
+import { PendenciaRdvViewer } from "@/components/PendenciaRdvViewer";
 import { pendenciaSuportaAssinaturaInline } from "@/utils/pendenciaAssinatura";
 import { pendenciaEhMovimento } from "@/utils/pendenciaMovimento";
 import { pendenciaEhPagamento } from "@/utils/pendenciaPagamento";
@@ -88,6 +89,16 @@ export function PendenciaInlineViewer({ item, onClose, onConcluido }: Props) {
   if (pendenciaEhFiscal(item.tipo)) {
     return (
       <PendenciaFiscalViewer
+        item={item}
+        onClose={onClose}
+        onConcluido={onConcluido}
+      />
+    );
+  }
+
+  if (item.tipo.trim().toLowerCase() === "rdv") {
+    return (
+      <PendenciaRdvViewer
         item={item}
         onClose={onClose}
         onConcluido={onConcluido}
