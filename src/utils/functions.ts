@@ -28,6 +28,15 @@ export function extrairMensagemErroApi(body: string, fallback: string): string {
   try {
     const json = JSON.parse(mensagem)
     if (typeof json === "string") mensagem = json
+    else if (json?.errors && typeof json.errors === "object") {
+      // Erro de validação do ASP.NET: o título é genérico; mostra quais campos foram recusados.
+      const campos = Object.keys(json.errors)
+        .map((k) => k.replace(/^\$\.?/, "").replace(/^dto\./i, ""))
+        .filter(Boolean)
+      mensagem = campos.length
+        ? `Dados inválidos no envio. Confira: ${campos.join(", ")}.`
+        : (json?.title ?? "")
+    }
     else mensagem = json?.erro ?? json?.message ?? json?.title ?? ""
   } catch { /* body não é JSON — usa como está */ }
   mensagem = (mensagem ?? "").split("\n")[0].trim()
