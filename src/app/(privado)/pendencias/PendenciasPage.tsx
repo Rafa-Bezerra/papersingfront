@@ -79,7 +79,7 @@ export default function PendenciasPage() {
     setLoading(true);
 
     try {
-      const data = await getPendenciasGestor(30, force ? { force: true } : undefined);
+      const data = await getPendenciasGestor(12, force ? { force: true } : undefined);
       if (reqId !== carregarReqRef.current) return;
       aplicarDados(data);
     } catch (e) {
@@ -114,7 +114,7 @@ export default function PendenciasPage() {
     const reqId = ++filtroReqRef.current;
     setRecarregando(true);
 
-    void getPendenciasGestor(30, {
+    void getPendenciasGestor(12, {
       unidade: filtroUnidade || null,
       tipo: filtroTipo || null,
       force: true,
