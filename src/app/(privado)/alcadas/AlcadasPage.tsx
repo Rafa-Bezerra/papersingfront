@@ -51,8 +51,10 @@ import {
 } from '@/services/aprovadoresService'
 import {
     Usuario,
-    getAll as getAllUsuarios
+    getUsuariosAprovadores
 } from '@/services/usuariosService'
+import { getAllCentrosDeCusto } from '@/services/mgoFinanceiroService'
+import { CentroDeCusto } from '@/types/Carrinho'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -63,6 +65,7 @@ import {
   FormMessage
 } from '@/components/ui/form'
 import { toast } from 'sonner'
+import { mostrarErro } from '@/utils/avisoApi'
 
 export default function Page() {
     const titulo = 'Alçadas de Aprovação'
@@ -100,6 +103,8 @@ export default function Page() {
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [comboUsuarioAberto, setComboUsuarioAberto] = useState(false)
     const carregouUsuarios = useRef(false)
+    const [centrosCusto, setCentrosCusto] = useState<CentroDeCusto[]>([])
+    const [comboCcAberto, setComboCcAberto] = useState(false)
 
     const form = useForm<Alcada>({
         defaultValues: { 
@@ -161,24 +166,9 @@ export default function Page() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    function unidadeDaSessao(): string {
-        try {
-            const raw = sessionStorage.getItem('userData')
-            if (!raw) return ''
-            const u = JSON.parse(raw)
-            return String(u.unidade ?? u.UNIDADE ?? '').trim()
-        } catch {
-            return ''
-        }
-    }
-
     async function buscaUsuarios() {
         try {
-            const unidade = unidadeDaSessao()
-            const unidadeFiltro =
-                unidade.toUpperCase() === 'WAY CSC' ? undefined : unidade || undefined
-            const dados = await getAllUsuarios(unidadeFiltro)
-            setUsuarios(dados.filter((u) => u.ativo !== false))
+            setUsuarios(await getUsuariosAprovadores())
             carregouUsuarios.current = true
         } catch {
             setUsuarios([])
@@ -233,14 +223,33 @@ export default function Page() {
         await handleSearch(query)
     }
 
+    // Centros de custo ativos da unidade (GCCUSTO): a alçada só pode ser cadastrada para um deles.
+    async function buscaCentrosCusto() {
+        if (centrosCusto.length) return
+        try {
+            const dados = await getAllCentrosDeCusto()
+            // O GCCUSTO da unidade pode ter o mesmo código ativo em mais de uma linha (SEQUENCIAL diferente).
+            const porCodigo = new Map<string, CentroDeCusto>()
+            for (const c of dados) {
+                const ccusto = (c.ccusto ?? '').trim()
+                if (ccusto && !porCodigo.has(ccusto)) porCodigo.set(ccusto, { ...c, ccusto, custo: (c.custo ?? '').trim() })
+            }
+            setCentrosCusto([...porCodigo.values()].sort((a, b) => a.ccusto.localeCompare(b.ccusto)))
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
     async function handleInserir () {
-        form.reset({ 
+        form.reset({
             id: 0,
             centro_custo: '',
             centro_custo_nome: ''
         })
         setUpdateAlcadaMode(false)
+        setComboCcAberto(false)
         setIsFormAlcadaOpen(true)
+        await buscaCentrosCusto()
     }
 
     async function handleAprovadores (alcada: Alcada) {
@@ -264,8 +273,11 @@ export default function Page() {
             centro_custo: alcada.centro_custo,
             centro_custo_nome: alcada.centro_custo_nome
         })
+        setAlcadaSelecionada(alcada)
         setUpdateAlcadaMode(true)
+        setComboCcAberto(false)
         setIsFormAlcadaOpen(true)
+        await buscaCentrosCusto()
     }
 
     async function handleExcluir () {
@@ -285,17 +297,17 @@ export default function Page() {
         setError(null)
         try {
             if (data.id && data.id !== 0) {
-                await updateAlcada(data)        
+                await updateAlcada(data)
             } else {
                 await createAlcada(data)
             }
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
             toast.success(`Registro enviado`)
             form.reset()
-            await handleSearchClick()
             setIsFormAlcadaOpen(false)
+            await handleSearchClick()
+        } catch (err) {
+            // Mantém o modal aberto para corrigir (ex.: CC inexistente ou alçada duplicada).
+            mostrarErro(err)
         }
     }
 
@@ -365,7 +377,7 @@ export default function Page() {
             setIsModalAprovadoresOpen(false)
             await handleSearchClick()
         } catch (err) {
-            toast.error((err as Error).message)
+            mostrarErro(err)
         }
     }
     
@@ -512,7 +524,7 @@ export default function Page() {
 
             <Card className="mb-6">
                 <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={loading} />
+                    <DataTable columns={colunas} data={results} loading={loading} hideSearch />
                 </CardContent>
             </Card>
 
@@ -625,12 +637,63 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="centro_custo"
-                                rules={{ required: 'Centro de custo é obrigatório' }}
+                                rules={{
+                                    required: 'Centro de custo é obrigatório',
+                                    validate: (v) =>
+                                        centrosCusto.some((c) => c.ccusto === String(v ?? '').trim()) ||
+                                        (updateAlcadaMode && v === alcadaSelecionada?.centro_custo)
+                                            ? true
+                                            : 'Escolha um centro de custo da lista.',
+                                }}
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Centro de custo</FormLabel>
                                     <FormControl>
-                                    <Input {...field} />
+                                    <Popover modal open={comboCcAberto} onOpenChange={setComboCcAberto}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full justify-between font-normal"
+                                            >
+                                                <span className="truncate">
+                                                    {field.value
+                                                        ? `${field.value} — ${form.getValues('centro_custo_nome') ?? ''}`
+                                                        : centrosCusto.length ? 'Selecione o centro de custo' : 'Carregando centros de custo…'}
+                                                </span>
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverPortal>
+                                            <PopoverContent
+                                                className="p-0 w-[min(100vw-2rem,28rem)] pointer-events-auto z-[9999]"
+                                                align="start"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Command>
+                                                    <CommandInput placeholder="Buscar por código ou nome..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>Nenhum centro de custo encontrado.</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {centrosCusto.map((c) => (
+                                                                <CommandItem
+                                                                    key={c.ccusto}
+                                                                    value={`${c.ccusto} - ${c.custo}`}
+                                                                    onSelect={() => {
+                                                                        field.onChange(c.ccusto)
+                                                                        form.setValue('centro_custo_nome', c.custo, { shouldValidate: true })
+                                                                        setComboCcAberto(false)
+                                                                    }}
+                                                                >
+                                                                    {`${c.ccusto} - ${c.custo}`}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </PopoverPortal>
+                                    </Popover>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -644,7 +707,7 @@ export default function Page() {
                                 <FormItem>
                                     <FormLabel>Descrição</FormLabel>
                                     <FormControl>
-                                    <Input {...field} />
+                                    <Input {...field} readOnly className="bg-muted" placeholder="Preenchida pelo centro de custo" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -762,7 +825,16 @@ export default function Page() {
                             <FormField
                                 control={formAprovadores.control}
                                 name="valor_final"
-                                rules={{ required: 'Valor final é obrigatório' }}
+                                rules={{
+                    required: 'Valor final é obrigatório',
+                    // Mesma regra da API (AprovadorCadastroRegras.ValidarFaixa).
+                    validate: (v, valores) => {
+                        const fim = Number(v)
+                        if (fim === 1) return 'Valor final não pode ser 1. Sem limite: use um valor alto (ex.: 9999999).'
+                        if (fim <= Number(valores.valor_inicial)) return 'Valor final tem que ser maior que o valor inicial.'
+                        return true
+                    },
+                }}
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor final</FormLabel>

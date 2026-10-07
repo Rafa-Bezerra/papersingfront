@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { AvisoApi, mostrarErro } from "@/utils/avisoApi";
 import { Button } from "@/components/ui/button";
 import { PendenciaAcoesFooter } from "@/components/PendenciaAcoesFooter";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
@@ -186,7 +187,8 @@ export function PendenciaMovimentoViewer({ item, onClose, onConcluido }: Props) 
       toast.message("Movimento assinado. Escolha Aprovar ou Recusar abaixo.");
     } catch (e) {
       toast.dismiss(toastId);
-      toast.error(e instanceof Error ? e.message : "Erro ao assinar.");
+      if (e instanceof AvisoApi) mostrarErro(e);
+      else toast.error(e instanceof Error ? e.message : "Erro ao assinar.");
     } finally {
       setProcessando(false);
     }
@@ -208,7 +210,8 @@ export function PendenciaMovimentoViewer({ item, onClose, onConcluido }: Props) 
       );
     } catch (e) {
       toast.dismiss(toastId);
-      toast.error(e instanceof Error ? e.message : "Erro ao aprovar movimento.");
+      if (e instanceof AvisoApi) mostrarErro(e);
+      else toast.error(e instanceof Error ? e.message : "Erro ao aprovar movimento.");
     } finally {
       setProcessando(false);
     }

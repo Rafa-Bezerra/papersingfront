@@ -1,5 +1,6 @@
 import type { Bordero, BorderoItem, BorderoAprovacao } from "@/types/Bordero";
 import { API_BASE, headers } from "@/utils/constants";
+import { erroDaResposta } from "@/utils/avisoApi";
 import { AnexoMovimento } from "./requisicoesService";
 const caminho = "Bordero";
 const elemento_singular = "borderô";
@@ -52,10 +53,7 @@ export async function getAllAprovadores(id:number): Promise<BorderoAprovacao[]> 
   
 export async function adicionarAprovador(data: BorderoAprovacao): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/aprovadores/adicionar`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
-    }
+    if (!res.ok) throw await erroDaResposta(res, `adicionar aprovador`);
 }
   
 export async function toggleAprovador(id: number, toggle: number): Promise<void> {

@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
 import { ChevronsUpDown, SearchIcon, SquarePlus, X } from 'lucide-react'
 import { toast } from 'sonner';
+import { mostrarErro } from '@/utils/avisoApi';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -49,7 +50,7 @@ import {
 import { PopoverPortal } from '@radix-ui/react-popover'
 import {
   Usuario,
-  getAll as getAllUsuarios
+  getUsuariosAprovadores
 } from '@/services/usuariosService'
 
 export default function Page() {
@@ -98,7 +99,7 @@ export default function Page() {
   async function buscaUsuarios() {
     setError(null)
     try {
-      const dados = await getAllUsuarios()
+      const dados = await getUsuariosAprovadores()
       setUsuarios(dados)
       carregou.current = true;
     } catch (err) {
@@ -185,13 +186,12 @@ export default function Page() {
     setError(null)
     try {
       await adicionarAprovador(data)
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
       toast.success(`Registro enviado`)
       form.reset()
       await handleSearchClick()
       setIsModalOpen(false)
+    } catch (err) {
+      mostrarErro(err)
     }
   }
 

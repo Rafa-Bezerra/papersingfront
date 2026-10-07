@@ -1,4 +1,5 @@
 import { API_BASE, headers } from '@/utils/constants'
+import { erroDaResposta } from '@/utils/avisoApi'
 import { buscarUsuariosSubstituicao, SubstituicaoUsuario } from '@/services/substituicaoAprovadoresService'
 
 export type { SubstituicaoUsuario as TransferenciaUsuario }
@@ -6,6 +7,7 @@ export type { SubstituicaoUsuario as TransferenciaUsuario }
 const caminho = 'TransferenciaAlcadas'
 
 async function lerErro(res: Response, fallback: string) {
+  if (res.status === 400 || res.status === 409) throw await erroDaResposta(res, fallback)
   const msg = await res.text()
   throw new Error(msg || fallback)
 }

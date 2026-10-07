@@ -49,6 +49,7 @@ import { Assinar, assinar } from '@/services/assinaturaService'
 import { getAllTiposContrato, TipoContrato } from '@/services/carrinhoService'
 import CriarContratoDialog from '../components/CriarContratoDialog'
 import { toast } from 'sonner'
+import { AvisoApi, mostrarErro } from '@/utils/avisoApi'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
 import {
@@ -473,7 +474,7 @@ export default function Page() {
             handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
-            toast.error((err as Error).message)
+            mostrarErro(err)
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
@@ -556,7 +557,8 @@ export default function Page() {
             // Refetch em background para manter dados sincronizados.
             handleSearch(query)
         } catch (err) {
-            setError((err as Error).message)
+            if (err instanceof AvisoApi) mostrarErro(err)
+            else setError((err as Error).message)
         } finally {
             setIsProcessing(false)
         }

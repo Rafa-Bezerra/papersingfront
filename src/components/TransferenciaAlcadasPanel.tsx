@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { AvisoApi, mostrarErro } from '@/utils/avisoApi'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -368,7 +369,8 @@ export default function TransferenciaAlcadasPanel() {
       setFormOpen(false)
       await carregar()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha ao aplicar.')
+      if (err instanceof AvisoApi) mostrarErro(err)
+      else toast.error(err instanceof Error ? err.message : 'Falha ao aplicar.')
     } finally {
       setSalvando(false)
     }

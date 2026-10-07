@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form'
 import { ColumnDef } from '@tanstack/react-table'
 import { ChevronsUpDown, SearchIcon, SquarePlus, X } from 'lucide-react'
 import { toast } from 'sonner';
+import { mostrarErro } from '@/utils/avisoApi';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -44,7 +45,7 @@ import { stripDiacritics, toMoney } from '@/utils/functions'
 import { PopoverPortal } from '@radix-ui/react-popover'
 import {
   Usuario,
-  getAll as getAllUsuarios
+  getUsuariosAprovadores
 } from '@/services/usuariosService'
 import { AprovadoresImpostos, createElement, deleteElement, getAll, updateElement } from '@/services/aprovadoresImpostosService'
 
@@ -99,7 +100,7 @@ export default function Page() {
   async function buscaUsuarios() {
     setError(null)
     try {
-      const dados = await getAllUsuarios()
+      const dados = await getUsuariosAprovadores()
       setUsuarios(dados)
       carregou.current = true;
     } catch (err) {
@@ -198,13 +199,12 @@ export default function Page() {
       } else {
         await createElement(data);
       }
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
       toast.success(`Registro enviado`)
       form.reset()
       await handleSearchClick()
       setIsModalOpen(false)
+    } catch (err) {
+      mostrarErro(err)
     }
   }
 
@@ -402,7 +402,16 @@ export default function Page() {
               <FormField
                 control={form.control}
                 name="valor_final"
-                rules={{ required: 'Valor final é obrigatório' }}
+                rules={{
+                    required: 'Valor final é obrigatório',
+                    // Mesma regra da API (AprovadorCadastroRegras.ValidarFaixa).
+                    validate: (v, valores) => {
+                        const fim = Number(v)
+                        if (fim === 1) return 'Valor final não pode ser 1. Sem limite: use um valor alto (ex.: 9999999).'
+                        if (fim <= Number(valores.valor_inicial)) return 'Valor final tem que ser maior que o valor inicial.'
+                        return true
+                    },
+                }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Valor final</FormLabel>
