@@ -18,7 +18,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, X } from 'lucide-react'
+import { Bell, Check, ChevronLeft, ChevronRight, Filter, RefreshCw, SearchIcon, TriangleAlert, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -57,6 +57,7 @@ import { Assinar, assinar } from '@/services/assinaturaService'
 import { getAllTiposContrato, TipoContrato } from '@/services/carrinhoService'
 import CriarContratoDialog from './CriarContratoDialog'
 import { toast } from 'sonner'
+import { AvisoApi, mostrarErro } from '@/utils/avisoApi'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
 import {
@@ -389,7 +390,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
-            toast.error((err as Error).message)
+            mostrarErro(err)
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
@@ -470,7 +471,8 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             }
             handleSearch(query)
         } catch (err) {
-            setError((err as Error).message)
+            if (err instanceof AvisoApi) mostrarErro(err)
+            else setError((err as Error).message)
         } finally {
             setIsProcessing(false)
         }
@@ -662,7 +664,31 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             { accessorKey: 'requisicao.movimento', header: 'Movimento' },
             { accessorKey: 'requisicao.tipo_movimento', header: 'Tipo movimento' },
             { accessorKey: 'requisicao.nome_solicitante', header: 'Solicitante', accessorFn: (row) => row.requisicao?.nome_solicitante?.trim() || "—" },
-            { accessorKey: 'requisicao.status_movimento', header: 'Situação' },
+            {
+                accessorKey: 'requisicao.status_movimento',
+                header: 'Situação',
+                cell: ({ row }) => {
+                    const status = row.original.requisicao.status_movimento
+                    // Concluído no RM (ex.: atendimento cancelado e regerado já em F) sem todas as assinaturas do PS.
+                    const pendentes = status?.startsWith('Concluído')
+                        ? (row.original.requisicao_aprovacoes ?? []).filter(a => a.situacao?.trim().toUpperCase() !== 'A').length
+                        : 0
+                    return (
+                        <span className="flex flex-col gap-1">
+                            <span>{status}</span>
+                            {pendentes > 0 && (
+                                <span
+                                    className="inline-flex w-fit items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400"
+                                    title="Concluído no RM, mas ainda há aprovadores sem assinatura no PaperSign. Veja em Aprovações."
+                                >
+                                    <TriangleAlert className="h-3 w-3" />
+                                    {pendentes === 1 ? '1 assinatura pendente' : `${pendentes} assinaturas pendentes`}
+                                </span>
+                            )}
+                        </span>
+                    )
+                },
+            },
             {
                 accessorKey: 'requisicao.situacao_entrega',
                 header: 'Entrega',

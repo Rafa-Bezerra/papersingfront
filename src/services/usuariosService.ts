@@ -64,6 +64,32 @@ export async function getAll(unidadeFiltro?: string): Promise<Usuario[]> {
     });
 }
 
+/**
+ * Usuários que podem ser escolhidos como aprovador: GUSUARIO ativa da unidade logada (inclusive na
+ * WAY CSC, que sem filtro recebe todas as bases e repete o mesmo login), um por login.
+ * A API recusa aprovador fora da GUSUARIO da unidade (AprovadorCadastroRegras).
+ */
+export async function getUsuariosAprovadores(): Promise<Usuario[]> {
+    let unidade = "";
+    try {
+        const raw = sessionStorage.getItem("userData");
+        if (raw) {
+            const u = JSON.parse(raw);
+            unidade = String(u.unidade ?? u.UNIDADE ?? "").trim();
+        }
+    } catch { /* sem sessão: a API filtra pela unidade do token */ }
+
+    const dados = await getAll(unidade || undefined);
+    const porLogin = new Map<string, Usuario>();
+    for (const u of dados) {
+        const codigo = (u.codusuario ?? "").trim();
+        if (!codigo || u.ativo === false) continue;
+        if (unidade && u.unidade && u.unidade.trim().toUpperCase() !== unidade.toUpperCase()) continue;
+        if (!porLogin.has(codigo.toLowerCase())) porLogin.set(codigo.toLowerCase(), { ...u, codusuario: codigo });
+    }
+    return [...porLogin.values()].sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
+}
+
 export async function getElementById(id: number): Promise<Usuario> {
     const res = await fetch(
       `${API_BASE}/api/${caminho}/${id}`,

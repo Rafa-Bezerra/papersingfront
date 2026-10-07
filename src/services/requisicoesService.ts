@@ -1,5 +1,6 @@
 import { AnexoMovimento, RequisicaoDto, Requisicao_aprovacao, Requisicao_avaliacoes, Requisicao_item } from "@/types/Requisicao";
 import { API_BASE, fetchJson, headers } from "@/utils/constants";
+import { erroDaResposta } from "@/utils/avisoApi";
 const caminho = "Requisicoes";
 const elemento_singular = "requisição";
 const elemento_plural = "requisições";
@@ -27,10 +28,7 @@ export type AprovarRequisicaoResult = {
 /** Aprova no servidor e devolve mensagens (incl. aviso amigável se notificação por e-mail falhar após persistir a aprovação). */
 export async function aprovar(id: number, atendimento: number): Promise<AprovarRequisicaoResult> {
     const res = await fetch(`${API_BASE}/api/${caminho}/aprovar/${id}/${atendimento}`,  { method: "POST", headers: headers(), body: JSON.stringify(id) }); 
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao aprovar ${elemento_singular}: ${msg}`);
-    }
+    if (!res.ok) throw await erroDaResposta(res, `aprovar ${elemento_singular}`);
     return (await res.json()) as AprovarRequisicaoResult;
 }
 

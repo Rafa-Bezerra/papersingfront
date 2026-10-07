@@ -1,5 +1,6 @@
 import { AprovadoresFiscal } from "@/types/AprovadoresFiscal";
 import { API_BASE, headers } from "@/utils/constants";
+import { erroDaResposta } from "@/utils/avisoApi";
 const caminho = "AprovadoresFiscal";
 const elemento_singular = "aprovador";
 const elemento_plural = "aprovadores";
@@ -28,18 +29,12 @@ export async function getElementById(id: number): Promise<AprovadoresFiscal> {
 
 export async function createElement(data: AprovadoresFiscal): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
-    if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);
-    }
+    if (!res.ok) throw await erroDaResposta(res, `criar ${elemento_singular}`);
 }
   
 export async function updateElement(data: AprovadoresFiscal): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/editar/${data.id}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
-    }
+    if (!res.ok) throw await erroDaResposta(res, `atualizar ${elemento_singular}`);
 }
   
 export async function deleteElement(id: number): Promise<void> {
