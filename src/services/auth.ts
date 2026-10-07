@@ -195,12 +195,44 @@ export async function exchangeSamlCode(code: string): Promise<LoginResponse> {
 }
 
 
+export const WAY_UNIDADES_ORDEM = [
+  'WAY 112',
+  'WAY 153',
+  'WAY 262',
+  'WAY 306',
+  'WAY 364',
+  'WAY CSC',
+] as const;
+
+export function ordenarUnidadesWay(lista: string[]): string[] {
+  const set = new Set(lista.map((u) => u.trim()).filter(Boolean));
+  const ordenadas: string[] = WAY_UNIDADES_ORDEM.filter((u) => set.has(u));
+  for (const u of set) {
+    if (!ordenadas.includes(u)) ordenadas.push(u);
+  }
+  return ordenadas;
+}
+
+/** Bases em que o usuário tem cadastro ativo (tela de login, antes do token). */
+export async function getUnidadesLogin(usuario: string): Promise<string[]> {
+  const cod = usuario.trim();
+  if (!cod) return [];
+  const res = await fetch(
+    `${API_BASE}/api/Usuarios/unidades-login?usuario=${encodeURIComponent(cod)}`,
+    { headers: { Accept: 'application/json' } }
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as string[];
+  return ordenarUnidadesWay(Array.isArray(data) ? data : []);
+}
+
 export async function getUnidadesDisponiveis(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/Usuarios/unidades-disponiveis`, {
     headers: headers(),
   });
   if (!res.ok) throw new Error('Erro ao buscar unidades disponíveis');
-  return res.json();
+  const data = (await res.json()) as string[];
+  return ordenarUnidadesWay(Array.isArray(data) ? data : []);
 }
 
 export async function trocarUnidade(novaUnidade: string): Promise<LoginResponse> {

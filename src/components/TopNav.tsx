@@ -17,6 +17,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { GLPI_SUPPORT_URL } from "@/utils/constants";
 import { getUnidadesDisponiveis, trocarUnidade } from "@/services/auth";
+import { USERDATA_UPDATED_EVENT } from "@/utils/sessionUser";
+import { notifyPapersignLogin } from "@/utils/pendenciaNavigation";
 
 interface TopNavProps {
   onMenuClick: () => void;
@@ -60,7 +62,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       }
     }
     getUnidadesDisponiveis()
-      .then((u) => setUnidadesDisponiveis([...u].sort((a, b) => a.localeCompare(b))))
+      .then((u) => setUnidadesDisponiveis(u))
       .catch(() => { });
   }, []);
 
@@ -75,7 +77,9 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       const novoUsuario = await trocarUnidade(unidade);
       sessionStorage.setItem("authToken", novoUsuario.token);
       sessionStorage.setItem("userData", JSON.stringify(novoUsuario));
-      window.location.href = "/home";
+      notifyPapersignLogin();
+      window.dispatchEvent(new Event(USERDATA_UPDATED_EVENT));
+      window.location.href = "/home/";
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao trocar unidade");
     } finally {

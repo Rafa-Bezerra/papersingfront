@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { imprimirPdfBase64, rotinaTipoMovimento, podeExcluirAnexoMovimento, safeDateLabel, stripDiacritics, toBase64 } from '@/utils/functions'
 import { aprovadorEhUsuarioLogado, codigosUsuarioParaAprovacao } from '@/utils/usuarioAprovacaoMovimento'
+import { refreshCurrentUserSessionFromApi, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
+import { SESSION_PERMS_REFRESH_KEY } from '@/utils/pendenciaNavigation'
 import {
     RequisicaoDto,
     Requisicao_aprovacao,
@@ -44,6 +46,7 @@ import {
 } from '@/services/requisicoesService'
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { toast } from 'sonner'
+import { AvisoApi, mostrarErro } from '@/utils/avisoApi'
 import { Loader2 } from "lucide-react";
 import { Label } from '@radix-ui/react-label';
 import {
@@ -166,8 +169,9 @@ export default function Page() {
         setDateFrom(prev => prev || "1900-01-01");
         setDateTo(prev => prev || today.toISOString().substring(0, 10));
 
-        const storedUser = sessionStorage.getItem("userData");
-        if (storedUser) {
+        const applyUserFromSession = () => {
+            const storedUser = sessionStorage.getItem("userData");
+            if (!storedUser) return;
             const user = JSON.parse(storedUser);
             setUserAdmin(user.admin);
             setUserAdministrativo(user.administrativo);
@@ -176,8 +180,16 @@ export default function Page() {
             setCodigosVinculados(
                 Array.isArray(user.codusuarios_vinculados) ? user.codusuarios_vinculados : []
             );
+        };
+        applyUserFromSession();
+        if (!sessionStorage.getItem(SESSION_PERMS_REFRESH_KEY)) {
+            void refreshCurrentUserSessionFromApi().then(() => {
+                sessionStorage.setItem(SESSION_PERMS_REFRESH_KEY, '1');
+                applyUserFromSession();
+            });
         }
-
+        const onUserDataUpdated = () => applyUserFromSession();
+        window.addEventListener(USERDATA_UPDATED_EVENT, onUserDataUpdated);
 
         // Compatibilidade: alguns cards antigos usam ?filtro=pendentes.
         const status = searchParams.get("status") ?? searchParams.get("filtro") ?? "";
@@ -237,6 +249,8 @@ export default function Page() {
         }
 
         setUserCarregado(true);
+
+        return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserDataUpdated);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -427,7 +441,7 @@ export default function Page() {
             handleSearchClick()
             toast.success("Assinatura enviada com sucesso!");
         } catch (err) {
-            toast.error((err as Error).message)
+            mostrarErro(err)
         } finally {
             setIsModalDocumentosOpen(false)
             setSearched(true)
@@ -485,7 +499,8 @@ export default function Page() {
             }
             handleSearch(query)
         } catch (err) {
-            setError((err as Error).message)
+            if (err instanceof AvisoApi) mostrarErro(err)
+            else setError((err as Error).message)
         } finally {
             setIsLoading(false)
         }
