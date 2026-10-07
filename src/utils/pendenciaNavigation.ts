@@ -200,10 +200,13 @@ export function clearPendenciasModalDismissed(): void {
   }
 }
 
+export const SESSION_PERMS_REFRESH_KEY = "papersign-session-perms-refreshed";
+
 export function notifyPapersignLogin(): void {
   try {
     clearGestorUnidadeContext();
     clearPendenciasModalDismissed();
+    sessionStorage.removeItem(SESSION_PERMS_REFRESH_KEY);
     sessionStorage.setItem(ABRIR_APOS_LOGIN_KEY, "1");
     window.dispatchEvent(new Event("papersign-login"));
   } catch {

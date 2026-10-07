@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm, SubmitHandler } from 'react-hook-form'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import {
   Card,
   CardContent,
@@ -22,15 +22,18 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
   getSamlStatus,
+  getUnidadesLogin,
   login,
   LoginPayload,
   SamlStatus,
-  startMicrosoftLogin
+  startMicrosoftLogin,
+  WAY_UNIDADES_ORDEM
 } from '@/services/auth'
 import { notifyPapersignLogin } from '@/utils/pendenciaNavigation'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MicrosoftSignInButton } from '@/components/MicrosoftSignInButton'
 
 interface LoginFormValues {
   usuario: string
@@ -48,7 +51,8 @@ function LoginPageInner() {
     setValue,
     watch,
     formState: { isSubmitting },
-    clearErrors
+    clearErrors,
+    getValues
   } = form
   const router = useRouter()
   const search = useSearchParams()
@@ -58,8 +62,16 @@ function LoginPageInner() {
     requireMicrosoftLogin: false
   })
   const [ssoBusy, setSsoBusy] = useState(false)
+  const [basesDisponiveis, setBasesDisponiveis] = useState<string[]>([])
+  const [basesCarregando, setBasesCarregando] = useState(false)
   const baseSelecionada = watch('base')
+  const usuarioDigitado = watch('usuario')
   const soMicrosoft = saml.enabled && saml.requireMicrosoftLogin
+
+  const opcoesBase = useMemo(() => {
+    if (soMicrosoft) return [...WAY_UNIDADES_ORDEM]
+    return basesDisponiveis
+  }, [soMicrosoft, basesDisponiveis])
 
   useEffect(() => {
     const err = search.get('sso_error')
@@ -69,6 +81,39 @@ function LoginPageInner() {
       .catch(() => setSaml({ enabled: false, requireMicrosoftLogin: false }))
   }, [search])
 
+  useEffect(() => {
+    if (soMicrosoft) return
+
+    const cod = (usuarioDigitado || '').trim()
+    if (cod.length < 2) {
+      setBasesDisponiveis([])
+      if (getValues('base')) setValue('base', '')
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setBasesCarregando(true)
+      getUnidadesLogin(cod)
+        .then((lista) => {
+          if (cancelled) return
+          setBasesDisponiveis(lista)
+          const atual = getValues('base')
+          if (atual && !lista.includes(atual)) {
+            setValue('base', '')
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setBasesCarregando(false)
+        })
+    }, 400)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [usuarioDigitado, soMicrosoft, setValue, getValues])
+
   const onSubmit: SubmitHandler<LoginFormValues> = async values => {
     try {
       if (soMicrosoft) {
@@ -77,6 +122,10 @@ function LoginPageInner() {
       }
       if (!values.usuario || !values.password) {
         alert('Por favor, preencha todos os campos')
+        return
+      }
+      if (!values.base) {
+        alert('Selecione a base')
         return
       }
 
@@ -110,6 +159,16 @@ function LoginPageInner() {
     setSsoBusy(true)
     startMicrosoftLogin(base)
   }
+
+  const placeholderBase = soMicrosoft
+    ? 'Selecione a base'
+    : basesCarregando
+      ? 'Carregando bases...'
+      : (usuarioDigitado || '').trim().length < 2
+        ? 'Informe o usuário acima'
+        : opcoesBase.length === 0
+          ? 'Nenhuma base para este usuário'
+          : 'Selecione a base'
 
   return (
     <main className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
@@ -156,7 +215,7 @@ function LoginPageInner() {
                   senha atual.
                 </p>
                 <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  Selecione a base e clique em Entrar.
+                  Selecione a base e clique em Entrar com Microsoft.
                 </p>
               </div>
             )}
@@ -176,6 +235,7 @@ function LoginPageInner() {
                           <FormControl>
                             <Input
                               placeholder="Digite seu usuário"
+                              autoComplete="username"
                               {...field}
                               className="h-12 border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
                             />
@@ -198,6 +258,7 @@ function LoginPageInner() {
                               <Input
                                 type={showPassword ? 'text' : 'password'}
                                 placeholder="Digite sua senha"
+                                autoComplete="current-password"
                                 {...field}
                                 className="h-12 pr-12 border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
                               />
@@ -233,44 +294,47 @@ function LoginPageInner() {
                           field.onChange(v)
                           setValue('base', v, { shouldDirty: true, shouldValidate: true })
                         }}
+                        disabled={!soMicrosoft && (basesCarregando || opcoesBase.length === 0)}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione a base" />
+                            <SelectValue placeholder={placeholderBase} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="z-[200]">
-                          <SelectItem value="WAY 112">WAY 112</SelectItem>
-                          <SelectItem value="WAY 153">WAY 153</SelectItem>
-                          <SelectItem value="WAY 262">WAY 262</SelectItem>
-                          <SelectItem value="WAY 306">WAY 306</SelectItem>
-                          <SelectItem value="WAY 364">WAY 364</SelectItem>
-                          <SelectItem value="WAY CSC">WAY CSC</SelectItem>
+                          {opcoesBase.map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {!soMicrosoft && (usuarioDigitado || '').trim().length >= 2 && !basesCarregando && opcoesBase.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Somente bases em que você tem cadastro ativo.
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
                 {soMicrosoft ? (
-                  <Button
-                    type="button"
-                    disabled={ssoBusy || !baseSelecionada}
+                  <MicrosoftSignInButton
+                    busy={ssoBusy}
+                    disabled={!baseSelecionada}
                     onClick={onMicrosoft}
-                    className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    variant="microsoft"
                   >
                     {ssoBusy
                       ? 'Redirecionando...'
                       : !baseSelecionada
                         ? 'Selecione a base para entrar'
-                        : 'Entrar'}
-                  </Button>
+                        : 'Entrar com Microsoft'}
+                  </MicrosoftSignInButton>
                 ) : (
                   <>
                     <Button
                       type="submit"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !baseSelecionada || opcoesBase.length === 0}
                       className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
@@ -295,19 +359,18 @@ function LoginPageInner() {
                             </span>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={ssoBusy || !baseSelecionada}
+                        <MicrosoftSignInButton
+                          busy={ssoBusy}
+                          disabled={!baseSelecionada}
                           onClick={onMicrosoft}
-                          className="w-full h-12 rounded-lg border-slate-300"
+                          variant="microsoft"
                         >
                           {ssoBusy
                             ? 'Redirecionando...'
                             : !baseSelecionada
-                              ? 'Selecione a base para Microsoft'
+                              ? 'Selecione a base'
                               : 'Entrar com Microsoft'}
-                        </Button>
+                        </MicrosoftSignInButton>
                       </>
                     )}
                   </>
