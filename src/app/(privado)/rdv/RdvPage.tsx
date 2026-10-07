@@ -246,10 +246,17 @@ export default function Page() {
         rdv.descricao = form.getValues("descricao")
         rdv.origem = form.getValues("origem")
         rdv.destino = form.getValues("destino")
-        rdv.periodo_de = form.getValues("periodo_de")
-        rdv.periodo_ate = form.getValues("periodo_ate")
+        // A API recusa ("One or more validation errors occurred") data vazia "" e número como texto:
+        // o <Input type="number"> devolve string quando o usuário digita a quantidade.
+        rdv.periodo_de = form.getValues("periodo_de") || undefined
+        rdv.periodo_ate = form.getValues("periodo_ate") || undefined
         rdv.codcfo = form.getValues("codcfo")
-        rdv.itens = produtosSubmit
+        rdv.itens = produtosSubmit.map(it => ({
+            ...it,
+            idprd: Number(it.idprd),
+            quantidade: Number(it.quantidade ?? 1),
+            valor: Number(it.valor ?? 0),
+        }))
         rdv.anexos = anexosSubmit
         rdv.aprovadores = aprovadoresSubmit
         const usuario_codcfo = fornecedores.find(f => f.codcfo == rdv.codcfo)?.usuario
