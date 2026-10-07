@@ -252,6 +252,16 @@ export default function Page() {
         await handleRefresh()
     }
 
+    // Admin/Administrativo veem todos os RDVs; assinar só quem está na lista, ainda não decidiu e com RDV em andamento.
+    function podeAssinarRdv(rdv: Rdv) {
+        const eu = stripDiacritics(userCodusuario.toLowerCase().trim());
+        const meus = rdv.aprovadores.filter(ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === eu);
+        return meus.length > 0
+            && !meus.some(ap => ap.aprovacao === 'A' || ap.aprovacao === 'R')
+            && ['Em andamento'].includes(rdv.situacao)
+            && !rdv.arquivo_assinado;
+    }
+
     const colunas = useMemo<ColumnDef<Rdv>[]>(
         () => [
             { accessorKey: 'id', header: 'ID' },
@@ -546,7 +556,7 @@ export default function Page() {
                 onOpenChange={setIsModalVisualizarDocumentoOpen}
                 title={documentoSelecionado ? `Documento ${documentoSelecionado.nome}` : ''}
                 pdfBase64={documentoSelecionado?.anexo ?? null}
-                canSign={selectedResult ? !selectedResult.arquivo_assinado : false}
+                canSign={selectedResult ? podeAssinarRdv(selectedResult) : false}
                 onSign={confirmarAssinatura}
                 onPrint={handleImprimirDocumento}
                 isLoading={isLoading}
