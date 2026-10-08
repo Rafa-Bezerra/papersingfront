@@ -7,6 +7,7 @@
 import React, {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,6 +57,7 @@ export default function Page() {
 
     // Estados de loading e erro
     const [isLoading, setIsLoading] = useState(false)
+    const enviandoRef = useRef(false)
     // Dados carregados da API
     const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCusto[]>([])
     const [results, setResults] = useState<RequisicaoDto[]>([])
@@ -208,6 +210,9 @@ export default function Page() {
 
     /** Envia o carrinho completo para a API */
     async function onSubmit() {
+        // Trava síncrona: isLoading (state) só atualiza após o render e permite duplo clique
+        if (enviandoRef.current) return
+        enviandoRef.current = true
         setIsLoading(true)
         setError(null)
         carrinho.descricao = form.getValues("descricao")
@@ -231,6 +236,7 @@ export default function Page() {
             // Falha de envio: toast mais longo + botão de fechar para o usuário conseguir ler
             toast.error((err as Error).message, { duration: 10000, closeButton: true })
         } finally {
+            enviandoRef.current = false
             setIsLoading(false)
         }
     }

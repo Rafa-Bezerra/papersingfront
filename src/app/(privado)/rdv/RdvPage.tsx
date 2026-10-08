@@ -4,6 +4,7 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react'
 import { NumericFormat } from "react-number-format";
@@ -56,6 +57,7 @@ import { getAnexoByIdmov } from '@/services/requisicoesService';
 export default function Page() {
     const titulo = 'Lançamento de RDV';
     const [isLoading, setIsLoading] = useState(false)
+    const enviandoRef = useRef(false)
     const [error, setError] = useState<string | null>(null)
     const [editar, setEditar] = useState<number | null>(null)
     const [userCodusuario, setCodusuario] = useState("");
@@ -237,6 +239,9 @@ export default function Page() {
     }
 
     async function onSubmit() {
+        // Trava síncrona: isLoading (state) só atualiza após o render e permite duplo clique
+        if (enviandoRef.current) return
+        enviandoRef.current = true
         setIsLoading(true)
         setError(null)
         if (editar != null) {
@@ -281,6 +286,7 @@ export default function Page() {
             // Falha de envio: toast mais longo + botão de fechar para o usuário conseguir ler
             toast.error((err as Error).message, { duration: 10000, closeButton: true })
         } finally {
+            enviandoRef.current = false
             setIsLoading(false)
         }
     }
@@ -306,6 +312,8 @@ export default function Page() {
     }
 
     async function reenviarSoap(rdv: Rdv) {
+        if (enviandoRef.current) return
+        enviandoRef.current = true
         setIsLoading(true)
         try {
             await updateElement({
@@ -313,10 +321,12 @@ export default function Page() {
                 anexos: rdv.anexos.map(a => ({ ...a, anexo: a.anexo ?? "" })),
             })
             toast.success('RDV reenviado ao TOTVS com sucesso!')
-            await buscaUltimosRdvs()
         } catch (err) {
             toast.error((err as Error).message, { duration: 10000, closeButton: true })
         } finally {
+            // Recarrega a lista mesmo após erro/timeout: o RM pode ter gravado e o IDMOV já estar preenchido
+            try { await buscaUltimosRdvs() } catch { /* ignora */ }
+            enviandoRef.current = false
             setIsLoading(false)
         }
     }
