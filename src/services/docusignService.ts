@@ -575,6 +575,299 @@ export async function listarMinhasSolicitacoes(
     }
 }
 
+/** T-WS3a: linha da lista única (fluxo interno + envios PlugSign do PaperSign). */
+export type ItemWaySign = Documento & {
+    origem: "INTERNO" | "PLUGSIGN" | "DOCINTERNO";
+    chave: string;
+    document_key?: string | null;
+    data_utc?: string | null;
+    enviado_por?: string | null;
+    enviado_por_nome?: string | null;
+    situacao_waysign: string;
+    status_original?: string | null;
+    unidade?: string | null;
+    destinatarios?: string | null;
+    pdf_no_papersign: boolean;
+    eu_remetente: boolean;
+    eu_destinatario: boolean;
+    minha_acao: boolean;
+};
+
+export type ItensWaySignResult = {
+    data: ItemWaySign[];
+    page: number;
+    pageSize: number;
+    total: number;
+    lastPage: number;
+    solicitantes: string[];
+    aviso?: string | null;
+    /** PlugSign:WaySignAssinarHabilitado (desligado até o teste confirmar a assinatura em nome do signatário). */
+    assinarHabilitado?: boolean;
+};
+
+export type ItensWaySignParams = {
+    page?: number;
+    pageSize?: number;
+    texto?: string;
+    situacao?: string;
+    origem?: string;
+    solicitante?: string;
+    dataIni?: string;
+    dataFim?: string;
+    visao?: string;
+    foco?: number | null;
+    /** Só os documentos do próprio usuário (mesmo para Admin). */
+    apenasMeus?: boolean;
+};
+
+export async function listarItensWaySign(params: ItensWaySignParams): Promise<ItensWaySignResult> {
+    try {
+        const url = new URL(`${API_BASE}/api/${caminho}/itens`);
+        for (const [k, v] of Object.entries(params)) {
+            if (v !== undefined && v !== null && String(v).trim() !== "") url.searchParams.set(k, String(v).trim());
+        }
+        const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, `buscar ${elemento_plural}`));
+        const json = (await res.json()) as ItensWaySignResult;
+        return {
+            ...json,
+            data: (json.data ?? []).map((item) => normalizarDocumento(item as unknown as Record<string, unknown>) as ItemWaySign),
+            solicitantes: json.solicitantes ?? [],
+        };
+    } catch (err) {
+        throw mensagemFalhaRede(`buscar ${elemento_plural}`, err);
+    }
+}
+
+/** Link para assinar na PlugSign e se o "Assinar" do WaySign está liberado (403 se não houver pendência sua). */
+export async function obterMinhaAssinaturaPlugSign(
+    documentKey: string
+): Promise<{ linkPlugSign: string; assinarAqui: boolean }> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao/${encodeURIComponent(documentKey)}/minha-assinatura`,
+            { headers: headers() },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "obter sua assinatura"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("obter sua assinatura", err);
+    }
+}
+
+/** Assina, com o A1 do usuário, a solicitação PlugSign pendente dele (o servidor descobre o signing_key). */
+export async function assinarSolicitacaoPlugSign(documentKey: string): Promise<string> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao/${encodeURIComponent(documentKey)}/assinar`,
+            { method: "POST", headers: headers() },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "assinar"));
+        const json = await res.json();
+        return json?.message ?? "Documento assinado.";
+    } catch (err) {
+        throw mensagemFalhaRede("assinar", err);
+    }
+}
+
+export type SignatarioPlugSign = {
+    id?: number | null;
+    email?: string | null;
+    status?: string | null;
+    doubleAuth: boolean;
+    enviadaEm?: string | null;
+    atualizadaEm?: string | null;
+    expiraEm?: string | null;
+    eu: boolean;
+    signingKey?: string | null;
+    link?: string | null;
+};
+
+/** Signatários de um envio PlugSign; gerenciar = quem enviou ou Admin da unidade (conferido no servidor). */
+export async function listarSignatariosPlugSign(
+    documentKey: string
+): Promise<{ gerenciar: boolean; data: SignatarioPlugSign[] }> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao/${encodeURIComponent(documentKey)}/signatarios`,
+            { headers: headers() },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "listar signatários"));
+        return await res.json();
+    } catch (err) {
+        throw mensagemFalhaRede("listar signatários", err);
+    }
+}
+
+export type MensagemSignatario = {
+    canal: "email" | "whatsapp";
+    destino?: string | null;
+    assunto?: string | null;
+    status?: string | null;
+    origem?: string | null;
+    momento?: string | null;
+};
+
+/** E-mails e WhatsApps enviados a um signatário (remetente, Admin da unidade ou o próprio). */
+export async function listarMensagensSignatario(documentKey: string, signingKey: string): Promise<MensagemSignatario[]> {
+    try {
+        const url = new URL(`${API_BASE}/api/${caminho}/solicitacao/${encodeURIComponent(documentKey)}/mensagens`);
+        url.searchParams.set("signingKey", signingKey);
+        const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "listar mensagens"));
+        const json = await res.json();
+        return json?.data ?? [];
+    } catch (err) {
+        throw mensagemFalhaRede("listar mensagens", err);
+    }
+}
+
+export type AcaoSolicitacaoPlugSign = {
+    acao: "lembrete-email" | "lembrete-whatsapp" | "trocar-signatario" | "2fa" | "cancelar";
+    signingKey: string;
+    telefone?: string;
+    contato?: string;
+    mensagem?: string;
+    assunto?: string;
+    exigir2fa?: boolean;
+};
+
+export async function acaoSolicitacaoPlugSign(documentKey: string, dados: AcaoSolicitacaoPlugSign): Promise<string> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/solicitacao/${encodeURIComponent(documentKey)}/acao`,
+            { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, "executar a ação"));
+        const json = await res.json();
+        return json?.message ?? "Feito.";
+    } catch (err) {
+        throw mensagemFalhaRede("executar a ação", err);
+    }
+}
+
+// ---------------- WaySign · Administração (Admin; alterar só PlugSign:WaySignAdminsConta) ----------------
+
+async function adminFetch<T>(caminhoRel: string, acao: string, init?: RequestInit): Promise<T> {
+    try {
+        const res = await apiFetch(
+            `${API_BASE}/api/${caminho}/admin/${caminhoRel}`,
+            { headers: headers(), ...init },
+            ASSINATURA_TIMEOUT_MS
+        );
+        if (!res.ok) throw new Error(await lerErroApi(res, acao));
+        return (await res.json()) as T;
+    } catch (err) {
+        throw mensagemFalhaRede(acao, err);
+    }
+}
+
+export type ClientePlugSign = { id: number; email: string; nome: string; sobrenome: string };
+export type LembreteAutomatico = { id?: number | null; assunto?: string | null; mensagem?: string | null; dias?: number | null };
+export type WebhookPlugSign = { id?: number | null; url?: string | null; tipo?: string | null; ativo: boolean };
+export type NotificacaoWebhook = { id?: number | null; url?: string | null; tipo?: string | null; httpStatus?: number | null; dataHora?: string | null };
+
+export const adminListarClientes = (q?: string) =>
+    adminFetch<{ alterar: boolean; data: ClientePlugSign[] }>(
+        `clientes${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`, "listar clientes");
+export const adminAtualizarCliente = (email: string, dados: { name?: string; last_name?: string; phone?: string; cpf?: string; address?: string; birth?: string }) =>
+    adminFetch<{ message: string }>(`clientes/${encodeURIComponent(email)}`, "atualizar cliente",
+        { method: "PUT", body: JSON.stringify(dados) });
+export const adminExcluirCliente = (email: string) =>
+    adminFetch<{ message: string }>(`clientes/${encodeURIComponent(email)}`, "excluir cliente", { method: "DELETE" });
+
+export const adminListarLembretes = () =>
+    adminFetch<{ alterar: boolean; data: LembreteAutomatico[] }>("lembretes", "listar lembretes");
+export const adminSalvarLembrete = (l: { id?: number | null; assunto: string; mensagem: string; dias: number }) =>
+    adminFetch<{ message: string }>("lembretes", "salvar lembrete", { method: "POST", body: JSON.stringify(l) });
+export const adminExcluirLembrete = (id: number) =>
+    adminFetch<{ message: string }>(`lembretes/${id}`, "excluir lembrete", { method: "DELETE" });
+
+export const adminWebhooks = (page = 1) =>
+    adminFetch<{ alterar: boolean; webhooks: WebhookPlugSign[]; notificacoes: NotificacaoWebhook[]; page: number; lastPage: number }>(
+        `webhooks?page=${page}`, "listar webhooks");
+export const adminReenviarWebhooks = (documentKey: string) =>
+    adminFetch<{ message: string }>("webhooks/reenviar", "reenviar webhooks",
+        { method: "POST", body: JSON.stringify({ documentKey }) });
+
+// ---------------- WaySign · Templates e Lotes ----------------
+
+async function waySignFetch<T>(caminhoRel: string, acao: string, init?: RequestInit): Promise<T> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/${caminhoRel}`, { headers: headers(), ...init }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, acao));
+        return (await res.json()) as T;
+    } catch (err) {
+        throw mensagemFalhaRede(acao, err);
+    }
+}
+
+export type TemplateWaySign = {
+    id?: number | null;
+    nome?: string | null;
+    arquivo?: string | null;
+    extensao?: string | null;
+    documentKey?: string | null;
+    enviadoEm?: string | null;
+    enviadoPor?: string | null;
+};
+
+export const listarTemplatesWaySign = (nome?: string) =>
+    waySignFetch<{ excluir: boolean; data: TemplateWaySign[] }>(
+        `templates${nome?.trim() ? `?nome=${encodeURIComponent(nome.trim())}` : ""}`, "listar templates");
+export const enviarTemplateWaySign = (dados: { nome?: string; arquivoNome: string; base64: string }) =>
+    waySignFetch<{ message: string; documentKey?: string }>("templates", "enviar template",
+        { method: "POST", body: JSON.stringify(dados) });
+export const excluirTemplateWaySign = (id: number) =>
+    waySignFetch<{ message: string }>(`templates/${id}`, "excluir template", { method: "DELETE" });
+export const tagsTemplateWaySign = (documentKey: string) =>
+    waySignFetch<{ data: string[] }>(`templates/${encodeURIComponent(documentKey)}/tags`, "ler campos do template");
+export const usarTemplateWaySign = (
+    documentKey: string,
+    dados: {
+        nomeDocumento?: string;
+        mensagem?: string;
+        emCadeia?: boolean;
+        doubleAuth?: boolean;
+        tags?: Record<string, string>;
+        destinatarios: { email: string; nome?: string }[];
+    }
+) =>
+    waySignFetch<{ message: string; documentKey?: string | null; naLista: boolean }>(
+        `templates/${encodeURIComponent(documentKey)}/enviar`, "enviar para assinatura",
+        { method: "POST", body: JSON.stringify(dados) });
+
+export type LoteResumo = { id?: number | null; nome?: string | null; criadoEm?: string | null; arquivos: number; solicitacoes: number; pendentes: number };
+export type LoteDetalhe = {
+    id?: number | null;
+    nome?: string | null;
+    criadoEm?: string | null;
+    arquivos: { id?: number | null; nome?: string | null; documentKey?: string | null; status?: string | null }[];
+    solicitacoes: { signingKey?: string | null; email?: string | null; status?: string | null; enviadaEm?: string | null; atualizadaEm?: string | null }[];
+};
+
+export const listarLotesWaySign = (page = 1) =>
+    waySignFetch<{ data: LoteResumo[]; page: number; lastPage: number }>(`lotes?page=${page}`, "listar lotes");
+export const detalheLoteWaySign = (id: number) => waySignFetch<LoteDetalhe>(`lotes/${id}`, "abrir lote");
+export const acaoLoteWaySign = (id: number, acao: "lembrete" | "cancelar", signingKey: string) =>
+    waySignFetch<{ message: string }>(`lotes/${id}/acao`, acao === "lembrete" ? "enviar lembrete" : "cancelar",
+        { method: "POST", body: JSON.stringify({ acao, signingKey }) });
+
+/** ZIP do lote (base64) para baixar no navegador. */
+export async function baixarZipLoteWaySign(id: number): Promise<Blob> {
+    try {
+        const res = await apiFetch(`${API_BASE}/api/${caminho}/lotes/${id}/zip`, { headers: headers() }, ASSINATURA_TIMEOUT_MS);
+        if (!res.ok) throw new Error(await lerErroApi(res, "baixar lote"));
+        return await res.blob();
+    } catch (err) {
+        throw mensagemFalhaRede("baixar lote", err);
+    }
+}
+
 export type HistoricoSolicitacaoItem = {
     id: number;
     activity: string;
