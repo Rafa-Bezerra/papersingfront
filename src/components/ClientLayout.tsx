@@ -118,8 +118,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               setIsAuthorized(false);
             }
 
-            // Bloqueia acesso direto ao Docusign sem permissão (admin/financeiro/docusign).
-            if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign) {
+            // Bloqueia acesso direto ao WaySign sem permissão (admin/financeiro/docusign; quem tem só "Documentos" entra e vê só os documentos internos).
+            if (normalizedPath === "/docusign" && !isAdmin && !isFinanceiro && !canDocusign && !Boolean(parsedUser?.documentos)) {
               setIsAuthorized(false);
             }
 

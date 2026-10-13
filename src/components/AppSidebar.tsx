@@ -308,7 +308,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                         if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
                         if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
                         if (item.url === "/fiscal" && !userFiscal) return null;
-                        if (item.url === "/docusign" && !userDocusign) return null;
+                        if (item.url === "/docusign" && !userDocusign && !userDocumentos) return null;
                         if (item.url === "/projetos" && !userProjetos) return null;
                         if ([
                             "/alcadas",

@@ -294,7 +294,10 @@ async function ativarFormCiSePreciso(seletor: string): Promise<void> {
   }
 }
 
-/** Valor da aba PlugSign para cada seletor interno do tour. */
+/**
+ * Valor da aba WaySign para cada seletor interno do tour (T-WS3a: Documentos / Solicitações / Clientes e parceiros).
+ * "solicitar" abre o formulário "Solicitar assinatura" (modal dentro de Documentos).
+ */
 function abaPlugSignPorSeletor(seletor: string): string | null {
   if (!seletor.startsWith('#tour-plugsign-')) return null
   if (
@@ -302,18 +305,19 @@ function abaPlugSignPorSeletor(seletor: string): string | null {
     seletor === '#tour-plugsign-doc-painel' ||
     seletor === '#tour-plugsign-doc-titulo' ||
     seletor === '#tour-plugsign-doc-acoes' ||
-    seletor === '#tour-plugsign-cert'
+    seletor === '#tour-plugsign-cert' ||
+    seletor === '#tour-plugsign-solicitacao'
   ) {
     return 'documentos'
   }
-  if (seletor === '#tour-plugsign-solicitacao' || seletor.startsWith('#tour-plugsign-solicitacao-')) {
-    return 'solicitacao'
+  if (seletor.startsWith('#tour-plugsign-solicitacao-')) {
+    return 'solicitar'
   }
   if (seletor === '#tour-plugsign-minhas' || seletor === '#tour-plugsign-minhas-painel') {
-    return 'minhas-solicitacoes'
+    return 'solicitacoes'
   }
   if (seletor === '#tour-plugsign-fornecedor' || seletor === '#tour-plugsign-fornecedor-painel') {
-    return 'fornecedor'
+    return 'clientes'
   }
   return null
 }
@@ -333,13 +337,11 @@ async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
 
   // 2) Fallback: mousedown no TabsTrigger (Radix não troca só com .click()).
   const triggerId =
-    valorAba === 'documentos'
+    valorAba === 'documentos' || valorAba === 'solicitar'
       ? '#tour-plugsign-documentos'
-      : valorAba === 'solicitacao'
-        ? '#tour-plugsign-solicitacao'
-        : valorAba === 'minhas-solicitacoes'
-          ? '#tour-plugsign-minhas'
-          : '#tour-plugsign-fornecedor'
+      : valorAba === 'solicitacoes'
+        ? '#tour-plugsign-minhas'
+        : '#tour-plugsign-fornecedor'
 
   const tab = document.querySelector(triggerId)
   if (tab instanceof HTMLElement) {
