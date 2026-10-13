@@ -1,0 +1,7 @@
+---
+description: Regras do PaperSign (front). O contexto da investigação de aprovação fica no repo da API.
+alwaysApply: true
+---
+- Antes de mexer em telas de aprovação (geral, pendências, modal de aprovações), leia `../papersing-master/docs/fix/HANDOFF.md` e `../papersing-master/.cursor/rules/papersign-aprovacao.mdc`.
+- Só implementar tarefas marcadas como APROVADAS no HANDOFF. Registrar no Log do HANDOFF o que foi feito, com arquivo:linha.
+- Preservar o estilo; nada de refatoração fora do escopo. Responder em português.
