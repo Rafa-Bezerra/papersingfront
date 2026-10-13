@@ -241,44 +241,68 @@ export default function Page() {
     async function onSubmit() {
         // Trava síncrona: isLoading (state) só atualiza após o render e permite duplo clique
         if (enviandoRef.current) return
+
+        const descricao = (form.getValues("descricao") ?? "").trim()
+        const origem = (form.getValues("origem") ?? "").trim()
+        const destino = (form.getValues("destino") ?? "").trim()
+        const periodoDe = form.getValues("periodo_de") || ""
+        const periodoAte = form.getValues("periodo_ate") || ""
+        const faltando = [
+            !descricao && "Descrição",
+            !origem && "Origem",
+            !destino && "Destino",
+            !periodoDe && "Período de",
+            !periodoAte && "Período até",
+        ].filter(Boolean)
+        if (faltando.length > 0) {
+            await form.trigger()
+            toast.error(`Preencha os campos obrigatórios: ${faltando.join(", ")}`)
+            return
+        }
+        if (periodoAte < periodoDe) {
+            toast.error("O período final não pode ser anterior ao período inicial")
+            return
+        }
+
         enviandoRef.current = true
         setIsLoading(true)
         setError(null)
+        const payload: Rdv = { ...rdv }
         if (editar != null) {
-            rdv.id = editar;
-            rdv.idmov = form.getValues("idmov");
+            payload.id = editar;
+            payload.idmov = form.getValues("idmov");
         }
-        rdv.descricao = form.getValues("descricao")
-        rdv.origem = form.getValues("origem")
-        rdv.destino = form.getValues("destino")
+        payload.descricao = descricao
+        payload.origem = origem
+        payload.destino = destino
         // A API recusa ("One or more validation errors occurred") data vazia "" e número como texto:
         // o <Input type="number"> devolve string quando o usuário digita a quantidade.
-        rdv.periodo_de = form.getValues("periodo_de") || undefined
-        rdv.periodo_ate = form.getValues("periodo_ate") || undefined
-        rdv.codcfo = form.getValues("codcfo")
-        rdv.itens = produtosSubmit.map(it => ({
+        payload.periodo_de = periodoDe
+        payload.periodo_ate = periodoAte
+        payload.codcfo = form.getValues("codcfo")
+        payload.itens = produtosSubmit.map(it => ({
             ...it,
             idprd: Number(it.idprd),
             quantidade: Number(it.quantidade ?? 1),
             valor: Number(it.valor ?? 0),
         }))
-        rdv.anexos = anexosSubmit
-        rdv.aprovadores = aprovadoresSubmit
-        const usuario_codcfo = fornecedores.find(f => f.codcfo == rdv.codcfo)?.usuario
+        payload.anexos = anexosSubmit
+        payload.aprovadores = aprovadoresSubmit
+        const usuario_codcfo = fornecedores.find(f => f.codcfo == payload.codcfo)?.usuario
         if (usuario_codcfo) {
-            if (!rdv.aprovadores.some(a => a.usuario === usuario_codcfo)) {
-                rdv.aprovadores = [
+            if (!payload.aprovadores.some(a => a.usuario === usuario_codcfo)) {
+                payload.aprovadores = [
                     { usuario: usuario_codcfo },
-                    ...rdv.aprovadores
+                    ...payload.aprovadores
                 ]
-            }            
+            }
         }
 
         try {
             if (editar) {
-                await updateElement(rdv);
+                await updateElement(payload);
             } else {
-                await createElement(rdv)
+                await createElement(payload)
             }
             toast.success('RDV enviado com sucesso!')
             window.location.reload()
@@ -295,11 +319,11 @@ export default function Page() {
         console.log(data);
         
         setEditar(data.id ?? 0);
-        form.setValue("descricao", data.descricao);
-        form.setValue("origem", data.origem);
-        form.setValue("destino", data.destino);
-        form.setValue("periodo_de", data.periodo_de?.substring(0, 10));
-        form.setValue("periodo_ate", data.periodo_ate?.substring(0, 10));
+        form.setValue("descricao", data.descricao ?? "");
+        form.setValue("origem", data.origem ?? "");
+        form.setValue("destino", data.destino ?? "");
+        form.setValue("periodo_de", data.periodo_de?.substring(0, 10) ?? "");
+        form.setValue("periodo_ate", data.periodo_ate?.substring(0, 10) ?? "");
         form.setValue("codcfo", data.codcfo);
         form.setValue("idmov", data.idmov);
         setProdutosSubmit(data.itens);
@@ -309,6 +333,10 @@ export default function Page() {
 
     async function cancelEditar() {
         setEditar(null);
+        form.reset();
+        setProdutosSubmit([]);
+        setAnexosSubmit([]);
+        setAprovadoresSubmit([]);
     }
 
     async function reenviarSoap(rdv: Rdv) {
@@ -667,6 +695,7 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="periodo_de"
+                                rules={{ required: 'Período de é obrigatório' }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Período de</FormLabel>
@@ -681,6 +710,7 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="periodo_ate"
+                                rules={{ required: 'Período até é obrigatório' }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Período até</FormLabel>
@@ -695,6 +725,7 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="origem"
+                                rules={{ required: 'Origem é obrigatória' }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Origem</FormLabel>
@@ -709,6 +740,7 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="destino"
+                                rules={{ required: 'Destino é obrigatório' }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Destino</FormLabel>
