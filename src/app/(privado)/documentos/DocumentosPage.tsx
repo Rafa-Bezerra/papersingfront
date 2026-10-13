@@ -1039,7 +1039,7 @@ export default function Page() {
                                                                 <CommandGroup>
                                                                     {usuarios.map((u) => (
                                                                         <CommandItem
-                                                                            key={u.codusuario}
+                                                                            key={`${u.codusuario}-${u.sequencial}`}
                                                                             value={`${u.codusuario} ${u.nome}`}
                                                                             onSelect={() => {
                                                                                 field.onChange(u.codusuario)
@@ -1222,7 +1222,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                                             <CommandGroup>
                                                                 {usuarios.map((u) => (
                                                                     <CommandItem
-                                                                        key={u.codusuario}
+                                                                        key={`${u.codusuario}-${u.sequencial}`}
                                                                         value={`${u.codusuario} ${u.nome}`}
                                                                         onSelect={() => {
                                                                             field.onChange(u.codusuario)

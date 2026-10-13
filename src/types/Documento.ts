@@ -47,4 +47,6 @@ export type DocumentoAnexoAssinar = {
     largura: number
     altura: number
     dataHoraAssinatura: string
+    /** WaySign: assinar com o certificado A1 (opcional). */
+    comCertificado?: boolean
 }

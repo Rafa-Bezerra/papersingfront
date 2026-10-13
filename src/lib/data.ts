@@ -21,7 +21,7 @@ export const data = {
         { title: "Controle imobilizado", url: "/controle" },
         { title: "Ordem de compra", url: "/ordens" },
         { title: "Aquisição de serviços", url: "/aquisicoes" },
-        { title: "Documentos", url: "/documentos" },
+        // "Documentos" fica dentro do WaySign (aba Documentos internos); a rota /documentos continua para links e pendências.
         { title: "WaySign", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },
         { title: "Receitas", url: "/receitas" },

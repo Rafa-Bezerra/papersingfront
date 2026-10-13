@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/command"
 import { PopoverPortal } from '@radix-ui/react-popover';
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog'
-import { DocumentoExterno, DocumentoExternoAprovador, DocumentoExternoAssinar, DocumentoExternoCreateDTO, DocumentoExternoFiltro, aprovar, assinarDocumento, createElement, deleteElement, getAll, getAllAprovadores, getDocumento } from '@/services/documentoExternoService'
+import { DocumentoExterno, DocumentoExternoAprovador, DocumentoExternoAssinar, DocumentoExternoCreateDTO, DocumentoExternoFiltro, aprovar, assinarDocumento, createElement, deleteElement, getAllAprovadores, getAllExterno, getDocumento } from '@/services/documentoExternoService'
 import { notificarAprovador } from '@/services/requisicoesService'
 import {
     Usuario,
@@ -190,7 +190,7 @@ export default function Page() {
                 status: snapshot?.status ?? statusFiltrado,
                 externo: false
             }
-            const dados = await getAll(data);
+            const dados = await getAllExterno(data);
             const qNorm = stripDiacritics(q.toLowerCase().trim())
             const filtrados = dados.filter(d => {
                 const matchQuery = qNorm === "" || String(d.assunto ?? '').includes(qNorm)

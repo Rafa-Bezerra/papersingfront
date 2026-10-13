@@ -1,5 +1,6 @@
 'use client'
 
+import MinhasSolicitacoesPanel from '@/components/MinhasSolicitacoesPanel'
 import React, {
     useEffect,
     useMemo,
@@ -9,7 +10,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Bell, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, History, Printer, SearchIcon, ShieldCheck, SquarePlus, Trash2, UserPlus, X } from 'lucide-react'
+import { BarChart3, Bell, Boxes, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, FolderCheck, History, LayoutTemplate, Mail, Printer, SearchIcon, Settings, ShieldCheck, SquarePlus, Table2, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
@@ -44,8 +46,9 @@ import {
     deleteElement,
     Documento,
     DocumentoAprovacao,
-    getAll,
     getAnexo,
+    ItemWaySign,
+    listarItensWaySign,
     getAnexosDocumento,
     resgatarDocumentoPlugSign,
     base64PdfEhValido,
@@ -84,10 +87,32 @@ import { DocumentoAnexo, DocumentoAnexoAssinar } from '@/types/Documento';
 import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import SolicitacaoAssinaturaPanel from '@/components/SolicitacaoAssinaturaPanel'
 import FornecedorParceiroPanel from '@/components/FornecedorParceiroPanel'
-import MinhasSolicitacoesPanel from '@/components/MinhasSolicitacoesPanel'
+import WaySignPlugSignAcoes from '@/components/WaySignPlugSignAcoes'
+import WaySignAdminPanel, { ClientesSecao } from '@/components/WaySignAdminPanel'
+import * as documentoService from '@/services/documentoService'
+import { listarAlertas } from '@/services/waySignService'
+import WaySignTemplatesPanel from '@/components/WaySignTemplatesPanel'
+import WaySignLotesPanel from '@/components/WaySignLotesPanel'
+import { WaySignAlertasBotao, WaySignMensagens, WaySignPainel, WaySignRelatorio } from '@/components/WaySignEspelhoPaineis'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
+import { getPendenciaIdFromSearchParams, isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
+
+const TAMANHOS_PAGINA = [10, 20, 50, 100]
+const ROTULO_ORIGEM: Record<string, string> = {
+    DOCINTERNO: 'Documentos internos',
+    // Internos = assinados dentro do PaperSign; WaySign = externos, pela PlugSign.
+    INTERNO: 'Documentos internos',
+    PLUGSIGN: 'WaySign',
+    INTERNOS: 'Internos (PaperSign)',
+    EXTERNOS: 'Externos (WaySign)',
+}
+const VISOES: { valor: string; label: string }[] = [
+    { valor: '', label: 'Todos' },
+    { valor: 'enviados', label: 'Enviados por mim' },
+    { valor: 'recebidos', label: 'Recebidos por mim' },
+    { valor: 'aguardando', label: 'Aguardando minha ação' },
+]
 
 
 export default function Page() {
@@ -100,20 +125,58 @@ export default function Page() {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
-    const [results, setResults] = useState<Documento[]>([])
+    const [results, setResults] = useState<ItemWaySign[]>([])
+    const [origemFiltrada, setOrigemFiltrada] = useState<string>("")
+    const [visao, setVisao] = useState<string>("")
+    const [pagina, setPagina] = useState(1)
+    const [tamanhoPagina, setTamanhoPagina] = useState(20)
+    const [totalItens, setTotalItens] = useState(0)
+    const [ultimaPagina, setUltimaPagina] = useState(1)
+    const [avisoLista, setAvisoLista] = useState<string | null>(null)
+    const [isAdminUser, setIsAdminUser] = useState(false)
+    // Unificação Documentos × WaySign: quem tem só "Documentos" entra no módulo e vê só "Documentos internos".
+    // null = ainda lendo a sessão (evita buscar a lista do WaySign sem saber se pode).
+    const [temWaySign, setTemWaySign] = useState<boolean | null>(null)
+    const [temDocumentos, setTemDocumentos] = useState(false)
+    const [aba, setAba] = useState('documentos')
+    // "Meus documentos": finalizados (internos e WaySign) sem limite de período. Usuário vê os dele; Admin, os da unidade (decisão 12/10).
+    const emMeus = aba === 'meus'
+    // Documentos = só pendentes; Meus documentos = finalizados (concluídos, recusados ou cancelados); Solicitações = filtro livre.
+    const situacaoDaAba = emMeus ? 'FINALIZADO' : aba === 'documentos' ? 'PENDENTE' : null
+    // Lista única: cada linha chama a API do próprio módulo (WaySign = api/Docusign, Documentos internos = api/Documentos).
+    const origemAtual = useRef<string>('INTERNO')
+    const ehDocInterno = () => origemAtual.current === 'DOCINTERNO'
+    const servico = () => (ehDocInterno()
+        ? documentoService
+        : { getAnexo, assinar, aprovar, deleteElement, createElement, adicionarAprovador })
+    // Só assina quem está no fluxo de aprovação (vale também para Admin); os demais só visualizam.
+    // eu_destinatario vem do servidor (login ou chapa com o mesmo e-mail); o servidor confere de novo ao assinar.
+    const estaNoFluxo = (doc?: Documento | null) => {
+        if (!doc) return false
+        if ((doc as ItemWaySign).eu_destinatario) return true
+        const eu = stripDiacritics(userCodusuario.toLowerCase().trim())
+        return (doc.aprovadores ?? []).some((ap) => stripDiacritics((ap.usuario ?? '').toLowerCase().trim()) === eu)
+    }
+    const marcarOrigem = (doc?: Documento | null) => {
+        origemAtual.current = (doc as ItemWaySign | undefined)?.origem ?? 'INTERNO'
+    }
+    const [assinarHabilitado, setAssinarHabilitado] = useState(false)
+    const [recarga, setRecarga] = useState(0)
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<Documento>()
     const [requisicaoAprovacoesSelecionada, setRequisicaoAprovacoesSelecionada] = useState<DocumentoAprovacao[]>([])
     const [searched, setSearched] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [certStatus, setCertStatus] = useState<CertificadoA1Status | null>(null)
     const [isCertDialogOpen, setIsCertDialogOpen] = useState(false)
+    // A1 é opcional: só quando a pessoa marca "Assinar com certificado" (decisão 13/10).
+    const [assinarComCertificado, setAssinarComCertificado] = useState(false)
     const [certSenha, setCertSenha] = useState("")
     const [certVinculando, setCertVinculando] = useState(false)
     const certFileRef = useRef<HTMLInputElement>(null)
     const certStatusSeq = useRef(0)
     const [isPending, startTransition] = useTransition()
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
-    // Valores retornados pela API: 'EM ANDAMENTO' | 'APROVADO' | 'REPROVADO'
+    // Situação normalizada da lista única: 'PENDENTE' | 'CONCLUÍDO' | 'RECUSADO' | 'CANCELADO'
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     const [isFormDocumentoOpen, setIsFormDocumentoOpen] = useState(false)
@@ -282,7 +345,7 @@ export default function Page() {
 
     useEffect(() => {
         if (isPendentesFromUrl(searchParams)) {
-            setSituacaoFiltrada("EM ANDAMENTO");
+            setSituacaoFiltrada("PENDENTE");
         }
 
         if (dateFrom === "" && dateTo === "") {
@@ -294,8 +357,16 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(String(user.nome ?? user.NOME ?? '').toUpperCase());
             setCodusuario(String(user.codusuario ?? user.CODUSUARIO ?? '').toUpperCase());
+            setIsAdminUser(Boolean(user.admin));
+            const adminOuFinanceiro = Boolean(user.admin) || Boolean(user.financeiro);
+            const podeWaySign = adminOuFinanceiro || Boolean(user.docusign);
+            setTemWaySign(podeWaySign);
+            setTemDocumentos(adminOuFinanceiro || Boolean(user.documentos));
+        } else {
+            setTemWaySign(false);
         }
 
+        if (temWaySign !== true && !temDocumentos) return
         if (debounceRef.current) clearTimeout(debounceRef.current)
         debounceRef.current = setTimeout(() => {
             startTransition(() => {
@@ -310,45 +381,41 @@ export default function Page() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [query, situacaoFiltrada, dateFrom, dateTo, solicitanteFiltrado])
+    }, [query, situacaoFiltrada, dateFrom, dateTo, solicitanteFiltrado, origemFiltrada, visao, pagina, tamanhoPagina, recarga, temWaySign, temDocumentos, emMeus, situacaoDaAba])
+
+    // Filtro novo volta para a página 1 (o debounce acima junta as duas mudanças em uma busca).
+    useEffect(() => {
+        setPagina(1)
+    }, [query, situacaoFiltrada, dateFrom, dateTo, solicitanteFiltrado, origemFiltrada, visao, tamanhoPagina, emMeus])
 
 
-    async function handleSearch(q: string): Promise<Documento[]> {
+    async function handleSearch(q: string): Promise<ItemWaySign[]> {
         setIsLoading(true)
         setError(null)
         try {
-            const dados = await getAll()
-
-            const solicitantesUnicos = Array.from(
-                new Set(
-                    dados
-                        .map(d => d.usuario_nome)
-                        .filter((s): s is string => !!s && s.trim() !== "")
-                )
-            ).sort((a, b) => a.localeCompare(b))
-            setSolicitantes(solicitantesUnicos)
-
-            const qNorm = stripDiacritics(q.toLowerCase().trim())
-            const filtrados = dados.filter(d => {
-                const nomeNorm = stripDiacritics(String(d.nome ?? '').toLowerCase())
-                const situacaoNorm = stripDiacritics(String(d.situacao ?? '').toUpperCase().trim())
-                const filtroSituacaoNorm = stripDiacritics(String(situacaoFiltrada ?? '').toUpperCase().trim())
-
-                const matchQuery = qNorm === "" || nomeNorm.includes(qNorm) || String(d.id ?? '').includes(qNorm)
-                const matchSituacao = filtroSituacaoNorm === "" || situacaoNorm === filtroSituacaoNorm
-                const matchSolicitante = solicitanteFiltrado === "" || d.usuario_nome == solicitanteFiltrado
-                // Regra: pendências ("EM ANDAMENTO") sempre aparecem, independente do período.
-                const isPendente = situacaoNorm === "EM ANDAMENTO"
-                const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
-                const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
-                // Visibilidade já vem filtrada pela API (inclui chapa x login nominal).
-                return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo
+            // Filtros, visibilidade e paginação no servidor (T-WS3a). Pendentes sempre aparecem, independente do período.
+            const res = await listarItensWaySign({
+                page: pagina,
+                pageSize: tamanhoPagina,
+                texto: q,
+                situacao: situacaoDaAba ?? situacaoFiltrada,
+                origem: origemFiltrada,
+                solicitante: solicitanteFiltrado,
+                dataIni: emMeus ? undefined : dateFrom,
+                dataFim: emMeus ? undefined : dateTo,
+                visao: emMeus ? '' : visao,
+                foco: getPendenciaIdFromSearchParams(searchParams),
             })
-
-            setResults(filtrados)
-            return filtrados
+            setSolicitantes(res.solicitantes)
+            setTotalItens(res.total ?? 0)
+            setUltimaPagina(res.lastPage ?? 1)
+            setAvisoLista(res.aviso ?? null)
+            setAssinarHabilitado(res.assinarHabilitado === true)
+            setResults(res.data)
+            return res.data
         } catch (err) {
             setError((err as Error).message)
+            toast.error((err as Error).message)
             setResults([])
             return []
         } finally {
@@ -364,7 +431,8 @@ export default function Page() {
 
     function aplicarAnexosNoDocumento(doc: Documento, anexos: DocumentoAnexo[]): Documento {
         const atualizado = { ...doc, anexos };
-        setResults((prev) => prev.map((d) => (d.id === doc.id ? atualizado : d)));
+        const origem = (doc as ItemWaySign).origem ?? 'INTERNO';
+        setResults((prev) => prev.map((d) => (d.origem === origem && d.id === doc.id ? { ...d, anexos } : d)));
         if (requisicaoSelecionada?.id === doc.id) {
             setRequisicaoSelecionada(atualizado);
         }
@@ -372,7 +440,7 @@ export default function Page() {
     }
 
     async function refreshDocumentoAnexos(doc: Documento): Promise<Documento> {
-        if ((doc.anexos?.length ?? 0) > 0) return doc;
+        if ((doc.anexos?.length ?? 0) > 0 || (doc as ItemWaySign).origem === 'DOCINTERNO') return doc;
         let anexos = await getAnexosDocumento(doc.id);
         if (anexos.length === 0) {
             try {
@@ -413,6 +481,7 @@ export default function Page() {
     }
 
     async function abrirDocumentoPrincipal(doc: Documento) {
+        marcarOrigem(doc);
         setRequisicaoSelecionada(doc);
         setIsLoading(true);
         try {
@@ -432,6 +501,7 @@ export default function Page() {
     }
 
     async function imprimirDocumentoPrincipal(doc: Documento) {
+        marcarOrigem(doc);
         setRequisicaoSelecionada(doc);
         setIsLoading(true);
         try {
@@ -461,12 +531,14 @@ export default function Page() {
     }
 
     async function handleAprovacoes(requisicao: Documento) {
+        marcarOrigem(requisicao)
         setIsModalAprovacoesOpen(true)
         setRequisicaoSelecionada(requisicao)
         setRequisicaoAprovacoesSelecionada(requisicao.aprovadores)
     }
 
     async function handleAnexos(requisicao: Documento) {
+        marcarOrigem(requisicao)
         setIsModalAnexosOpen(true)
         atualizarListaAnexosModal(requisicao)
         setIsLoading(true)
@@ -487,14 +559,15 @@ export default function Page() {
         searched && !isLoading,
         searchParams,
         router,
-        (d) => d.id,
+        (d) => (d.origem === 'INTERNO' ? d.id : null),
         abrirDocumentoPrincipal
     );
 
-    async function handleAprovar(id: number, aprovado: number) {
+    async function handleAprovar(doc: Documento, aprovado: number) {
+        marcarOrigem(doc)
         setIsLoading(true)
         try {
-            await aprovar(id, aprovado)
+            await servico().aprovar(doc.id, aprovado)
             handleSearchClick()
         } catch (err) {
             setError((err as Error).message)
@@ -504,6 +577,7 @@ export default function Page() {
     }
 
     async function handleInserirDocumento() {
+        origemAtual.current = temWaySign ? 'INTERNO' : 'DOCINTERNO'
         form.reset({
             id: 0,
             nome: '',
@@ -517,7 +591,7 @@ export default function Page() {
     async function handleExcluirDocumento() {
         if (!deleteDocumentoId) return
         try {
-            await deleteElement(deleteDocumentoId)
+            await servico().deleteElement(deleteDocumentoId)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -538,7 +612,7 @@ export default function Page() {
                 ];
             }
             data.anexos = anexosSubmit;
-            await createElement(data)
+            await servico().createElement(data)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -562,7 +636,7 @@ export default function Page() {
     async function handleExcluirAprovador() {
         if (!deleteAprovadorId) return
         try {
-            await deleteElement(deleteAprovadorId)
+            await servico().deleteElement(deleteAprovadorId)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -575,7 +649,7 @@ export default function Page() {
     async function submitAprovador(data: DocumentoAprovacao) {
         setError(null)
         try {
-            await adicionarAprovador(requisicaoSelecionada!.id, data)
+            await servico().adicionarAprovador(requisicaoSelecionada!.id, data)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -612,7 +686,7 @@ export default function Page() {
         if (anexo.anexo.startsWith('data:') || anexo.anexo.startsWith('/anexos/') === false && anexo.anexo.length > 500) {
             arquivo = normalizarPdfDataUrl(anexo.anexo)
         } else if (anexo.anexo.startsWith('/anexos/')) {
-            arquivo = await getAnexo(anexo.anexo)
+            arquivo = await servico().getAnexo(anexo.anexo)
         } else {
             arquivo = normalizarPdfDataUrl(anexo.anexo)
         }
@@ -664,7 +738,7 @@ export default function Page() {
         setSearched(false)
         const toastId = toast.loading("Assinando documento e gerando comprovante PlugSign…")
         try {
-            const msg = await assinar(data)
+            const msg = await servico().assinar(data)
             toast.dismiss(toastId)
             if (msg.includes("não foi gerado") || msg.includes("PaperSign em anexo (PlugSign")) {
                 toast.warning(msg)
@@ -674,7 +748,7 @@ export default function Page() {
             const docId = requisicaoSelecionada?.id
             const filtrados = await handleSearch(query)
             if (docId != null) {
-                const atualizado = filtrados.find((d) => d.id === docId)
+                const atualizado = filtrados.find((d) => d.origem === origemAtual.current && d.id === docId)
                 if (atualizado) {
                     setRequisicaoSelecionada(atualizado)
                     if (isModalAnexosOpen) {
@@ -694,9 +768,11 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo({ page, posX, posY, largura, altura }: PdfSignData) {
-        if (certStatus?.plugsignAtivo && !certStatus.temCertificadoA1 && !certStatus.certificadoPersistido) {
-            const detalhe = certStatus.motivoCertificado
-                || (certStatus.vinculadoPlugSign
+        // Documentos internos não exigem certificado (pode ter, mas não é obrigatório).
+        const comCertificado = assinarComCertificado && !ehDocInterno()
+        if (comCertificado && !certStatus?.temCertificadoA1 && !certStatus?.certificadoPersistido) {
+            const detalhe = certStatus?.motivoCertificado
+                || (certStatus?.vinculadoPlugSign
                     ? "Conta PlugSign encontrada, mas sem certificado A1 ativo. Envie o .pfx."
                     : "Cadastre seu certificado A1 (.pfx) no DocuSign antes de assinar.");
             toast.error(detalhe);
@@ -717,21 +793,56 @@ export default function Page() {
             largura,
             altura,
             dataHoraAssinatura: new Date().toLocaleString('pt-BR'),
+            comCertificado,
         };
         await handleAssinarAnexo(dadosAssinatura);
     }
 
-    const colunas = useMemo<ColumnDef<Documento>[]>(
+    const colunas = useMemo<ColumnDef<ItemWaySign>[]>(
         () => [
-            { accessorKey: 'id', header: 'ID' },
-            { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
+            { id: 'id', header: 'ID', accessorFn: (row) => (row.origem === 'PLUGSIGN' ? '—' : row.id) },
+            {
+                id: 'data',
+                header: 'Data',
+                accessorFn: (row) => safeDateLabel((row.origem === 'INTERNO' ? row.data_criacao : row.data_utc) ?? undefined),
+            },
+            {
+                id: 'origem',
+                header: 'Origem',
+                cell: ({ row }) => (
+                    <Badge variant={row.original.origem === 'PLUGSIGN' ? 'secondary' : 'outline'}>
+                        {ROTULO_ORIGEM[row.original.origem] ?? row.original.origem}
+                    </Badge>
+                ),
+            },
             { accessorKey: 'usuario_nome', header: 'Solicitante' },
             { accessorKey: 'nome', header: 'Descrição' },
-            { accessorKey: 'situacao', header: 'Situação' },
+            {
+                id: 'situacao',
+                header: 'Situação',
+                cell: ({ row }) => {
+                    const s = row.original.situacao_waysign
+                    return (
+                        <Badge variant={s === 'CONCLUÍDO' ? 'default' : s === 'PENDENTE' ? 'secondary' : s === 'RECUSADO' || s === 'CANCELADO' ? 'destructive' : 'outline'}>
+                            {s || '—'}
+                        </Badge>
+                    )
+                },
+            },
             {
                 id: 'actions',
                 header: 'Ações',
                 cell: ({ row }) => {
+                    if (row.original.origem === 'PLUGSIGN') {
+                        return (
+                            <WaySignPlugSignAcoes
+                                item={row.original}
+                                isAdmin={isAdminUser}
+                                assinarHabilitado={assinarHabilitado}
+                                onAssinado={() => setRecarga((r) => r + 1)}
+                            />
+                        )
+                    }
                     const usuarioAprovador = row.original.aprovadores.some(
                         ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
                     );
@@ -759,6 +870,17 @@ export default function Page() {
 
                     return (
                         <div className="flex flex-wrap gap-2">
+                            {row.original.minha_acao && !assinouOuSemAnexos && (
+                                <Button
+                                    size="sm"
+                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                    title="Abrir o documento para assinar"
+                                    onClick={() => abrirDocumentoPrincipal(row.original)}
+                                >
+                                    <FileSignature className="w-4 h-4" />
+                                    Assinar
+                                </Button>
+                            )}
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -792,7 +914,7 @@ export default function Page() {
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
-                                    onClick={() => handleAprovar(row.original.id, 1)}
+                                    onClick={() => handleAprovar(row.original, 1)}
                                 >
                                     Aprovar
                                 </Button>
@@ -802,7 +924,7 @@ export default function Page() {
                                 <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleAprovar(row.original.id, 0)}
+                                    onClick={() => handleAprovar(row.original, 0)}
                                 >
                                     Reprovar
                                 </Button>
@@ -811,7 +933,7 @@ export default function Page() {
                             {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => { setDeleteDocumentoId(row.original.id); }}
+                                onClick={() => { marcarOrigem(row.original); setDeleteDocumentoId(row.original.id); }}
                             >
                                 Excluir
                             </Button>)}
@@ -820,7 +942,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userCodusuario]
+        [userName, userCodusuario, isAdminUser, assinarHabilitado]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -908,67 +1030,198 @@ export default function Page() {
         []
     )
 
-    const [aba, setAba] = useState('documentos')
+    // T-WS3a: Documentos (lista única) / Solicitações (Enviadas | Recebidas da mesma lista) / Clientes e parceiros.
+    const [solicitarOpen, setSolicitarOpen] = useState(false)
     const [fornecedorPrefill, setFornecedorPrefill] = useState<{ nome?: string; email?: string } | null>(null)
 
+    function trocarAba(valor: string) {
+        if (valor === 'solicitacoes') {
+            setVisao((v) => (v === 'enviados' || v === 'recebidos' ? v : 'enviados'))
+        } else if (valor === 'documentos' && aba === 'solicitacoes') {
+            setVisao('')
+        }
+        setAba(valor)
+    }
+
     // Tour Raphaela: troca a aba controlada (Radix Tabs não muda só com .click()).
+    // Aceita os valores antigos (solicitacao, minhas-solicitacoes, fornecedor) e os novos.
     useEffect(() => {
         const handler = (ev: Event) => {
             const detail = (ev as CustomEvent<string>).detail
-            if (
-                detail === 'documentos' ||
-                detail === 'solicitacao' ||
-                detail === 'minhas-solicitacoes' ||
-                detail === 'fornecedor'
-            ) {
-                setAba(detail)
+            if (detail === 'documentos') {
+                setAba('documentos')
+            } else if (detail === 'solicitacao' || detail === 'solicitar') {
+                setAba('documentos')
+                setSolicitarOpen(true)
+            } else if (detail === 'minhas-solicitacoes' || detail === 'solicitacoes') {
+                setVisao((v) => (v === 'enviados' || v === 'recebidos' ? v : 'enviados'))
+                setAba('solicitacoes')
+            } else if (detail === 'fornecedor' || detail === 'clientes') {
+                setAba('clientes')
             }
         }
         window.addEventListener('tour-plugsign-aba', handler)
         return () => window.removeEventListener('tour-plugsign-aba', handler)
     }, [])
 
+    const emSolicitacoes = aba === 'solicitacoes'
+    // Solicitações > Histórico WaySign: o painel antigo das solicitações PlugSign (status, quem abriu, histórico).
+    const [verHistoricoWaySign, setVerHistoricoWaySign] = useState(false)
+
+    // Painel, Relatório e Mensagens só aparecem depois da cópia dos dados da PlugSign (senão ficariam em branco).
+    const [espelhoDisponivel, setEspelhoDisponivel] = useState(false)
+    useEffect(() => {
+        if (temWaySign !== true) return
+        listarAlertas()
+            .then((r) => setEspelhoDisponivel(r.disponivel === true))
+            .catch(() => setEspelhoDisponivel(false))
+    }, [temWaySign])
+
     return (
         <div className="p-6">
-            <Tabs value={aba} onValueChange={setAba} className="space-y-4">
+            <Tabs value={aba} onValueChange={trocarAba} className="space-y-4">
                 <TabsList id="tour-plugsign-guias" className="flex-wrap h-auto w-fit">
-                    <TabsTrigger id="tour-plugsign-documentos" value="documentos">
-                        <FileSignature className="w-4 h-4" /> Documentos
+                    {(temWaySign || temDocumentos) && (
+                        <TabsTrigger id="tour-plugsign-documentos" value="documentos">
+                            <FileSignature className="w-4 h-4" /> Documentos
+                        </TabsTrigger>
+                    )}
+                    {(temWaySign || temDocumentos) && (
+                        <TabsTrigger value="meus">
+                            <FolderCheck className="w-4 h-4" /> Meus documentos
+                        </TabsTrigger>
+                    )}
+                    {temWaySign && (
+                    <>
+                    <TabsTrigger id="tour-plugsign-minhas" value="solicitacoes">
+                        <History className="w-4 h-4" /> Solicitações
                     </TabsTrigger>
-                    <TabsTrigger id="tour-plugsign-solicitacao" value="solicitacao">
-                        <SquarePlus className="w-4 h-4" /> Solicitação de assinatura
+                    <TabsTrigger id="tour-plugsign-fornecedor" value="clientes">
+                        <UserPlus className="w-4 h-4" /> Clientes e parceiros
                     </TabsTrigger>
-                    <TabsTrigger id="tour-plugsign-minhas" value="minhas-solicitacoes">
-                        <History className="w-4 h-4" /> Minhas solicitações
+                    {espelhoDisponivel && (
+                        <>
+                            <TabsTrigger value="painel">
+                                <BarChart3 className="w-4 h-4" /> Painel
+                            </TabsTrigger>
+                            <TabsTrigger value="relatorio">
+                                <Table2 className="w-4 h-4" /> Relatório
+                            </TabsTrigger>
+                            <TabsTrigger value="mensagens">
+                                <Mail className="w-4 h-4" /> Mensagens
+                            </TabsTrigger>
+                        </>
+                    )}
+                    <TabsTrigger value="templates">
+                        <LayoutTemplate className="w-4 h-4" /> Templates
                     </TabsTrigger>
-                    <TabsTrigger id="tour-plugsign-fornecedor" value="fornecedor">
-                        <UserPlus className="w-4 h-4" /> Fornecedor / parceiro
-                    </TabsTrigger>
+                    {isAdminUser && (
+                        <TabsTrigger value="lotes">
+                            <Boxes className="w-4 h-4" /> Lotes
+                        </TabsTrigger>
+                    )}
+                    {isAdminUser && (
+                        <TabsTrigger value="admin">
+                            <Settings className="w-4 h-4" /> Administração
+                        </TabsTrigger>
+                    )}
+                    </>
+                    )}
                 </TabsList>
 
-                <TabsContent value="solicitacao" className="mt-0">
-                    <SolicitacaoAssinaturaPanel
-                        onCadastrarFornecedor={(draft) => {
-                            setFornecedorPrefill(draft ?? null)
-                            setAba('fornecedor')
-                        }}
-                    />
-                </TabsContent>
-
-                <TabsContent value="minhas-solicitacoes" className="mt-0">
-                    <MinhasSolicitacoesPanel />
-                </TabsContent>
-
-                <TabsContent value="fornecedor" className="mt-0">
+                <TabsContent value="clientes" className="mt-0 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Fornecedores e parceiros são pessoas de fora da empresa que assinam documentos.
+                        Cadastre aqui para que eles recebam o acesso e apareçam na hora de enviar para assinatura.
+                    </p>
                     <FornecedorParceiroPanel prefill={fornecedorPrefill} />
+                    {isAdminUser && <ClientesSecao />}
                 </TabsContent>
 
-                <TabsContent value="documentos" className="mt-0 space-y-0">
+                <TabsContent value="painel" className="mt-0">
+                    <WaySignPainel />
+                </TabsContent>
+
+                <TabsContent value="relatorio" className="mt-0">
+                    <WaySignRelatorio />
+                </TabsContent>
+
+                <TabsContent value="mensagens" className="mt-0">
+                    <WaySignMensagens />
+                </TabsContent>
+
+                <TabsContent value="templates" className="mt-0">
+                    <WaySignTemplatesPanel onEnviado={() => setRecarga((r) => r + 1)} />
+                </TabsContent>
+
+                {isAdminUser && (
+                    <TabsContent value="lotes" className="mt-0">
+                        <WaySignLotesPanel onNovoLote={() => setSolicitarOpen(true)} />
+                    </TabsContent>
+                )}
+
+                {isAdminUser && (
+                    <TabsContent value="admin" className="mt-0">
+                        <WaySignAdminPanel />
+                    </TabsContent>
+                )}
+
+                {/* Solicitar assinatura: o painel de envio atual, agora em modal (sem mudar o envio). */}
+                <Dialog
+                    open={solicitarOpen}
+                    onOpenChange={(open) => {
+                        setSolicitarOpen(open)
+                        if (!open) void handleSearchClick()
+                    }}
+                >
+                    <DialogContent className="sm:max-w-[min(1100px,95vw)] max-h-[92dvh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Solicitar assinatura</DialogTitle>
+                            <DialogDescription>Envie documentos para assinatura pela PlugSign.</DialogDescription>
+                        </DialogHeader>
+                        <SolicitacaoAssinaturaPanel
+                            onCadastrarFornecedor={(draft) => {
+                                setFornecedorPrefill(draft ?? null)
+                                setSolicitarOpen(false)
+                                setAba('clientes')
+                            }}
+                        />
+                    </DialogContent>
+                </Dialog>
+
+                {(aba === 'documentos' || emSolicitacoes || emMeus) && (
+                <div className="mt-0 space-y-0">
             {/* Header */}
             <Card id="tour-plugsign-doc-painel" className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
-                        <CardTitle id="tour-plugsign-doc-titulo" className="text-2xl font-bold">{titulo}</CardTitle>
+                        <CardTitle id="tour-plugsign-doc-titulo" className="text-2xl font-bold">
+                            {emSolicitacoes ? 'Solicitações' : emMeus ? 'Meus documentos' : titulo}
+                        </CardTitle>
+                        {emMeus && (
+                            <Tabs value={origemFiltrada || 'todos'} onValueChange={(v) => setOrigemFiltrada(v === 'todos' ? '' : v)}>
+                                <TabsList>
+                                    <TabsTrigger value="todos">Todos</TabsTrigger>
+                                    <TabsTrigger value="INTERNOS">Internos (PaperSign)</TabsTrigger>
+                                    {temWaySign && <TabsTrigger value="EXTERNOS">Externos (WaySign)</TabsTrigger>}
+                                </TabsList>
+                            </Tabs>
+                        )}
+                        {emSolicitacoes && (
+                            <Tabs
+                                value={verHistoricoWaySign ? 'historico' : visao === 'recebidos' ? 'recebidos' : 'enviados'}
+                                onValueChange={(v) => {
+                                    setVerHistoricoWaySign(v === 'historico')
+                                    if (v !== 'historico') setVisao(v)
+                                }}
+                            >
+                                <TabsList id="tour-plugsign-minhas-painel" className="flex-wrap h-auto">
+                                    <TabsTrigger value="enviados">Enviadas</TabsTrigger>
+                                    <TabsTrigger value="recebidos">Recebidas</TabsTrigger>
+                                    <TabsTrigger value="historico">Histórico WaySign</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        )}
                         <a
                             href="https://app.plugsign.com.br/signin/?secure=true"
                             target="_blank"
@@ -981,6 +1234,13 @@ export default function Page() {
                         </a>
                     </div>
                     <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
+                        <WaySignAlertasBotao
+                            onAbrirDocumento={(key) => {
+                                setOrigemFiltrada('')
+                                setSituacaoFiltrada('')
+                                setQuery(key)
+                            }}
+                        />
                         <Button
                             id="tour-plugsign-cert"
                             type="button"
@@ -989,6 +1249,8 @@ export default function Page() {
                         >
                             {certStatus?.temCertificadoA1 ? "Certificado A1 OK" : "Certificado digital A1"}
                         </Button>
+                        {situacaoDaAba == null && (
+                        <>
                         {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="docDateFrom">Data de</Label>
@@ -1011,6 +1273,8 @@ export default function Page() {
                                 className="w-40"
                             />
                         </div>
+                        </>
+                        )}
                         {/* Solicitante */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1042,29 +1306,50 @@ export default function Page() {
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-64" align="end">
+                                {situacaoDaAba == null && (
+                                <>
                                 <DropdownMenuLabel>Status</DropdownMenuLabel>
-                                <DropdownMenuCheckboxItem
-                                    key={"EM ANDAMENTO"}
-                                    checked={situacaoFiltrada == "EM ANDAMENTO"}
-                                    onCheckedChange={() => setSituacaoFiltrada("EM ANDAMENTO")}
-                                >
-                                    Em Andamento
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
-                                    key={"APROVADO"}
-                                    checked={situacaoFiltrada == "APROVADO"}
-                                    onCheckedChange={() => setSituacaoFiltrada("APROVADO")}
-                                >
-                                    Aprovados
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
-                                    key={"REPROVADO"}
-                                    checked={situacaoFiltrada == "REPROVADO"}
-                                    onCheckedChange={() => setSituacaoFiltrada("REPROVADO")}
-                                >
-                                    Reprovados
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
+                                {[
+                                    { valor: "PENDENTE", label: "Pendentes" },
+                                    { valor: "CONCLUÍDO", label: "Concluídos" },
+                                    { valor: "RECUSADO", label: "Recusados" },
+                                    { valor: "CANCELADO", label: "Cancelados" },
+                                    { valor: "", label: "Todos" },
+                                ].map((s) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={s.valor || "Todos"}
+                                        checked={situacaoFiltrada == s.valor}
+                                        onCheckedChange={() => setSituacaoFiltrada(s.valor)}
+                                    >
+                                        {s.label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                </>
+                                )}
+                                <DropdownMenuLabel>Origem</DropdownMenuLabel>
+                                {[
+                                    { valor: "INTERNOS", label: "Internos (PaperSign)" },
+                                    ...(temWaySign ? [{ valor: "EXTERNOS", label: "Externos (WaySign)" }] : []),
+                                    { valor: "", label: "Todas" },
+                                ].map((o) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={o.valor || "Todas"}
+                                        checked={origemFiltrada == o.valor}
+                                        onCheckedChange={() => setOrigemFiltrada(o.valor)}
+                                    >
+                                        {o.label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                <DropdownMenuLabel>Visão</DropdownMenuLabel>
+                                {VISOES.map((v) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={v.valor || "Todos"}
+                                        checked={visao == v.valor}
+                                        onCheckedChange={() => setVisao(v.valor)}
+                                    >
+                                        {v.label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -1094,16 +1379,104 @@ export default function Page() {
                         <SearchIcon className="mr-1 h-4 w-4" /> Buscar
                     </Button>
 
-                    <Button onClick={handleInserirDocumento} className="flex items-center">
-                        <SquarePlus className="mr-1 h-4 w-4" /> Novo
-                    </Button>
+                    {/* Um botão só: aprovação interna (fluxo em níveis do PaperSign) ou envio para assinatura pela PlugSign. */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button id="tour-plugsign-solicitacao" className="flex items-center">
+                                <SquarePlus className="mr-1 h-4 w-4" /> Novo
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-80">
+                            <DropdownMenuItem onSelect={() => handleInserirDocumento()} className="flex-col items-start gap-0.5">
+                                <span className="font-medium">Aprovação interna (em níveis)</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Aprovadores do PaperSign, em ordem, assinando aqui dentro (certificado A1 opcional).
+                                </span>
+                            </DropdownMenuItem>
+                            {temWaySign && (
+                            <DropdownMenuItem onSelect={() => setSolicitarOpen(true)} className="flex-col items-start gap-0.5">
+                                <span className="font-medium">Enviar para assinatura (PlugSign)</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Para fornecedores, parceiros e quem assina pelo link do e-mail.
+                                </span>
+                            </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </CardContent>
             </Card>
 
+            {emSolicitacoes && verHistoricoWaySign && <MinhasSolicitacoesPanel />}
+
             {/* Main */}
-            <Card className="mb-6">
-                <CardContent className="flex flex-col">
-                    <DataTable columns={colunas} data={results} loading={isLoading} getRowDataId={(d) => d.id} />
+            <Card className={emSolicitacoes && verHistoricoWaySign ? "hidden" : "mb-6"}>
+                <CardContent className="flex flex-col gap-3">
+                    {avisoLista && (
+                        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                            {avisoLista}
+                        </p>
+                    )}
+                    {(origemFiltrada || visao) && (
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            {origemFiltrada && (
+                                <Badge variant="outline" className="gap-1">
+                                    Origem: {ROTULO_ORIGEM[origemFiltrada] ?? origemFiltrada}
+                                    <button type="button" aria-label="Remover filtro de origem" onClick={() => setOrigemFiltrada("")}>
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </Badge>
+                            )}
+                            {visao && (
+                                <Badge variant="outline" className="gap-1">
+                                    {VISOES.find((v) => v.valor === visao)?.label}
+                                    <button type="button" aria-label="Remover filtro de visão" onClick={() => setVisao("")}>
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </Badge>
+                            )}
+                        </div>
+                    )}
+                    <DataTable
+                        columns={colunas}
+                        data={results}
+                        loading={isLoading}
+                        hidePagination
+                        hideSearch
+                        getRowDataId={(d) => (d.origem === 'INTERNO' ? d.id : null)}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isLoading || pagina <= 1}
+                            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                        >
+                            Anterior
+                        </Button>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Página {pagina} de {ultimaPagina || 1} · {totalItens} documento(s)</span>
+                            <select
+                                aria-label="Itens por página"
+                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                value={tamanhoPagina}
+                                onChange={(e) => setTamanhoPagina(Number(e.target.value))}
+                            >
+                                {TAMANHOS_PAGINA.map((t) => (
+                                    <option key={t} value={t}>{t} por página</option>
+                                ))}
+                            </select>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isLoading || pagina >= ultimaPagina}
+                            onClick={() => setPagina((p) => p + 1)}
+                        >
+                            Próxima
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -1132,7 +1505,7 @@ export default function Page() {
                             <DialogTitle className="text-lg font-semibold text-center">{`Anexos documento n° ${requisicaoSelecionada.id}`}</DialogTitle>
                         </DialogHeader>
                         <div className="w-full">
-                            {selectedAnexosResult.length === 0 && !isLoading && (
+                            {selectedAnexosResult.length === 0 && !isLoading && !ehDocInterno() && (
                                 <div className="mb-4 space-y-3 text-center">
                                     <p className="text-sm text-muted-foreground">
                                         O PDF deste documento está na PlugSign. Clique abaixo para buscar o arquivo assinado.
@@ -1322,7 +1695,7 @@ export default function Page() {
                                                                 <CommandGroup>
                                                                     {usuarios.map((u) => (
                                                                         <CommandItem
-                                                                            key={u.codusuario}
+                                                                            key={`${u.codusuario}-${u.sequencial}`}
                                                                             value={`${u.codusuario} ${u.nome}`}
                                                                             onSelect={() => {
                                                                                 field.onChange(u.codusuario)
@@ -1537,10 +1910,20 @@ export default function Page() {
                     onOpenChange={(open) => { if (!open) setAnexoPdfBase64ParaAssinatura(null); setIsModalVisualizarAnexoOpen(open); }}
                     title={`Anexo ${anexoSelecionado.nome}`}
                     pdfBase64={anexoPdfBase64ParaAssinatura}
-                    canSign={anexoSelecionado.documento_assinado == 0}
+                    canSign={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)}
                     onSign={confirmarAssinaturaAnexo}
                     onPrint={handleImprimirAnexo}
                     isLoading={isLoading}
+                    extraControls={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
+                        && origemAtual.current !== 'DOCINTERNO' && certStatus?.plugsignAtivo ? (
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <Checkbox
+                                checked={assinarComCertificado}
+                                onCheckedChange={(v) => setAssinarComCertificado(v === true)}
+                            />
+                            Assinar com certificado (A1)
+                        </label>
+                    ) : undefined}
                 />
             )}
 
@@ -1563,7 +1946,8 @@ export default function Page() {
                     Nenhum registro encontrado.
                 </p>
             )}
-                </TabsContent>
+                </div>
+                )}
             </Tabs>
         </div>
     )
@@ -1624,7 +2008,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
                                                             <CommandGroup>
                                                                 {usuarios.map((u) => (
                                                                     <CommandItem
-                                                                        key={u.codusuario}
+                                                                        key={`${u.codusuario}-${u.sequencial}`}
                                                                         value={`${u.codusuario} ${u.nome}`}
                                                                         onSelect={() => {
                                                                             field.onChange(u.codusuario)
