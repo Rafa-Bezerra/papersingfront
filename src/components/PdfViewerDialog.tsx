@@ -158,7 +158,7 @@ function FieldPlaceholder({
     kind?: string
     selected?: boolean
     style: React.CSSProperties
-    onMouseDown?: (e: React.MouseEvent) => void
+    onMouseDown?: (e: React.PointerEvent) => void
     children?: React.ReactNode
 }) {
     const theme = themeForKind(kind || kindFromTitle(title))
@@ -170,8 +170,10 @@ function FieldPlaceholder({
                 zIndex: selected ? 12 : 6,
                 pointerEvents: onMouseDown ? 'auto' : 'none',
                 cursor: onMouseDown ? 'move' : 'default',
+                // Toque: arrastar a caixa não rola a página.
+                touchAction: onMouseDown ? 'none' : undefined,
             }}
-            onMouseDown={onMouseDown}
+            onPointerDown={onMouseDown}
             title={owner ? `${title} — ${owner}` : title}
         >
             <div
@@ -440,12 +442,13 @@ export default function PdfViewerDialog({
     }
 
     // --- Drag da caixa ---
-    const onBoxMouseDown = useCallback((e: React.MouseEvent) => {
+    // Pointer events: funcionam com mouse e com o dedo (celular/tablet).
+    const onBoxMouseDown = useCallback((e: React.PointerEvent) => {
         if (!signatureCoords) return
         e.stopPropagation(); e.preventDefault()
         dragRef.current = { startX: e.clientX, startY: e.clientY, origCoords: signatureCoords }
 
-        function onMove(ev: MouseEvent) {
+        function onMove(ev: PointerEvent) {
             if (!dragRef.current || !viewport) return
             const ov = overlayRef()
             if (!ov) return
@@ -461,15 +464,17 @@ export default function PdfViewerDialog({
         }
         function onUp() {
             dragRef.current = null
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
+            window.removeEventListener('pointermove', onMove)
+            window.removeEventListener('pointerup', onUp)
+            window.removeEventListener('pointercancel', onUp)
         }
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
+        window.addEventListener('pointermove', onMove)
+        window.addEventListener('pointerup', onUp)
+        window.addEventListener('pointercancel', onUp)
     }, [signatureCoords, viewport])
 
     // --- Resize handles ---
-    const onHandleMouseDown = useCallback((dir: ResizeDir, e: React.MouseEvent) => {
+    const onHandleMouseDown = useCallback((dir: ResizeDir, e: React.PointerEvent) => {
         if (!signatureCoords) return
         e.stopPropagation(); e.preventDefault()
         resizeRef.current = {
@@ -479,7 +484,7 @@ export default function PdfViewerDialog({
             origCoords: signatureCoords,
         }
 
-        function onMove(ev: MouseEvent) {
+        function onMove(ev: PointerEvent) {
             const r = resizeRef.current; if (!r || !viewport) return
             const ov = overlayRef(); if (!ov) return
             const rect = ov.getBoundingClientRect()
@@ -509,11 +514,13 @@ export default function PdfViewerDialog({
         }
         function onUp() {
             resizeRef.current = null
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
+            window.removeEventListener('pointermove', onMove)
+            window.removeEventListener('pointerup', onUp)
+            window.removeEventListener('pointercancel', onUp)
         }
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
+        window.addEventListener('pointermove', onMove)
+        window.addEventListener('pointerup', onUp)
+        window.addEventListener('pointercancel', onUp)
     }, [signatureCoords, boxPxW, boxPxH, viewport])
 
     // --- Assinar / confirmar posição ---
@@ -648,8 +655,8 @@ export default function PdfViewerDialog({
                                     {(placeMode ? CORNER_HANDLES : HANDLE_DIRS).map(dir => (
                                         <div
                                             key={dir}
-                                            style={handleStyle(dir, theme.accent)}
-                                            onMouseDown={e => onHandleMouseDown(dir, e)}
+                                            style={{ ...handleStyle(dir, theme.accent), touchAction: 'none' }}
+                                            onPointerDown={e => onHandleMouseDown(dir, e)}
                                         />
                                     ))}
                                 </FieldPlaceholder>
@@ -670,16 +677,16 @@ export default function PdfViewerDialog({
                 ) : null}
 
                 {/* Barra de controles */}
-                <div className="flex justify-center items-center gap-2 sm:gap-4 p-2 sm:p-3 border-t shrink-0 bg-background flex-wrap overflow-y-auto max-h-[35%]">
+                <div className="flex justify-center items-center gap-2 sm:gap-4 p-2 sm:p-3 border-t shrink-0 bg-background flex-wrap overflow-y-auto max-h-[45%] sm:max-h-[35%]">
                     {/* Paginação */}
                     <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)}>Anterior</Button>
                     <span className="text-sm">Página {currentPage}{totalPages ? ` / ${totalPages}` : ''}</span>
                     <Button variant="outline" size="sm" disabled={currentPage >= (totalPages ?? 1)} onClick={() => changePage(currentPage + 1)}>Próxima</Button>
 
                     {/* Zoom */}
-                    <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                        <Search className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Zoom:</span>
+                    <div className="flex items-center gap-2 sm:border-l sm:pl-4 sm:ml-2">
+                        <Search className="hidden sm:block h-4 w-4 text-muted-foreground" />
+                        <span className="hidden sm:inline text-sm text-muted-foreground">Zoom:</span>
                         <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoom <= 0.5} title="Diminuir zoom"><ZoomOut className="h-4 w-4" /></Button>
                         <span className="text-sm min-w-[3rem] text-center font-medium">{Math.round(zoom * 100)}%</span>
                         <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={zoom >= 5} title="Aumentar zoom"><ZoomIn className="h-4 w-4" /></Button>
@@ -687,7 +694,7 @@ export default function PdfViewerDialog({
 
                     {/* Tamanho da caixa */}
                     {canSign && signatureCoords && (
-                        <div className="flex items-center gap-2 border-l pl-4 ml-2 text-xs text-muted-foreground">
+                        <div className="hidden sm:flex items-center gap-2 border-l pl-4 ml-2 text-xs text-muted-foreground">
                             <span>Largura</span>
                             <input
                                 type="range" min={30} max={300} step={5} value={boxPxW}
@@ -708,14 +715,14 @@ export default function PdfViewerDialog({
                     )}
 
                     {/* Controles extras */}
-                    {extraControls && <div className="flex items-center gap-2 border-l pl-4 ml-2">{extraControls}</div>}
+                    {extraControls && <div className="flex items-center gap-2 sm:border-l sm:pl-4 sm:ml-2">{extraControls}</div>}
 
                     {/* Imprimir */}
                     {onPrint && <Button variant="outline" onClick={onPrint} className="border-l ml-2 pl-4">Imprimir</Button>}
 
                     {/* Assinar / confirmar posição */}
                     {canSign && onSign && (
-                        <div className="flex items-center gap-3 border-l pl-4 ml-2">
+                        <div className="order-first w-full justify-center sm:order-none sm:w-auto flex flex-wrap items-center gap-3 sm:border-l sm:pl-4 sm:ml-2">
                             {!coords
                                 ? <span className="text-xs text-muted-foreground">{placeHint || 'Clique no documento para posicionar'}</span>
                                 : <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
@@ -759,6 +766,8 @@ export default function PdfViewerDialog({
         </Dialog>
     )
 }
+
+
 
 
 

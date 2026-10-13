@@ -58,7 +58,7 @@ function shortKey(key: string) {
 }
 
 /** Nome legível; ignora se veio só a document_key. */
-function nomeExibicao(nome: string | null | undefined, documentKey: string) {
+export function nomeExibicao(nome: string | null | undefined, documentKey: string) {
   const n = (nome || '').trim()
   const key = (documentKey || '').trim()
   if (!n) return null
@@ -74,7 +74,7 @@ function nomeExibicao(nome: string | null | undefined, documentKey: string) {
 }
 
 /** Destaca e-mails e textos entre colchetes (IP) no activity da PlugSign. */
-function ActivityText({ text }: { text: string }) {
+export function ActivityText({ text }: { text: string }) {
   const parts = text.split(/(\S+@\S+\.\S+|\[[^\]]+\])/g)
   return (
     <span>
