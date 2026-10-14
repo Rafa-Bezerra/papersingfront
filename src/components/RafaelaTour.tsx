@@ -57,6 +57,12 @@ function usuarioPodePlugSign(): boolean {
   return Boolean(u?.admin || u?.financeiro || u?.docusign)
 }
 
+/** Mesma regra do menu e da rota /docusign: o item Documentos saiu do menu e fica dentro do WaySign. */
+function usuarioPodeDocumentosWaySign(): boolean {
+  const u = lerUserData()
+  return Boolean(u?.admin || u?.financeiro || u?.docusign || u?.documentos)
+}
+
 /** Mesma regra do menu: admin, financeiro ou flag comunicados. */
 function usuarioPodePagamentosCi(): boolean {
   const u = lerUserData()
@@ -83,6 +89,32 @@ function passoEhPlugSign(passo: TourPasso): boolean {
   if (sel.includes('plugsign') || sel.includes('docusign')) return true
   if (rota.includes('/docusign')) return true
   return false
+}
+
+/** Partes do WaySign que quem só tem a permissão Documentos também enxerga. */
+const SELETORES_WAYSIGN_DOCUMENTOS = new Set([
+  '#tour-menu-plugsign',
+  '#tour-plugsign-guias',
+  '#tour-plugsign-documentos',
+  '#tour-plugsign-doc-painel',
+  '#tour-plugsign-doc-titulo',
+  '#tour-plugsign-doc-acoes',
+  '#tour-plugsign-cert',
+  '#tour-plugsign-solicitacao',
+  '#tour-plugsign-meus',
+  '#tour-plugsign-meus-origem',
+])
+
+function passoEhWaySignDocumentos(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  return SELETORES_WAYSIGN_DOCUMENTOS.has(sel)
+}
+
+/** Versão do tour que explica a saída do item Documentos do menu (tem o passo da aba Meus documentos). */
+function tourEhDocumentosNoWaySign(tour: TourPendente | null): boolean {
+  return Boolean(
+    tour?.passos?.some((p) => (p.seletorCss || '').trim().toLowerCase() === '#tour-plugsign-meus')
+  )
 }
 
 function passoEhPagamentosCi(passo: TourPasso): boolean {
@@ -137,7 +169,7 @@ function listarModulosTour(): string[] {
   const mods: string[] = ['Pendências do gestor']
   if (usuarioPodeReceitas()) mods.push('Receitas')
   if (usuarioPodePagamentosCi()) mods.push('Pagamentos CI')
-  if (usuarioPodePlugSign()) mods.push(NOME_MODULO_ASSINATURA)
+  if (usuarioPodeDocumentosWaySign()) mods.push(NOME_MODULO_ASSINATURA)
   return mods
 }
 
@@ -157,6 +189,7 @@ function juntarListaPt(itens: string[]): string {
  */
 function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
   const podePlug = usuarioPodePlugSign()
+  const podeDocWaySign = usuarioPodeDocumentosWaySign()
   const podeReceitas = usuarioPodeReceitas()
   const podeCi = usuarioPodePagamentosCi()
   const podeFinRm = usuarioPodeFinanceiroRm()
@@ -171,10 +204,31 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
     if (passoEhReceitas(p)) return podeReceitas
     if (passoEhCiFinanceiroRm(p)) return podeCi && podeFinRm
     if (passoEhPagamentosCi(p)) return podeCi
+    if (passoEhWaySignDocumentos(p)) return podeDocWaySign
     if (passoEhPlugSign(p)) return podePlug
 
     return temAlgumModulo
   })
+}
+
+function mensagemIntroDocumentosNoWaySign(): string {
+  if (!usuarioPodeDocumentosWaySign()) {
+    return `Olá, sou a Raphaela!\n\nMudamos um lugar no sistema: o item Documentos saiu do menu lateral e agora fica dentro do ${NOME_MODULO_ASSINATURA}.\n\nNo seu perfil esses módulos não estão liberados, então nada muda no seu dia a dia. Se precisar acessar documentos, vou te mostrar onde pedir a liberação.`
+  }
+  return `Olá, sou a Raphaela!\n\nMudamos um lugar no sistema: o item Documentos saiu do menu lateral.\n\nAgora os documentos ficam dentro do ${NOME_MODULO_ASSINATURA}. Nada foi perdido: seus documentos, aprovadores e assinaturas continuam os mesmos — só mudou o caminho.\n\nVou te mostrar, passo a passo, onde encontrar cada coisa.`
+}
+
+function mensagemFimDocumentosNoWaySign(): string {
+  if (!usuarioPodeDocumentosWaySign()) {
+    return `Pronto!\n\nSe precisar de acesso a Documentos ou ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
+  }
+  let texto =
+    `Pronto! Recapitulando:\n\n• Menu ${NOME_MODULO_ASSINATURA} → aba Documentos: o que está pendente (era o antigo menu Documentos).\n• Botão Novo → Aprovação interna: cria um documento para aprovação em níveis, como antes.\n• Aba Meus documentos: os já finalizados (concluídos, recusados ou cancelados).\n• Links e pendências antigos de Documentos continuam funcionando.`
+  if (usuarioPodePlugSign()) {
+    texto +=
+      '\n• Solicitações e Clientes e parceiros: envio para assinatura pela PlugSign, como antes.'
+  }
+  return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
 
 function mensagemIntroPorPerfil(): string {
@@ -310,6 +364,9 @@ function abaPlugSignPorSeletor(seletor: string): string | null {
   ) {
     return 'documentos'
   }
+  if (seletor === '#tour-plugsign-meus' || seletor === '#tour-plugsign-meus-origem') {
+    return 'meus'
+  }
   if (seletor.startsWith('#tour-plugsign-solicitacao-')) {
     return 'solicitar'
   }
@@ -327,8 +384,20 @@ async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
   const valorAba = abaPlugSignPorSeletor(seletor)
   if (!valorAba) return
 
-  // Se o alvo já está na tela, a aba certa já está aberta.
-  if (document.querySelector(seletor)) return
+  const triggerId =
+    valorAba === 'documentos' || valorAba === 'solicitar'
+      ? '#tour-plugsign-documentos'
+      : valorAba === 'meus'
+        ? '#tour-plugsign-meus'
+        : valorAba === 'solicitacoes'
+          ? '#tour-plugsign-minhas'
+          : '#tour-plugsign-fornecedor'
+
+  // Alvo na tela e aba dele ativa: nada a trocar. O cabeçalho é o mesmo em Documentos, Meus documentos e Solicitações.
+  if (document.querySelector(seletor)) {
+    const trigger = document.querySelector(triggerId)
+    if (valorAba === 'solicitar' || trigger?.getAttribute('data-state') !== 'inactive') return
+  }
 
   // 1) Evento dedicado (Tabs controlado no React — mais confiável).
   window.dispatchEvent(
@@ -336,13 +405,6 @@ async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
   )
 
   // 2) Fallback: mousedown no TabsTrigger (Radix não troca só com .click()).
-  const triggerId =
-    valorAba === 'documentos' || valorAba === 'solicitar'
-      ? '#tour-plugsign-documentos'
-      : valorAba === 'solicitacoes'
-        ? '#tour-plugsign-minhas'
-        : '#tour-plugsign-fornecedor'
-
   const tab = document.querySelector(triggerId)
   if (tab instanceof HTMLElement) {
     clicarAbaRadix(tab)
@@ -736,11 +798,12 @@ export default function RafaelaTour() {
       .replace(/\s*v(ers[aã]o)?\s*\d+(\.\d+)*/gi, '')
       .trim() || 'Novos recursos do sistema'
 
+  const docsNoWaySign = tourEhDocumentosNoWaySign(tour)
   const balãoTexto =
     fase === 'intro' || fase === 'auto-start'
-      ? mensagemIntroPorPerfil()
+      ? docsNoWaySign ? mensagemIntroDocumentosNoWaySign() : mensagemIntroPorPerfil()
       : fase === 'fim'
-        ? mensagemFimPorPerfil() + '\n\nComo deseja continuar?'
+        ? (docsNoWaySign ? mensagemFimDocumentosNoWaySign() : mensagemFimPorPerfil()) + '\n\nComo deseja continuar?'
         : 'Siga os destaques na tela. Use Próximo e Anterior no guia.'
 
   return (

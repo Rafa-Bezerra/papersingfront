@@ -1050,6 +1050,8 @@ export default function Page() {
             const detail = (ev as CustomEvent<string>).detail
             if (detail === 'documentos') {
                 setAba('documentos')
+            } else if (detail === 'meus') {
+                setAba('meus')
             } else if (detail === 'solicitacao' || detail === 'solicitar') {
                 setAba('documentos')
                 setSolicitarOpen(true)
@@ -1087,7 +1089,7 @@ export default function Page() {
                         </TabsTrigger>
                     )}
                     {(temWaySign || temDocumentos) && (
-                        <TabsTrigger value="meus">
+                        <TabsTrigger id="tour-plugsign-meus" value="meus">
                             <FolderCheck className="w-4 h-4" /> Meus documentos
                         </TabsTrigger>
                     )}
@@ -1200,7 +1202,7 @@ export default function Page() {
                         </CardTitle>
                         {emMeus && (
                             <Tabs value={origemFiltrada || 'todos'} onValueChange={(v) => setOrigemFiltrada(v === 'todos' ? '' : v)}>
-                                <TabsList>
+                                <TabsList id="tour-plugsign-meus-origem">
                                     <TabsTrigger value="todos">Todos</TabsTrigger>
                                     <TabsTrigger value="INTERNOS">Internos (PaperSign)</TabsTrigger>
                                     {temWaySign && <TabsTrigger value="EXTERNOS">Externos (WaySign)</TabsTrigger>}
