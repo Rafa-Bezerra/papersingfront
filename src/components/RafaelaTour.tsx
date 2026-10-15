@@ -103,11 +103,29 @@ const SELETORES_WAYSIGN_DOCUMENTOS = new Set([
   '#tour-plugsign-solicitacao',
   '#tour-plugsign-meus',
   '#tour-plugsign-meus-origem',
+  '#tour-plugsign-solicitante',
+  '#tour-plugsign-filtros',
+  '#tour-plugsign-busca',
+  '#tour-plugsign-lista',
+  '#tour-plugsign-paginacao',
 ])
 
 function passoEhWaySignDocumentos(passo: TourPasso): boolean {
   const sel = (passo.seletorCss || '').trim().toLowerCase()
   return SELETORES_WAYSIGN_DOCUMENTOS.has(sel)
+}
+
+/** Abas Lotes e Administração: só Admin (mesma regra do DocusignPage). */
+function passoEhWaySignAdmin(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  return sel === '#tour-plugsign-lotes' || sel === '#tour-plugsign-admin'
+}
+
+/** Tour que percorre o WaySign inteiro, parte por parte (tem o passo da lista de documentos). */
+function tourEhWaySignCompleto(tour: TourPendente | null): boolean {
+  return Boolean(
+    tour?.passos?.some((p) => (p.seletorCss || '').trim().toLowerCase() === '#tour-plugsign-lista')
+  )
 }
 
 /** Versão do tour que explica a saída do item Documentos do menu (tem o passo da aba Meus documentos). */
@@ -204,11 +222,35 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
     if (passoEhReceitas(p)) return podeReceitas
     if (passoEhCiFinanceiroRm(p)) return podeCi && podeFinRm
     if (passoEhPagamentosCi(p)) return podeCi
+    if (passoEhWaySignAdmin(p)) return Boolean(lerUserData()?.admin)
     if (passoEhWaySignDocumentos(p)) return podeDocWaySign
     if (passoEhPlugSign(p)) return podePlug
 
     return temAlgumModulo
   })
+}
+
+function mensagemIntroWaySignCompleto(): string {
+  if (!usuarioPodeDocumentosWaySign()) {
+    return `Olá, sou a Raphaela!\n\nO ${NOME_MODULO_ASSINATURA} reúne os documentos internos (aprovação em níveis) e as assinaturas pela PlugSign.\n\nNo seu perfil ele não está liberado, então nada muda no seu dia a dia. Vou te mostrar onde pedir a liberação, se precisar.`
+  }
+  if (!usuarioPodePlugSign()) {
+    return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: onde ficam os documentos pendentes e os finalizados, como buscar e filtrar, como criar um documento para aprovação e o que cada botão da lista faz.\n\nVocê pode voltar ou avançar a qualquer momento.`
+  }
+  return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: as abas, os botões do topo, a busca e os filtros, como criar um documento ou enviar para assinatura, o que cada coluna e ação da lista faz, e as abas de acompanhamento (Solicitações, Clientes e parceiros, Templates e relatórios).\n\nVocê pode voltar ou avançar a qualquer momento.`
+}
+
+function mensagemFimWaySignCompleto(): string {
+  if (!usuarioPodeDocumentosWaySign()) {
+    return `Pronto!\n\nSe precisar de acesso ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
+  }
+  let texto =
+    `Pronto! Recapitulando:\n\n• Documentos: o que está pendente. Meus documentos: o que já foi finalizado.\n• Novo → Aprovação interna: documento com aprovadores em níveis.\n• Busca, Solicitante e Filtros (Status, Origem e Visão) refinam a lista.\n• Na linha do documento: Assinar, Documento, Imprimir, Anexos, Aprovações e Aprovar/Reprovar.`
+  if (usuarioPodePlugSign()) {
+    texto +=
+      '\n• Novo → Enviar para assinatura (PlugSign): para quem é de fora da empresa.\n• Solicitações: Enviadas, Recebidas e Histórico, com Detalhes e Lembrete.\n• Clientes e parceiros, Templates, Painel, Relatório e Mensagens completam o acompanhamento.'
+  }
+  return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
 
 function mensagemIntroDocumentosNoWaySign(): string {
@@ -348,6 +390,16 @@ async function ativarFormCiSePreciso(seletor: string): Promise<void> {
   }
 }
 
+/** Abas que o tour destaca pelo próprio botão da aba (seletor → valor da aba no DocusignPage). */
+const ABAS_WAYSIGN_PROPRIAS: Record<string, string> = {
+  '#tour-plugsign-templates': 'templates',
+  '#tour-plugsign-painel': 'painel',
+  '#tour-plugsign-relatorio': 'relatorio',
+  '#tour-plugsign-mensagens': 'mensagens',
+  '#tour-plugsign-lotes': 'lotes',
+  '#tour-plugsign-admin': 'admin',
+}
+
 /**
  * Valor da aba WaySign para cada seletor interno do tour (T-WS3a: Documentos / Solicitações / Clientes e parceiros).
  * "solicitar" abre o formulário "Solicitar assinatura" (modal dentro de Documentos).
@@ -360,7 +412,14 @@ function abaPlugSignPorSeletor(seletor: string): string | null {
     seletor === '#tour-plugsign-doc-titulo' ||
     seletor === '#tour-plugsign-doc-acoes' ||
     seletor === '#tour-plugsign-cert' ||
-    seletor === '#tour-plugsign-solicitacao'
+    seletor === '#tour-plugsign-solicitacao' ||
+    seletor === '#tour-plugsign-waysign-link' ||
+    seletor === '#tour-plugsign-alertas' ||
+    seletor === '#tour-plugsign-solicitante' ||
+    seletor === '#tour-plugsign-filtros' ||
+    seletor === '#tour-plugsign-busca' ||
+    seletor === '#tour-plugsign-lista' ||
+    seletor === '#tour-plugsign-paginacao'
   ) {
     return 'documentos'
   }
@@ -370,13 +429,25 @@ function abaPlugSignPorSeletor(seletor: string): string | null {
   if (seletor.startsWith('#tour-plugsign-solicitacao-')) {
     return 'solicitar'
   }
-  if (seletor === '#tour-plugsign-minhas' || seletor === '#tour-plugsign-minhas-painel') {
+  // As datas só aparecem em Solicitações (Documentos e Meus documentos não têm limite de data).
+  if (
+    seletor === '#tour-plugsign-minhas' ||
+    seletor === '#tour-plugsign-minhas-painel' ||
+    seletor === '#tour-plugsign-datas'
+  ) {
     return 'solicitacoes'
   }
   if (seletor === '#tour-plugsign-fornecedor' || seletor === '#tour-plugsign-fornecedor-painel') {
     return 'clientes'
   }
+  const abaPropria = ABAS_WAYSIGN_PROPRIAS[seletor]
+  if (abaPropria) return abaPropria
   return null
+}
+
+function fecharSolicitarSeAberto(): void {
+  if (!document.querySelector('#tour-plugsign-solicitacao-form')) return
+  window.dispatchEvent(new CustomEvent('tour-plugsign-aba', { detail: 'documentos' }))
 }
 
 /** Abre a aba correta do PlugSign (como o Novo da CI abre o formulário). */
@@ -391,10 +462,15 @@ async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
         ? '#tour-plugsign-meus'
         : valorAba === 'solicitacoes'
           ? '#tour-plugsign-minhas'
-          : '#tour-plugsign-fornecedor'
+          : valorAba === 'clientes'
+            ? '#tour-plugsign-fornecedor'
+            : `#tour-plugsign-${valorAba}`
 
   // Alvo na tela e aba dele ativa: nada a trocar. O cabeçalho é o mesmo em Documentos, Meus documentos e Solicitações.
-  if (document.querySelector(seletor)) {
+  // O formulário "Solicitar assinatura" é um modal: fora dos passos dele, precisa fechar.
+  const formSolicitarAberto =
+    valorAba !== 'solicitar' && Boolean(document.querySelector('#tour-plugsign-solicitacao-form'))
+  if (document.querySelector(seletor) && !formSolicitarAberto) {
     const trigger = document.querySelector(triggerId)
     if (valorAba === 'solicitar' || trigger?.getAttribute('data-state') !== 'inactive') return
   }
@@ -408,6 +484,13 @@ async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
   const tab = document.querySelector(triggerId)
   if (tab instanceof HTMLElement) {
     clicarAbaRadix(tab)
+  }
+
+  if (formSolicitarAberto) {
+    const inicio = Date.now()
+    while (document.querySelector('#tour-plugsign-solicitacao-form') && Date.now() - inicio < 1500) {
+      await new Promise((r) => setTimeout(r, 100))
+    }
   }
 
   // Espera o conteúdo da aba montar (igual ao form da CI).
@@ -791,6 +874,10 @@ export default function RafaelaTour() {
     iniciarPassos()
   }, [fase, tour, iniciarPassos])
 
+  useEffect(() => {
+    if (fase === 'fim') fecharSolicitarSeAberto()
+  }, [fase])
+
   if (!aberto || !tour || fase === 'idle') return null
 
   const tituloTour =
@@ -798,12 +885,17 @@ export default function RafaelaTour() {
       .replace(/\s*v(ers[aã]o)?\s*\d+(\.\d+)*/gi, '')
       .trim() || 'Novos recursos do sistema'
 
+  const waySignCompleto = tourEhWaySignCompleto(tour)
   const docsNoWaySign = tourEhDocumentosNoWaySign(tour)
   const balãoTexto =
     fase === 'intro' || fase === 'auto-start'
-      ? docsNoWaySign ? mensagemIntroDocumentosNoWaySign() : mensagemIntroPorPerfil()
+      ? waySignCompleto
+        ? mensagemIntroWaySignCompleto()
+        : docsNoWaySign ? mensagemIntroDocumentosNoWaySign() : mensagemIntroPorPerfil()
       : fase === 'fim'
-        ? (docsNoWaySign ? mensagemFimDocumentosNoWaySign() : mensagemFimPorPerfil()) + '\n\nComo deseja continuar?'
+        ? (waySignCompleto
+          ? mensagemFimWaySignCompleto()
+          : docsNoWaySign ? mensagemFimDocumentosNoWaySign() : mensagemFimPorPerfil()) + '\n\nComo deseja continuar?'
         : 'Siga os destaques na tela. Use Próximo e Anterior no guia.'
 
   return (

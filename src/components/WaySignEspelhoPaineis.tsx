@@ -350,7 +350,7 @@ export function WaySignMensagens() {
 
 // ---------------------------------------------------------------- Alertas (sininho)
 
-export function WaySignAlertasBotao({ onAbrirDocumento }: { onAbrirDocumento?: (documentKey: string) => void }) {
+export function WaySignAlertasBotao({ id, onAbrirDocumento }: { id?: string; onAbrirDocumento?: (documentKey: string) => void }) {
   const [alertas, setAlertas] = useState<Alerta[] | null>(null)
   const [indisponivel, setIndisponivel] = useState(false)
 
@@ -369,7 +369,7 @@ export function WaySignAlertasBotao({ onAbrirDocumento }: { onAbrirDocumento?: (
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="relative" aria-label="Alertas do WaySign">
+        <Button id={id} variant="outline" className="relative" aria-label="Alertas do WaySign">
           <Bell className="h-4 w-4" />
           {importantes > 0 && (
             <span className="absolute -right-1 -top-1 rounded-full bg-destructive px-1.5 text-[10px] font-bold text-white">
