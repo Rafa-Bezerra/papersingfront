@@ -153,6 +153,12 @@ function passoEhGlpi(passo: TourPasso): boolean {
   return sel.includes('suporte') || sel.includes('glpi')
 }
 
+const APRESENTACAO_KAZUO_GLPI =
+  '<div class="tour-kazuo"><img src="/kazuo.jpeg" alt="Kazuo" class="tour-kazuo-foto" />' +
+  '<div><strong>Este é o Kazuo</strong>, Gerente de Tecnologia do Grupo Way.</div></div>'
+
+const AVISO_CHAMADO_GLPI = '<br/><br/><strong>Não esqueça do chamado!</strong>'
+
 function passoEhMenuGeral(passo: TourPasso): boolean {
   const sel = (passo.seletorCss || '').trim().toLowerCase()
   return sel === '#tour-sidebar'
@@ -659,6 +665,8 @@ export default function RafaelaTour() {
 
     const steps: DriveStep[] = passos.map((p) => {
       const sel = p.seletorCss!.trim()
+      const glpi = passoEhGlpi(p)
+      const descricao = normalizarTextoTour(p.mensagem).replace(/\n/g, '<br/>')
       return {
         element: () => {
           const alvo = document.querySelector(sel) as Element | null
@@ -675,7 +683,7 @@ export default function RafaelaTour() {
         },
         popover: {
           title: normalizarTextoTour(p.titulo || tour.titulo || 'Novidade'),
-          description: normalizarTextoTour(p.mensagem).replace(/\n/g, '<br/>'),
+          description: glpi ? APRESENTACAO_KAZUO_GLPI + descricao + AVISO_CHAMADO_GLPI : descricao,
           side: ladoDriver(p.lado),
           align: 'start',
         },
@@ -1165,6 +1173,19 @@ export default function RafaelaTour() {
         .driver-popover-title {
           color: #1d4ed8 !important;
           font-weight: 700 !important;
+        }
+        .tour-kazuo {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 0.6rem;
+        }
+        .tour-kazuo-foto {
+          width: 72px;
+          height: 72px;
+          flex-shrink: 0;
+          border-radius: 999px;
+          object-fit: cover;
         }
         .driver-popover-next-btn,
         .driver-popover-done-btn {
