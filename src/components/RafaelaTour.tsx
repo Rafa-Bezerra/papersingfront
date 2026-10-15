@@ -1030,6 +1030,10 @@ export default function RafaelaTour() {
         }
         .rafaela-balloon {
           position: relative;
+          display: flex;
+          flex-direction: column;
+          /* Cabe acima do avatar (104px + gap + margens) sem passar do topo da tela. */
+          max-height: calc(100vh - 104px - 3rem);
           width: min(340px, calc(100vw - 2rem));
           background: rgba(255, 255, 255, 0.94);
           backdrop-filter: blur(10px);
@@ -1070,6 +1074,9 @@ export default function RafaelaTour() {
           font-size: 0.92rem;
           line-height: 1.45;
           color: #1e293b;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 0.25rem;
         }
         .rafaela-balloon-text p {
           margin: 0 0 0.35rem;
@@ -1215,6 +1222,9 @@ export default function RafaelaTour() {
           .rafaela-avatar {
             width: 76px;
             height: 76px;
+          }
+          .rafaela-balloon {
+            max-height: calc(100vh - 76px - 2.5rem);
           }
         }
       `}</style>
