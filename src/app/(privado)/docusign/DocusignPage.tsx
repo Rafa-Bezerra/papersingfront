@@ -1048,6 +1048,7 @@ export default function Page() {
     useEffect(() => {
         const handler = (ev: Event) => {
             const detail = (ev as CustomEvent<string>).detail
+            if (detail !== 'solicitacao' && detail !== 'solicitar') setSolicitarOpen(false)
             if (detail === 'documentos') {
                 setAba('documentos')
             } else if (detail === 'meus') {
@@ -1060,6 +1061,8 @@ export default function Page() {
                 setAba('solicitacoes')
             } else if (detail === 'fornecedor' || detail === 'clientes') {
                 setAba('clientes')
+            } else if (['templates', 'painel', 'relatorio', 'mensagens', 'lotes', 'admin'].includes(detail)) {
+                setAba(detail)
             }
         }
         window.addEventListener('tour-plugsign-aba', handler)
@@ -1103,27 +1106,27 @@ export default function Page() {
                     </TabsTrigger>
                     {espelhoDisponivel && (
                         <>
-                            <TabsTrigger value="painel">
+                            <TabsTrigger id="tour-plugsign-painel" value="painel">
                                 <BarChart3 className="w-4 h-4" /> Painel
                             </TabsTrigger>
-                            <TabsTrigger value="relatorio">
+                            <TabsTrigger id="tour-plugsign-relatorio" value="relatorio">
                                 <Table2 className="w-4 h-4" /> Relatório
                             </TabsTrigger>
-                            <TabsTrigger value="mensagens">
+                            <TabsTrigger id="tour-plugsign-mensagens" value="mensagens">
                                 <Mail className="w-4 h-4" /> Mensagens
                             </TabsTrigger>
                         </>
                     )}
-                    <TabsTrigger value="templates">
+                    <TabsTrigger id="tour-plugsign-templates" value="templates">
                         <LayoutTemplate className="w-4 h-4" /> Templates
                     </TabsTrigger>
                     {isAdminUser && (
-                        <TabsTrigger value="lotes">
+                        <TabsTrigger id="tour-plugsign-lotes" value="lotes">
                             <Boxes className="w-4 h-4" /> Lotes
                         </TabsTrigger>
                     )}
                     {isAdminUser && (
-                        <TabsTrigger value="admin">
+                        <TabsTrigger id="tour-plugsign-admin" value="admin">
                             <Settings className="w-4 h-4" /> Administração
                         </TabsTrigger>
                     )}
@@ -1225,6 +1228,7 @@ export default function Page() {
                             </Tabs>
                         )}
                         <a
+                            id="tour-plugsign-waysign-link"
                             href="https://app.plugsign.com.br/signin/?secure=true"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -1237,6 +1241,7 @@ export default function Page() {
                     </div>
                     <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
                         <WaySignAlertasBotao
+                            id="tour-plugsign-alertas"
                             onAbrirDocumento={(key) => {
                                 setOrigemFiltrada('')
                                 setSituacaoFiltrada('')
@@ -1252,7 +1257,7 @@ export default function Page() {
                             {certStatus?.temCertificadoA1 ? "Certificado A1 OK" : "Certificado digital A1"}
                         </Button>
                         {situacaoDaAba == null && (
-                        <>
+                        <div id="tour-plugsign-datas" className="flex flex-wrap items-end gap-3">
                         {/* Data de */}
                         <div className="flex flex-col">
                             <Label htmlFor="docDateFrom">Data de</Label>
@@ -1275,12 +1280,12 @@ export default function Page() {
                                 className="w-40"
                             />
                         </div>
-                        </>
+                        </div>
                         )}
                         {/* Solicitante */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" aria-label="Filtrar por solicitante">
+                                <Button id="tour-plugsign-solicitante" variant="outline" aria-label="Filtrar por solicitante">
                                     <Filter className="h-4 w-4 mr-2" />
                                     <span className="hidden sm:inline">Solicitante</span>
                                 </Button>
@@ -1302,7 +1307,7 @@ export default function Page() {
                         {/* Botão de Filtros - Dropdown com checkboxes */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" aria-label="Abrir filtros">
+                                <Button id="tour-plugsign-filtros" variant="outline" aria-label="Abrir filtros">
                                     <Filter className="h-4 w-4 mr-2" />
                                     <span className="hidden sm:inline">Filtros</span>
                                 </Button>
@@ -1357,7 +1362,7 @@ export default function Page() {
                     </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 md:flex-row">
-                    <div className="relative flex-1 w-full">
+                    <div id="tour-plugsign-busca" className="relative flex-1 w-full">
                         <Input
                             placeholder="Pesquise por nome ou ID"
                             value={query}
@@ -1411,7 +1416,7 @@ export default function Page() {
             {emSolicitacoes && verHistoricoWaySign && <MinhasSolicitacoesPanel />}
 
             {/* Main */}
-            <Card className={emSolicitacoes && verHistoricoWaySign ? "hidden" : "mb-6"}>
+            <Card id="tour-plugsign-lista" className={emSolicitacoes && verHistoricoWaySign ? "hidden" : "mb-6"}>
                 <CardContent className="flex flex-col gap-3">
                     {avisoLista && (
                         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -1446,7 +1451,7 @@ export default function Page() {
                         hideSearch
                         getRowDataId={(d) => (d.origem === 'INTERNO' ? d.id : null)}
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div id="tour-plugsign-paginacao" className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <Button
                             type="button"
                             variant="outline"
