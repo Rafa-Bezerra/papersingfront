@@ -768,8 +768,8 @@ export default function Page() {
     }
 
     async function confirmarAssinaturaAnexo({ page, posX, posY, largura, altura }: PdfSignData) {
-        // Documentos internos não exigem certificado (pode ter, mas não é obrigatório).
-        const comCertificado = assinarComCertificado && !ehDocInterno()
+        // Certificado A1 é opcional em todas as origens (internos inclusive): só quando a pessoa marca a opção.
+        const comCertificado = assinarComCertificado
         if (comCertificado && !certStatus?.temCertificadoA1 && !certStatus?.certificadoPersistido) {
             const detalhe = certStatus?.motivoCertificado
                 || (certStatus?.vinculadoPlugSign
@@ -1917,7 +1917,7 @@ export default function Page() {
                     onPrint={handleImprimirAnexo}
                     isLoading={isLoading}
                     extraControls={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
-                        && origemAtual.current !== 'DOCINTERNO' && certStatus?.plugsignAtivo ? (
+                        && certStatus?.plugsignAtivo ? (
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                             <Checkbox
                                 checked={assinarComCertificado}
