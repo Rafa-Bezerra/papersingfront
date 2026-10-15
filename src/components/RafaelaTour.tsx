@@ -232,7 +232,8 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
 
 function mensagemIntroWaySignCompleto(): string {
   if (!usuarioPodeDocumentosWaySign()) {
-    return `Olá, sou a Raphaela!\n\nO ${NOME_MODULO_ASSINATURA} reúne os documentos internos (aprovação em níveis) e as assinaturas pela PlugSign.\n\nNo seu perfil ele não está liberado, então nada muda no seu dia a dia. Vou te mostrar onde pedir a liberação, se precisar.`
+    const ci = usuarioPodePagamentosCi() ? ' Também mostro quem aprova os Pagamentos CI.' : ''
+    return `Olá, sou a Raphaela!\n\nO ${NOME_MODULO_ASSINATURA} reúne os documentos internos (aprovação em níveis) e as assinaturas pela PlugSign.\n\nNo seu perfil ele não está liberado, então nada muda no seu dia a dia. Vou te mostrar onde pedir a liberação, se precisar.${ci}`
   }
   if (!usuarioPodePlugSign()) {
     return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: onde ficam os documentos pendentes e os finalizados, como buscar e filtrar, como criar um documento para aprovação e o que cada botão da lista faz.\n\nVocê pode voltar ou avançar a qualquer momento.`
@@ -240,15 +241,22 @@ function mensagemIntroWaySignCompleto(): string {
   return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: as abas, os botões do topo, a busca e os filtros, como criar um documento ou enviar para assinatura, o que cada coluna e ação da lista faz, e as abas de acompanhamento (Solicitações, Clientes e parceiros, Templates e relatórios).\n\nVocê pode voltar ou avançar a qualquer momento.`
 }
 
+const TEXTO_FLUXO_PAGAMENTOS_CI =
+  'Pagamentos CI: vão direto para o Gerente ADM Financeiro e o Diretor da Unidade; se necessário, conforme o valor, também para o Diretor Holding (Gomes) e/ou o Diretor Presidente (Lopes).'
+
 function mensagemFimWaySignCompleto(): string {
   if (!usuarioPodeDocumentosWaySign()) {
-    return `Pronto!\n\nSe precisar de acesso ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
+    const ci = usuarioPodePagamentosCi() ? `\n\n${TEXTO_FLUXO_PAGAMENTOS_CI}` : ''
+    return `Pronto!${ci}\n\nSe precisar de acesso ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
   }
   let texto =
     `Pronto! Recapitulando:\n\n• Documentos: o que está pendente. Meus documentos: o que já foi finalizado.\n• Novo → Aprovação interna: documento com aprovadores em níveis.\n• Busca, Solicitante e Filtros (Status, Origem e Visão) refinam a lista.\n• Na linha do documento: Assinar, Documento, Imprimir, Anexos, Aprovações e Aprovar/Reprovar.`
   if (usuarioPodePlugSign()) {
     texto +=
       '\n• Novo → Enviar para assinatura (PlugSign): para quem é de fora da empresa.\n• Solicitações: Enviadas, Recebidas e Histórico, com Detalhes e Lembrete.\n• Clientes e parceiros, Templates, Painel, Relatório e Mensagens completam o acompanhamento.'
+  }
+  if (usuarioPodePagamentosCi()) {
+    texto += `\n• ${TEXTO_FLUXO_PAGAMENTOS_CI}`
   }
   return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
