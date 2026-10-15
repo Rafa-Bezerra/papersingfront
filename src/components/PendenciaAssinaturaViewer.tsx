@@ -9,10 +9,6 @@ import { PendenciaAcoesFooter } from "@/components/PendenciaAcoesFooter";
 import PdfViewerDialog, { PdfSignData } from "@/components/PdfViewerDialog";
 import type { Documento, DocumentoAnexo } from "@/types/Documento";
 import type { PendenciaGestorItem } from "@/types/Pendencias";
-import {
-  CertificadoA1Status,
-  getCertificadoStatus,
-} from "@/services/docusignService";
 import { base64ParaImpressao } from "@/utils/documentoAnexo";
 import { imprimirPdfBase64 } from "@/utils/functions";
 import { invalidatePendenciasGestorCache } from "@/services/pendenciasService";
@@ -58,7 +54,6 @@ export function PendenciaAssinaturaViewer({ item, onClose, onSigned }: Props) {
   const [indiceAnexo, setIndiceAnexo] = useState(0);
   const [anexo, setAnexo] = useState<DocumentoAnexo | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
-  const [certStatus, setCertStatus] = useState<CertificadoA1Status | null>(null);
   const restaurarGestorRef = useRef<(() => void) | null>(null);
   const reqRef = useRef(0);
   const anexosRef = useRef<DocumentoAnexo[]>([]);
@@ -128,15 +123,6 @@ export function PendenciaAssinaturaViewer({ item, onClose, onSigned }: Props) {
 
       const { documento: doc, anexos: lista, anexo: principal } = await carregarDocumentoPendencia(item);
       if (reqId !== reqRef.current) return;
-
-      if (item.tipo.trim().toLowerCase() === "plugsign") {
-        try {
-          const status = await getCertificadoStatus();
-          if (reqId === reqRef.current) setCertStatus(status);
-        } catch {
-          /* certificado opcional até assinar */
-        }
-      }
 
       setDocumento(doc);
       setAnexos(lista);
@@ -211,23 +197,6 @@ export function PendenciaAssinaturaViewer({ item, onClose, onSigned }: Props) {
   async function confirmarAssinatura({ page, posX, posY, largura, altura }: PdfSignData) {
     const api = apiAssinaturaPorTipo(item.tipo);
     if (!api || !anexo?.id || !pdfBase64) return;
-
-    if (item.tipo.trim().toLowerCase() === "plugsign") {
-      const status = certStatus ?? (await getCertificadoStatus().catch(() => null));
-      if (
-        status?.plugsignAtivo &&
-        !status.temCertificadoA1 &&
-        !status.certificadoPersistido
-      ) {
-        const detalhe =
-          status.motivoCertificado ||
-          (status.vinculadoPlugSign
-            ? "Conta PlugSign encontrada, mas sem certificado A1 ativo. Cadastre o .pfx em DocuSign."
-            : "Cadastre seu certificado A1 (.pfx) em DocuSign antes de assinar.");
-        toast.error(detalhe);
-        return;
-      }
-    }
 
     if (!api.base64PdfEhValido(pdfBase64)) {
       toast.error("PDF inválido. Recarregue o documento e tente novamente.");
