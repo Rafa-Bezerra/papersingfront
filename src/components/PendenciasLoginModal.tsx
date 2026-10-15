@@ -22,6 +22,8 @@ import {
   labelTipoPendencia,
   markPendenciasModalDismissed,
   notificarPendenciasModalResolvido,
+  TOUR_RAPHAELA_ENCERRADO_EVENT,
+  tourRaphaelaEstaAberto,
   wasPendenciasModalDismissed,
 } from "@/utils/pendenciaNavigation";
 import { cn } from "@/lib/utils";
@@ -169,7 +171,7 @@ export default function PendenciasLoginModal() {
         aguardandoAbrirRef.current = true;
         timerRef.current = window.setTimeout(() => {
           aguardandoAbrirRef.current = false;
-          setOpen(true);
+          if (!tourRaphaelaEstaAberto()) setOpen(true);
         }, 400);
         return;
       }
@@ -197,11 +199,20 @@ export default function PendenciasLoginModal() {
       marcarResolvido();
       return;
     }
+    if (tourRaphaelaEstaAberto()) return;
     void carregar();
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
   }, [carregar, naHome, marcarResolvido]);
+
+  useEffect(() => {
+    const aposTour = () => {
+      if (!naHome) void carregar();
+    };
+    window.addEventListener(TOUR_RAPHAELA_ENCERRADO_EVENT, aposTour);
+    return () => window.removeEventListener(TOUR_RAPHAELA_ENCERRADO_EVENT, aposTour);
+  }, [carregar, naHome]);
 
   useEffect(() => {
     const onLogin = () => void carregar({ forcarAbrir: true });
