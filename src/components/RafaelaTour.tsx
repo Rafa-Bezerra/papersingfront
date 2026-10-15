@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { API_BASE, headers, apiFetch } from '@/utils/constants'
+import { marcarTourRaphaelaAberto } from '@/utils/pendenciaNavigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 type TourPasso = {
@@ -893,6 +894,12 @@ export default function RafaelaTour() {
   useEffect(() => {
     if (fase === 'fim') fecharSolicitarSeAberto()
   }, [fase])
+
+  useEffect(() => {
+    marcarTourRaphaelaAberto(aberto)
+  }, [aberto])
+
+  useEffect(() => () => marcarTourRaphaelaAberto(false), [])
 
   if (!aberto || !tour || fase === 'idle') return null
 
