@@ -27,6 +27,7 @@ export const data = {
         { title: "Receitas", url: "/receitas" },
         { title: "Extrato gestor", url: "/extrato-gestor" },
         { title: "Controle medição", url: "/controle-medicao" },
+        { title: "Contratos", url: "/contratos" },
         { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },
