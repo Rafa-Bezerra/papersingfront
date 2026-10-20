@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processo de Cadastro e Aprovações - PaperSign</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #0066cc;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 13px;
+            color: #999;
+        }
+
+        h2 {
+            color: #0066cc;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #0066cc;
+            padding-left: 15px;
+        }
+
+        h3 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .process-box {
+            background: #f9f9f9;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .process-box h4 {
+            color: #0066cc;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .process-box p {
+            margin: 5px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .flow {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .step {
+            background: #e8f4ff;
+            border: 2px solid #0066cc;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0066cc;
+            white-space: nowrap;
+        }
+
+        .arrow {
+            color: #0066cc;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+
+        table th {
+            background: #0066cc;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #999;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Processo de Cadastro e Aprovações</h1>
+            <p>PaperSign - Sistema de Aprovação de Documentos</p>
+        </div>
+
+        <div class="meta">
+            <div>Versão: 1.0</div>
+            <div>Data: 18 de outubro de 2026</div>
+            <div>Prazo: até 26/10/2026</div>
+        </div>
+
+        <div class="section">
+            <h2>1. Visão Geral do Processo</h2>
+            <p>O PaperSign é um sistema de aprovação de documentos que integra cadastro de alçadas, centros de custo, usuários aprovadores e fluxos de aprovação com diferentes níveis e faixas de valor.</p>
+        </div>
+
+        <div class="section">
+            <h2>2. Módulos Principais</h2>
+
+            <h3>2.1 Cadastro de Alçadas</h3>
+            <div class="process-box">
+                <h4>Objetivo</h4>
+                <p>Definir os níveis de aprovação por centro de custo e faixa de valor.</p>
+                <h4>Dados</h4>
+                <ul>
+                    <li>Centro de Custo (CC)</li>
+                    <li>Nível de aprovação (0, 1, 2, 3...)</li>
+                    <li>Faixa de valor (inicial - final)</li>
+                    <li>Usuário aprovador</li>
+                </ul>
+                <h4>Funcionalidades</h4>
+                <ul>
+                    <li>Criar nova alçada</li>
+                    <li>Editar alçada existente</li>
+                    <li>Incluir aprovador em vários CCs de uma vez (T-ALC-LOTE)</li>
+                    <li>Remover aprovador</li>
+                </ul>
+            </div>
+
+            <h3>2.2 Cadastro de Usuários</h3>
+            <div class="process-box">
+                <h4>Objetivo</h4>
+                <p>Gerenciar usuários do sistema e suas permissões.</p>
+                <h4>Dados</h4>
+                <ul>
+                    <li>Código de usuário</li>
+                    <li>Nome</li>
+                    <li>E-mail</li>
+                    <li>Unidade</li>
+                    <li>Cargo/Função</li>
+                    <li>Ativo/Inativo</li>
+                </ul>
+            </div>
+
+            <h3>2.3 Fluxo de Aprovação</h3>
+            <div class="process-box">
+                <h4>Objetivo</h4>
+                <p>Rotear documentos para aprovação conforme alçadas configuradas.</p>
+                <h4>Passos</h4>
+                <ul>
+                    <li>Documento entra no sistema</li>
+                    <li>Sistema identifica CC e valor</li>
+                    <li>Sistema identifica aprovadores (alçada + nível)</li>
+                    <li>Documento é roteado para aprovadores</li>
+                    <li>Aprovadores aprovam/reprovam</li>
+                    <li>Documento segue para próximo nível ou conclui</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Fluxo de Cadastro Básico</h2>
+            <div class="flow">
+                <div class="step">1. Cadastrar CC</div>
+                <div class="arrow">→</div>
+                <div class="step">2. Cadastrar Alçada</div>
+                <div class="arrow">→</div>
+                <div class="step">3. Atribuir Aprovadores</div>
+                <div class="arrow">→</div>
+                <div class="step">4. Testar Fluxo</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>4. Níveis de Aprovação</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nível</th>
+                        <th>Descrição</th>
+                        <th>Exemplo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>0</td>
+                        <td>Aprovador primário</td>
+                        <td>Gestor direto</td>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>Aprovador secundário</td>
+                        <td>Gerente</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Aprovador terciário</td>
+                        <td>Diretor</td>
+                    </tr>
+                    <tr>
+                        <td>3+</td>
+                        <td>Níveis adicionais</td>
+                        <td>Presidência</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>5. Faixas de Valor</h2>
+            <p>Cada alçada define uma <span class="highlight">faixa de valor inicial até final</span> para a qual o aprovador tem competência.</p>
+            <div class="process-box">
+                <h4>Exemplo</h4>
+                <ul>
+                    <li>Alçada 1: R$ 0 até R$ 5.000 (Gestor)</li>
+                    <li>Alçada 2: R$ 5.001 até R$ 50.000 (Gerente)</li>
+                    <li>Alçada 3: R$ 50.001 até R$ 999.999 (Diretor)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>6. Funcionalidades Novas (T-ALC-LOTE)</h2>
+            <div class="process-box">
+                <h4>Incluir Aprovador em Vários CCs</h4>
+                <p>Permite adicionar um mesmo aprovador em múltiplos centros de custo de uma vez.</p>
+                <h4>Fluxo</h4>
+                <ol style="margin-left: 20px; margin-top: 10px;">
+                    <li>Selecionar usuário (busca)</li>
+                    <li>Buscar CCs (por nome ou código)</li>
+                    <li>Selecionar nível e faixa de valor</li>
+                    <li>Sistema lista CCs encontrados (checkbox)</li>
+                    <li>Desmarcar CCs que não pertencem ao grupo</li>
+                    <li>Clicar "Incluir"</li>
+                    <li>Sistema grava e exibe resumo (quantos incluídos/já existiam)</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>7. Regras Importantes</h2>
+            <ul>
+                <li><strong>Unidade:</strong> Aprovadores só podem ser incluídos na unidade logada</li>
+                <li><strong>Usuário ativo:</strong> Apenas usuários ativos no GUSUARIO aparecem para seleção</li>
+                <li><strong>Não duplica:</strong> Se aprovador já existe naquele nível, não duplica</li>
+                <li><strong>Transação:</strong> Tudo é gravado em uma única transação (tudo ou nada)</li>
+                <li><strong>Auditoria:</strong> Registra quem fez e quando cada operação</li>
+                <li><strong>Sem exclusão:</strong> A funcionalidade só inclui, nunca remove aprovadores</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>8. Checklist de Implementação</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Backend - Novo endpoint POST</td>
+                        <td>Em andamento</td>
+                    </tr>
+                    <tr>
+                        <td>Frontend - Novo modal/dialog</td>
+                        <td>Aguardando</td>
+                    </tr>
+                    <tr>
+                        <td>Validações</td>
+                        <td>Aguardando</td>
+                    </tr>
+                    <tr>
+                        <td>Testes</td>
+                        <td>Aguardando</td>
+                    </tr>
+                    <tr>
+                        <td>Deploy</td>
+                        <td>Aguardando</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>9. Perguntas Frequentes</h2>
+            <h3>P: Posso adicionar o mesmo aprovador em todos os CCs?</h3>
+            <p>R: Sim, deixe a busca em branco (ou use "*") para listar todos os CCs da unidade.</p>
+
+            <h3>P: O que acontece se o usuário já é aprovador naquele nível?</h3>
+            <p>R: O sistema não duplica. Apenas mostra no resumo "já existia".</p>
+
+            <h3>P: Preciso remover um aprovador?</h3>
+            <p>R: Use a tela de Alçadas normal (editar alçada e remover).</p>
+
+            <h3>P: Quem pode usar essa funcionalidade?</h3>
+            <p>R: Apenas usuários com permissão para editar alçadas.</p>
+        </div>
+
+        <div class="footer">
+            <p><strong>Documento preparado para:</strong> Estruturação do processo de cadastro e aprovações - PaperSign</p>
+            <p><strong>Prazo de conclusão:</strong> 26 de outubro de 2026</p>
+        </div>
+    </div>
+</body>
+</html>
