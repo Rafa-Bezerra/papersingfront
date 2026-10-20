@@ -219,13 +219,17 @@ export function ordenarUnidadesWay(lista: string[]): string[] {
 export async function getUnidadesLogin(usuario: string): Promise<string[]> {
   const cod = usuario.trim();
   if (!cod) return [];
-  const res = await fetch(
-    `${API_BASE}/api/Usuarios/unidades-login?usuario=${encodeURIComponent(cod)}`,
-    { headers: { Accept: 'application/json' } }
-  );
-  if (!res.ok) return [];
-  const data = (await res.json()) as string[];
-  return ordenarUnidadesWay(Array.isArray(data) ? data : []);
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/Usuarios/unidades-login?usuario=${encodeURIComponent(cod)}`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as string[];
+    return ordenarUnidadesWay(Array.isArray(data) ? data : []);
+  } catch {
+    return [];
+  }
 }
 
 export async function getUnidadesDisponiveis(): Promise<string[]> {

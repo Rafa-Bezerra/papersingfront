@@ -613,13 +613,13 @@ export default function Page() {
             }
             data.anexos = anexosSubmit;
             await servico().createElement(data)
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
             toast.success(`Registro enviado`)
             form.reset()
             await handleSearchClick()
             setIsFormDocumentoOpen(false)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
             setIsLoading(false)
         }
     }
@@ -1633,12 +1633,15 @@ export default function Page() {
                             <FormField
                                 control={form.control}
                                 name="nome"
-                                rules={{ required: 'Descrição é obrigatório' }}
+                                rules={{
+                                    required: 'Descrição é obrigatório',
+                                    maxLength: { value: 100, message: 'Descrição com no máximo 100 caracteres' },
+                                }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Descrição</FormLabel>
+                                        <FormLabel>Descrição ({(field.value ?? '').length}/100)</FormLabel>
                                         <FormControl>
-                                            <Input {...field} />
+                                            <Input {...field} maxLength={100} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

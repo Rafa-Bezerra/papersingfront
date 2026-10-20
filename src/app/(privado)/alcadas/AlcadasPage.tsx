@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
+import { ChevronsUpDown, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -23,12 +23,15 @@ import { PopoverPortal } from '@radix-ui/react-popover'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -40,7 +43,11 @@ import {
     getAll as getAlcadas,
     createElement as createAlcada,
     updateElement as updateAlcada,
-    deleteElement as deleteAlcada
+    deleteElement as deleteAlcada,
+    AlcadaLotePrevia,
+    AlcadaLoteResultado,
+    getPreviaLote,
+    incluirAprovadorEmLote
 } from '@/services/alcadasService'
 import {
     Aprovadores,
@@ -84,6 +91,7 @@ export default function Page() {
           : 'alcadas'
     )
     const [ehCsc, setEhCsc] = useState(false)
+    const [unidadeLogada, setUnidadeLogada] = useState('')
 
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Alcada[]>([])
@@ -105,6 +113,16 @@ export default function Page() {
     const carregouUsuarios = useRef(false)
     const [centrosCusto, setCentrosCusto] = useState<CentroDeCusto[]>([])
     const [comboCcAberto, setComboCcAberto] = useState(false)
+    const loteInicial = { usuario: '', cargo: '', nivel: '0', valor_inicial: '0', valor_final: '99999999', busca: '' }
+    const [isFormLoteOpen, setIsFormLoteOpen] = useState(false)
+    const [lote, setLote] = useState(loteInicial)
+    const [comboUsuarioLoteAberto, setComboUsuarioLoteAberto] = useState(false)
+    const [centrosLote, setCentrosLote] = useState<AlcadaLotePrevia[]>([])
+    const [marcadosLote, setMarcadosLote] = useState<Set<number>>(new Set())
+    const [loteLimitado, setLoteLimitado] = useState(false)
+    const [buscandoLote, setBuscandoLote] = useState(false)
+    const [salvandoLote, setSalvandoLote] = useState(false)
+    const [resumoLote, setResumoLote] = useState<AlcadaLoteResultado | null>(null)
 
     const form = useForm<Alcada>({
         defaultValues: { 
@@ -148,14 +166,17 @@ export default function Page() {
 
     useEffect(() => {
         let csc = false
+        let unidade = ''
         try {
             const raw = sessionStorage.getItem('userData')
             if (raw) {
                 const u = JSON.parse(raw)
-                csc = String(u.unidade ?? u.UNIDADE ?? '').trim().toUpperCase() === 'WAY CSC'
+                unidade = String(u.unidade ?? u.UNIDADE ?? '').trim()
+                csc = unidade.toUpperCase() === 'WAY CSC'
             }
         } catch { /* ignore */ }
         setEhCsc(csc)
+        setUnidadeLogada(unidade)
         if (!csc && (aba === 'substituicao' || aba === 'transferencia')) {
             setAba('alcadas')
             const params = new URLSearchParams(searchParams.toString())
@@ -380,6 +401,119 @@ export default function Page() {
             mostrarErro(err)
         }
     }
+
+    async function handleAbrirLote () {
+        await buscaUsuarios()
+        setLote(loteInicial)
+        setCentrosLote([])
+        setMarcadosLote(new Set())
+        setLoteLimitado(false)
+        setResumoLote(null)
+        setComboUsuarioLoteAberto(false)
+        setIsFormLoteOpen(true)
+    }
+
+    function alterarLote (campo: keyof typeof loteInicial, valor: string) {
+        setLote(l => ({ ...l, [campo]: valor }))
+        // Os aprovadores listados são do nível buscado: trocar o nível exige buscar de novo.
+        if (campo === 'nivel') {
+            setCentrosLote([])
+            setMarcadosLote(new Set())
+            setResumoLote(null)
+        }
+    }
+
+    async function buscarCentrosLote () {
+        const busca = lote.busca.trim()
+        if (busca.length < 2) {
+            toast.error('Digite pelo menos 2 caracteres do nome ou do código do centro de custo.')
+            return
+        }
+        setBuscandoLote(true)
+        setResumoLote(null)
+        try {
+            const r = await getPreviaLote(busca, Number(lote.nivel) || 0)
+            setCentrosLote(r.centros)
+            setMarcadosLote(new Set(r.centros.map(c => c.id)))
+            setLoteLimitado(r.limitado)
+            if (!r.centros.length) toast.info('Nenhum centro de custo encontrado para essa busca.')
+        } catch (err) {
+            mostrarErro(err)
+            setCentrosLote([])
+            setMarcadosLote(new Set())
+        } finally {
+            setBuscandoLote(false)
+        }
+    }
+
+    function marcarCentroLote (id: number, marcado: boolean) {
+        setMarcadosLote(atual => {
+            const novo = new Set(atual)
+            if (marcado) novo.add(id)
+            else novo.delete(id)
+            return novo
+        })
+    }
+
+    function usuarioJaNoNivel (c: AlcadaLotePrevia) {
+        const codigo = lote.usuario.trim().toLowerCase()
+        return codigo !== '' && c.aprovadores_nivel.some(a => a.toLowerCase() === codigo)
+    }
+
+    async function submitLote () {
+        const codigo = lote.usuario.trim()
+        if (!codigo || !usuarios.some((u) => u.codusuario === codigo)) {
+            toast.error('Selecione um usuário cadastrado no PaperSign (GUSUARIO).')
+            return
+        }
+        const nivel = Number(lote.nivel)
+        if (!Number.isInteger(nivel) || nivel < 0) {
+            toast.error('Nível tem que ser um número inteiro, 0 ou maior.')
+            return
+        }
+        const inicio = Number(lote.valor_inicial)
+        const fim = Number(lote.valor_final)
+        // Mesma regra da API (AprovadorCadastroRegras.ValidarFaixa).
+        if (Number.isNaN(inicio) || Number.isNaN(fim)) {
+            toast.error('Valores inicial e final têm que ser números.')
+            return
+        }
+        if (inicio < 0) {
+            toast.error('Valor inicial não pode ser negativo.')
+            return
+        }
+        if (fim === 1) {
+            toast.error('Valor final não pode ser 1. Sem limite: use um valor alto (ex.: 99999999).')
+            return
+        }
+        if (fim <= inicio) {
+            toast.error('Valor final tem que ser maior que o valor inicial.')
+            return
+        }
+        if (marcadosLote.size === 0) {
+            toast.error('Marque pelo menos um centro de custo.')
+            return
+        }
+        setSalvandoLote(true)
+        try {
+            const r = await incluirAprovadorEmLote({
+                usuario: codigo,
+                cargo: lote.cargo.trim(),
+                nivel,
+                valor_inicial: inicio,
+                valor_final: fim,
+                ids_alcada: [...marcadosLote]
+            })
+            setResumoLote(r)
+            toast.success(`Aprovador incluído em ${r.incluidos} centro(s) de custo. ${r.ja_existiam} já tinham esse aprovador no nível.`)
+            const p = await getPreviaLote(lote.busca.trim(), nivel)
+            setCentrosLote(p.centros)
+        } catch (err) {
+            mostrarErro(err)
+        } finally {
+            setSalvandoLote(false)
+        }
+    }
     
     const colunas = useMemo<ColumnDef<Alcada>[]>(
         () => [
@@ -518,6 +652,10 @@ export default function Page() {
 
                     <Button onClick={handleInserir} className="flex items-center">
                         <SquarePlus className="mr-1 h-4 w-4" /> Novo
+                    </Button>
+
+                    <Button onClick={handleAbrirLote} variant="outline" className="flex items-center">
+                        <ListChecks className="mr-1 h-4 w-4" /> Incluir aprovador em vários CCs
                     </Button>
                 </CardContent>
             </Card>
@@ -868,7 +1006,209 @@ export default function Page() {
                 </DialogContent>
             </Dialog>
 
-            
+            {/* Modal: incluir aprovador em vários centros de custo */}
+            <Dialog open={isFormLoteOpen} onOpenChange={setIsFormLoteOpen}>
+                <DialogContent className="sm:max-w-3xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-center">
+                            Incluir aprovador em vários centros de custo
+                        </DialogTitle>
+                        <DialogDescription className="text-center">
+                            Unidade: <strong>{unidadeLogada || '—'}</strong> — só centros de custo visíveis para esta base
+                            {unidadeLogada.toUpperCase() === 'WAY CSC'
+                                ? ' (filtro Centralizer; códigos costumam ser 001.*).'
+                                : (() => {
+                                    const n = unidadeLogada.replace(/\D/g, '')
+                                    return n ? ` (busque pelo prefixo ${n}., ex.: "${n}.3.08").` : '.'
+                                })()}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label>Usuário</Label>
+                                <Popover modal open={comboUsuarioLoteAberto} onOpenChange={setComboUsuarioLoteAberto}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full justify-between font-normal"
+                                        >
+                                            <span className="truncate">
+                                                {usuarios.find(u => u.codusuario === lote.usuario)?.nome
+                                                    ? `${lote.usuario} — ${usuarios.find(u => u.codusuario === lote.usuario)?.nome}`
+                                                    : lote.usuario || 'Selecione o usuário'}
+                                            </span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverPortal>
+                                        <PopoverContent
+                                            className="p-0 w-[min(100vw-2rem,28rem)] pointer-events-auto z-[9999]"
+                                            align="start"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Command>
+                                                <CommandInput placeholder="Buscar usuário..." />
+                                                <CommandList>
+                                                    <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {usuarios.map((u) => (
+                                                            <CommandItem
+                                                                key={u.codusuario}
+                                                                value={`${u.codusuario} - ${u.nome}`}
+                                                                onSelect={() => {
+                                                                    alterarLote('usuario', u.codusuario)
+                                                                    setResumoLote(null)
+                                                                    setComboUsuarioLoteAberto(false)
+                                                                }}
+                                                            >
+                                                                {`${u.codusuario} - ${u.nome}`}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </PopoverPortal>
+                                </Popover>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="lote-cargo">Cargo</Label>
+                                <Input
+                                    id="lote-cargo"
+                                    maxLength={50}
+                                    value={lote.cargo}
+                                    onChange={e => alterarLote('cargo', e.target.value)}
+                                    placeholder="Ex.: Gerente de TI"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 grid-cols-3">
+                            <div className="grid gap-2">
+                                <Label htmlFor="lote-nivel">Nível</Label>
+                                <Input
+                                    id="lote-nivel"
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    value={lote.nivel}
+                                    onChange={e => alterarLote('nivel', e.target.value)}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="lote-inicial">Valor inicial</Label>
+                                <Input
+                                    id="lote-inicial"
+                                    type="number"
+                                    min={0}
+                                    value={lote.valor_inicial}
+                                    onChange={e => alterarLote('valor_inicial', e.target.value)}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="lote-final">Valor final</Label>
+                                <Input
+                                    id="lote-final"
+                                    type="number"
+                                    min={0}
+                                    value={lote.valor_final}
+                                    onChange={e => alterarLote('valor_final', e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="lote-busca">Centros de custo</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="lote-busca"
+                                    value={lote.busca}
+                                    onChange={e => alterarLote('busca', e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            buscarCentrosLote()
+                                        }
+                                    }}
+                                    placeholder={
+                                        unidadeLogada.toUpperCase() === 'WAY CSC'
+                                            ? 'Nome ou código, ex.: "Tecnologia" ou "001.2.01"'
+                                            : (() => {
+                                                const n = unidadeLogada.replace(/\D/g, '')
+                                                return n
+                                                    ? `Nome ou código, ex.: "${n}.3.08" (evite só "TI")`
+                                                    : 'Nome ou código do centro de custo'
+                                            })()
+                                    }
+                                />
+                                <Button type="button" onClick={buscarCentrosLote} disabled={buscandoLote} className="flex items-center">
+                                    <SearchIcon className="mr-1 h-4 w-4" /> {buscandoLote ? 'Buscando…' : 'Buscar CCs'}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {centrosLote.length > 0 && (
+                            <div className="grid gap-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                    <span className="text-muted-foreground">
+                                        {marcadosLote.size} de {centrosLote.length} marcado(s). Desmarque o que não for do setor.
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <Button type="button" size="sm" variant="outline" onClick={() => setMarcadosLote(new Set(centrosLote.map(c => c.id)))}>
+                                            Marcar todos
+                                        </Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={() => setMarcadosLote(new Set())}>
+                                            Desmarcar todos
+                                        </Button>
+                                    </div>
+                                </div>
+                                {loteLimitado && (
+                                    <p className="text-sm text-amber-700">
+                                        A busca trouxe muitos resultados e a lista foi cortada. Refine o texto para ver todos.
+                                    </p>
+                                )}
+                                <div className="max-h-[40dvh] overflow-y-auto rounded-md border divide-y">
+                                    {centrosLote.map((c) => (
+                                        <label key={c.id} className="flex cursor-pointer items-start gap-3 p-2 hover:bg-muted/50">
+                                            <Checkbox
+                                                className="mt-0.5"
+                                                checked={marcadosLote.has(c.id)}
+                                                onCheckedChange={(v) => marcarCentroLote(c.id, v === true)}
+                                            />
+                                            <div className="min-w-0 flex-1 text-sm">
+                                                <div className="font-medium">{`${c.centro_custo} - ${c.centro_custo_nome}`}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {c.aprovadores_nivel.length
+                                                        ? `Nível ${lote.nivel}: ${c.aprovadores_nivel.map(a => usuarios.find(u => u.codusuario.toLowerCase() === a.toLowerCase())?.nome ?? a).join(', ')}`
+                                                        : `Nenhum aprovador no nível ${lote.nivel}`}
+                                                </div>
+                                                {usuarioJaNoNivel(c) && (
+                                                    <div className="text-xs font-medium text-amber-700">
+                                                        Já é aprovador neste nível (não será incluído de novo)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {resumoLote && (
+                            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                                {`Incluído em ${resumoLote.incluidos} centro(s) de custo. ${resumoLote.ja_existiam} já tinham ${resumoLote.usuario} no nível ${lote.nivel}. Ninguém foi removido ou alterado.`}
+                            </div>
+                        )}
+
+                        <Button type="button" onClick={submitLote} disabled={salvandoLote || marcadosLote.size === 0}>
+                            {salvandoLote ? 'Incluindo…' : `Incluir em ${marcadosLote.size} centro(s) de custo`}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

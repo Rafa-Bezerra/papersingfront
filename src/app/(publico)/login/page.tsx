@@ -30,6 +30,7 @@ import {
   WAY_UNIDADES_ORDEM
 } from '@/services/auth'
 import { notifyPapersignLogin } from '@/utils/pendenciaNavigation'
+import { API_BASE } from '@/utils/constants'
 import Image from 'next/image'
 import { Eye, EyeOff } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -64,6 +65,7 @@ function LoginPageInner() {
   const [ssoBusy, setSsoBusy] = useState(false)
   const [basesDisponiveis, setBasesDisponiveis] = useState<string[]>([])
   const [basesCarregando, setBasesCarregando] = useState(false)
+  const [basesApiOffline, setBasesApiOffline] = useState(false)
   const baseSelecionada = watch('base')
   const usuarioDigitado = watch('usuario')
   const soMicrosoft = saml.enabled && saml.requireMicrosoftLogin
@@ -87,6 +89,7 @@ function LoginPageInner() {
     const cod = (usuarioDigitado || '').trim()
     if (cod.length < 2) {
       setBasesDisponiveis([])
+      setBasesApiOffline(false)
       if (getValues('base')) setValue('base', '')
       return
     }
@@ -94,9 +97,20 @@ function LoginPageInner() {
     let cancelled = false
     const timer = window.setTimeout(() => {
       setBasesCarregando(true)
+      setBasesApiOffline(false)
       getUnidadesLogin(cod)
-        .then((lista) => {
+        .then(async (lista) => {
           if (cancelled) return
+          if (lista.length === 0) {
+            try {
+              const ping = await fetch(`${API_BASE}/api/Saml/status`, {
+                headers: { Accept: 'application/json' },
+              })
+              if (!ping.ok) setBasesApiOffline(true)
+            } catch {
+              setBasesApiOffline(true)
+            }
+          }
           setBasesDisponiveis(lista)
           const atual = getValues('base')
           if (atual && !lista.includes(atual)) {
@@ -307,6 +321,12 @@ function LoginPageInner() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {!soMicrosoft && basesApiOffline && (
+                        <p className="text-xs text-destructive">
+                          Não foi possível contactar a API ({API_BASE}). Verifique se o serviço da API está no ar
+                          (dev: porta 5170; produção: papersignapi no IIS).
+                        </p>
+                      )}
                       {!soMicrosoft && (usuarioDigitado || '').trim().length >= 2 && !basesCarregando && opcoesBase.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           Somente bases em que você tem cadastro ativo.
