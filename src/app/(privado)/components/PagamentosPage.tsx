@@ -8,7 +8,7 @@ import { notificarAprovador } from '@/services/requisicoesService';
 import { getAllTiposDocumento, TipoDocumento } from '@/services/comunicadoService';
 import { getAllFornecedores } from '@/services/fornecedoresRestritosService';
 import { Fornecedor } from '@/types/Rdv';
-import { dateToIso, htmlToPdfBase64, imprimirPdfBase64, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
+import { dateToIso, htmlToPdfBase64, imprimirPdfBase64, safeDate, safeDateLabel, stripDiacritics, toMoney } from "@/utils/functions";
 import { buildPagamentoAutorizacaoHtml } from "@/utils/pagamentoAutorizacaoHtml";
 import { ColumnDef } from "@tanstack/react-table";
 import { useSearchParams } from "next/navigation";
@@ -52,6 +52,35 @@ interface Props {
     grupo: string;
 }
 
+// Dias até o vencimento (só a data, sem hora): negativo = vencido. null quando sem data.
+function diasAteVencimento(iso?: string): number | null {
+    const dt = safeDate(iso)
+    if (!dt) return null
+    const hoje = new Date()
+    const a = Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate())
+    const b = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+    return Math.round((a - b) / 86400000)
+}
+
+function classeVencimento(iso?: string): string {
+    const dias = diasAteVencimento(iso)
+    if (dias === null) return ''
+    if (dias < 0) return 'text-red-600 dark:text-red-400 font-semibold'
+    if (dias <= 3) return 'text-amber-600 dark:text-amber-400 font-semibold'
+    return ''
+}
+
+// Tipo de guia (só IMPOSTOS), deduzido do texto de tipo_documento do TOTVS.
+const TIPOS_GUIA = ['DARF', 'GPS', 'FGTS', 'ISSQN', 'Outros'] as const
+function tipoGuia(tipoDocumento?: string): string {
+    const t = stripDiacritics((tipoDocumento ?? '').toUpperCase())
+    if (t.includes('DARF')) return 'DARF'
+    if (t.includes('GPS')) return 'GPS'
+    if (t.includes('FGTS')) return 'FGTS'
+    if (t.includes('ISS')) return 'ISSQN'
+    return 'Outros'
+}
+
 export default function Page({ titulo, grupo }: Props) {
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -71,6 +100,9 @@ export default function Page({ titulo, grupo }: Props) {
     const [filtroDashboard, setFiltroDashboard] = useState<string>("")
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Pagamento[]>([])
+    // Retorno da API antes dos filtros locais — base dos indicadores de IMPOSTOS.
+    const [dadosCarregados, setDadosCarregados] = useState<Pagamento[]>([])
+    const [filtroGuia, setFiltroGuia] = useState<string>("")
     // Tipos de documento vistos na última busca (antes do filtro de tipo abaixo) — só para
     // popular as opções do dropdown com o que realmente existe no período/status buscados.
     const [tiposDocumentoDisponiveis, setTiposDocumentoDisponiveis] = useState<string[]>([])
@@ -162,7 +194,7 @@ export default function Page({ titulo, grupo }: Props) {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado, filtroDashboard, filtroTiposDocumento, filtroFornecedor, filtroValorMin, filtroValorMax])
+    }, [dateFrom, dateTo, situacaoFiltrada, statusFiltrado, filtroDashboard, filtroTiposDocumento, filtroFornecedor, filtroValorMin, filtroValorMax, filtroGuia])
 
     function clearQuery() {
         setQuery('')
@@ -207,6 +239,7 @@ export default function Page({ titulo, grupo }: Props) {
             };
             const dados = await getAll(data, controller.signal)
 
+            setDadosCarregados(dados)
             setTiposDocumentoDisponiveis(Array.from(new Set(dados.map(d => d.tipo_documento).filter(Boolean))).sort())
 
             const qNorm = stripDiacritics(q.toLowerCase().trim())
@@ -226,9 +259,13 @@ export default function Page({ titulo, grupo }: Props) {
                 const matchFornecedor = fornecedorNorm === "" || stripDiacritics((d.nome_fantasia ?? '').toLowerCase()).includes(fornecedorNorm)
                 const matchValorMin = valorMin === null || Number.isNaN(valorMin) || d.valor_original >= valorMin
                 const matchValorMax = valorMax === null || Number.isNaN(valorMax) || d.valor_original <= valorMax
+                const matchGuia = filtroGuia === "" || tipoGuia(d.tipo_documento) === filtroGuia
                 return matchQuery && matchSituacao && matchStatus && matchMinhaVez
-                    && matchTipoDocumento && matchFornecedor && matchValorMin && matchValorMax
+                    && matchTipoDocumento && matchFornecedor && matchValorMin && matchValorMax && matchGuia
             })
+            // Vencimento mais próximo primeiro; sem data vai para o fim.
+            const vencimento = (p: Pagamento) => safeDate(p.data_vencimento)?.getTime() ?? Number.MAX_SAFE_INTEGER
+            filtrados.sort((a, b) => vencimento(a) - vencimento(b))
             setResults(filtrados)
         } catch (err) {
             // busca abortada por outra mais recente: ignora
@@ -625,7 +662,19 @@ export default function Page({ titulo, grupo }: Props) {
             { accessorKey: 'status_lancamento', header: 'Status' },
             { accessorKey: 'status_aprovacao', header: 'Situação' },
             { accessorKey: 'data_criacao', header: 'Data Criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
-            { accessorKey: 'data_vencimento', header: 'Data Vencimento', accessorFn: (row) => safeDateLabel(row.data_vencimento) },
+            {
+                accessorKey: 'data_vencimento', header: 'Data Vencimento',
+                cell: ({ row }) => {
+                    const dias = diasAteVencimento(row.original.data_vencimento)
+                    const emAberto = row.original.status_lancamento === 'EM ABERTO'
+                    return (
+                        <span className={emAberto ? classeVencimento(row.original.data_vencimento) : ''}
+                            title={emAberto && dias !== null ? (dias < 0 ? `Vencido há ${-dias} dia(s)` : dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia(s)`) : undefined}>
+                            {safeDateLabel(row.original.data_vencimento)}
+                        </span>
+                    )
+                },
+            },
             { accessorKey: 'data_prev_baixa', header: 'Data Prev Baixa', accessorFn: (row) => safeDateLabel(row.data_prev_baixa) },
             { accessorKey: 'tributos', header: 'Tributos', accessorFn: (row) => toMoney(row.tributos) },
             { accessorKey: 'multas', header: 'Multas', accessorFn: (row) => toMoney(row.multas) },
@@ -772,6 +821,28 @@ export default function Page({ titulo, grupo }: Props) {
         ],
         [handleNotificarAprovador]
     )
+
+    // ponytail: "Pagos no mês" usa data_prev_baixa (a API não devolve a data real da baixa)
+    // e só conta o que veio na busca — com Status = EM ABERTO não vem nenhum BAIXADO.
+    const indicadoresImpostos = useMemo(() => {
+        const hoje = new Date()
+        const emAberto = dadosCarregados.filter(p => p.status_lancamento === 'EM ABERTO')
+        return [
+            {
+                titulo: 'Vencem em até 3 dias', classe: 'text-amber-600 dark:text-amber-400',
+                itens: emAberto.filter(p => { const d = diasAteVencimento(p.data_vencimento); return d !== null && d >= 0 && d <= 3 }),
+            },
+            { titulo: 'Aguardando aprovação', classe: '', itens: emAberto.filter(p => p.status_aprovacao === 'PENDENTE') },
+            { titulo: 'Aprovados não baixados', classe: '', itens: emAberto.filter(p => p.status_aprovacao === 'APROVADA') },
+            {
+                titulo: 'Pagos no mês', classe: 'text-green-600 dark:text-green-400',
+                itens: dadosCarregados.filter(p => {
+                    const d = safeDate(p.data_prev_baixa)
+                    return p.status_lancamento === 'BAIXADO' && !!d && d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth()
+                }),
+            },
+        ]
+    }, [dadosCarregados])
 
     const colunasAglutinados = useMemo<ColumnDef<PagamentoAglutinadoItem>[]>(
         () => [
@@ -951,6 +1022,34 @@ export default function Page({ titulo, grupo }: Props) {
                     </Button>
                 </CardContent>
             </Card>
+
+            {grupo === "IMPOSTOS" && (
+                <>
+                    {/* Indicadores (calculados sobre o retorno da busca atual) */}
+                    <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                        {indicadoresImpostos.map(ind => (
+                            <Card key={ind.titulo}>
+                                <CardContent className="p-4">
+                                    <p className="text-sm text-muted-foreground">{ind.titulo}</p>
+                                    <p className={`text-2xl font-bold ${ind.classe}`}>{ind.itens.length}</p>
+                                    <p className="text-xs text-muted-foreground">{toMoney(ind.itens.reduce((s, p) => s + (p.valor_original ?? 0), 0))}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Filtro rápido por tipo de guia */}
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Tipo de guia:</span>
+                        {["", ...TIPOS_GUIA].map(g => (
+                            <Button key={g || "todas"} size="sm" variant={filtroGuia === g ? "default" : "outline"}
+                                onClick={() => setFiltroGuia(g)}>
+                                {g || "Todas"}
+                            </Button>
+                        ))}
+                    </div>
+                </>
+            )}
 
             {/* Main */}
             <Card className="mb-6">

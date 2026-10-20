@@ -9,6 +9,8 @@ import { API_BASE, headers } from "@/utils/constants";
 const caminho = "Anexos";
 const elemento_singular = "anexo";
 const elemento_plural = "anexos";
+/** Coluna NOME em MOVIMENTO_ANEXOS_* (SistAprovacao). */
+export const MOVIMENTO_ANEXO_NOME_MAX = 100;
 
 export async function getAll(idmov: number, unidade?: string): Promise<Anexo[]> {
     const url = new URL(`${API_BASE}/api/${caminho}`);
@@ -36,7 +38,8 @@ export async function getElementById(id: number): Promise<Anexo> {
 }
 
 export async function createElement(data: AnexoUpload): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    const nome = (data.nome || "anexo").trim().slice(0, MOVIMENTO_ANEXO_NOME_MAX)
+    const res = await fetch(`${API_BASE}/api/${caminho}`, { method: "POST", headers: headers(), body: JSON.stringify({ ...data, nome }) });
     if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Erro ${res.status} ao criar ${elemento_singular}: ${msg}`);

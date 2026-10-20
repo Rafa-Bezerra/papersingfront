@@ -31,6 +31,7 @@ export type Usuario = {
     receitas: boolean,
     extrato_gestor: boolean,
     controle_medicao: boolean,
+    modulo_contratos: boolean,
     config_alcadas?: boolean,
     config_usuarios?: boolean,
     config_bordero_aprovadores?: boolean,

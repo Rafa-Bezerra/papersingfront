@@ -66,6 +66,7 @@ import {
     AnexoUpload,
     getAll as getAllAnexos,
     createElement as createAnexo,
+    MOVIMENTO_ANEXO_NOME_MAX,
     updateElement as updateAnexo,
     deleteElement as deleteAnexo,
     importarAnexosRM
@@ -1275,10 +1276,12 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                                 </Button>
                                 <Input
                                     type="text"
+                                    maxLength={MOVIMENTO_ANEXO_NOME_MAX}
+                                    value={fileName}
                                     onChange={(e) => setFileName(e.target.value)}
                                     className="w-full sm:w-40"
                                     aria-label='Descrição do anexo'
-                                    placeholder='Descrição do anexo'
+                                    placeholder={`Descrição (máx. ${MOVIMENTO_ANEXO_NOME_MAX} caracteres)`}
                                 />
                                 <Button
                                     onClick={handleAnexarDocumento}

@@ -45,4 +45,41 @@ export async function deleteElement(id: number): Promise<void> {
     }
 }
 
+export type AlcadaLotePrevia = {
+    id: number,
+    centro_custo: string,
+    centro_custo_nome: string,
+    aprovadores_nivel: string[]
+}
+
+export type AlcadaLoteAprovador = {
+    usuario: string,
+    cargo: string,
+    nivel: number,
+    valor_inicial: number,
+    valor_final: number,
+    ids_alcada: number[]
+}
+
+export type AlcadaLoteResultado = {
+    usuario: string,
+    incluidos: number,
+    ja_existiam: number,
+    total: number,
+    ids_incluidos: number[]
+}
+
+export async function getPreviaLote(busca: string, nivel: number): Promise<{ centros: AlcadaLotePrevia[], limitado: boolean }> {
+    const qs = new URLSearchParams({ busca, nivel: String(nivel) })
+    const res = await fetch(`${API_BASE}/api/${caminho}/lote/previa?${qs.toString()}`, { headers: headers() });
+    if (!res.ok) throw await erroDaResposta(res, `buscar centros de custo`);
+    return res.json();
+}
+
+export async function incluirAprovadorEmLote(data: AlcadaLoteAprovador): Promise<AlcadaLoteResultado> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/lote/aprovador`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+    if (!res.ok) throw await erroDaResposta(res, `incluir aprovador nos centros de custo`);
+    return res.json();
+}
+
 export type { Alcada }

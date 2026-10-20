@@ -201,6 +201,7 @@ export default function PageUsuarios() {
       receitas: false,
       extrato_gestor: false,
       controle_medicao: false,
+      modulo_contratos: false,
       config_alcadas: false,
       config_usuarios: false,
       config_bordero_aprovadores: false,
@@ -356,6 +357,7 @@ export default function PageUsuarios() {
         receitas: response.receitas,
         extrato_gestor: response.extrato_gestor,
         controle_medicao: response.controle_medicao,
+        modulo_contratos: response.modulo_contratos,
         config_alcadas: response.config_alcadas ?? false,
         config_usuarios: response.config_usuarios ?? false,
         config_bordero_aprovadores: response.config_bordero_aprovadores ?? false,
@@ -408,6 +410,7 @@ export default function PageUsuarios() {
       receitas: false,
       extrato_gestor: false,
       controle_medicao: false,
+      modulo_contratos: false,
       config_alcadas: false,
       config_usuarios: false,
       config_bordero_aprovadores: false,
@@ -1073,6 +1076,22 @@ export default function PageUsuarios() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contratos</FormLabel>
+                      <FormControl>
+                        <PermissionCheckbox
+                          checked={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="modulo_contratos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Módulo Contratos</FormLabel>
                       <FormControl>
                         <PermissionCheckbox
                           checked={field.value}

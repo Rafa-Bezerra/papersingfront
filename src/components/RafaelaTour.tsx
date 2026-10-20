@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { API_BASE, headers, apiFetch } from '@/utils/constants'
+import { marcarTourRaphaelaAberto } from '@/utils/pendenciaNavigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 type TourPasso = {
@@ -153,6 +154,12 @@ function passoEhGlpi(passo: TourPasso): boolean {
   return sel.includes('suporte') || sel.includes('glpi')
 }
 
+const APRESENTACAO_KAZUO_GLPI =
+  '<div class="tour-kazuo"><img src="/kazuo.jpeg" alt="Kazuo" class="tour-kazuo-foto" />' +
+  '<div><strong>Este é o Kazuo</strong>, Gerente de Tecnologia do Grupo Way.</div></div>'
+
+const AVISO_CHAMADO_GLPI = '<br/><br/><strong>Não esqueça do chamado!</strong>'
+
 function passoEhMenuGeral(passo: TourPasso): boolean {
   const sel = (passo.seletorCss || '').trim().toLowerCase()
   return sel === '#tour-sidebar'
@@ -232,7 +239,8 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
 
 function mensagemIntroWaySignCompleto(): string {
   if (!usuarioPodeDocumentosWaySign()) {
-    return `Olá, sou a Raphaela!\n\nO ${NOME_MODULO_ASSINATURA} reúne os documentos internos (aprovação em níveis) e as assinaturas pela PlugSign.\n\nNo seu perfil ele não está liberado, então nada muda no seu dia a dia. Vou te mostrar onde pedir a liberação, se precisar.`
+    const ci = usuarioPodePagamentosCi() ? ' Também mostro quem aprova os Pagamentos CI.' : ''
+    return `Olá, sou a Raphaela!\n\nO ${NOME_MODULO_ASSINATURA} reúne os documentos internos (aprovação em níveis) e as assinaturas pela PlugSign.\n\nNo seu perfil ele não está liberado, então nada muda no seu dia a dia. Vou te mostrar onde pedir a liberação, se precisar.${ci}`
   }
   if (!usuarioPodePlugSign()) {
     return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: onde ficam os documentos pendentes e os finalizados, como buscar e filtrar, como criar um documento para aprovação e o que cada botão da lista faz.\n\nVocê pode voltar ou avançar a qualquer momento.`
@@ -240,15 +248,22 @@ function mensagemIntroWaySignCompleto(): string {
   return `Olá, sou a Raphaela!\n\nVou te mostrar o ${NOME_MODULO_ASSINATURA} parte por parte: as abas, os botões do topo, a busca e os filtros, como criar um documento ou enviar para assinatura, o que cada coluna e ação da lista faz, e as abas de acompanhamento (Solicitações, Clientes e parceiros, Templates e relatórios).\n\nVocê pode voltar ou avançar a qualquer momento.`
 }
 
+const TEXTO_FLUXO_PAGAMENTOS_CI =
+  'Pagamentos CI: vão direto para o Gerente ADM Financeiro e o Diretor da Unidade; se necessário, conforme o valor, também para o Diretor Holding (Gomes) e/ou o Diretor Presidente (Lopes).'
+
 function mensagemFimWaySignCompleto(): string {
   if (!usuarioPodeDocumentosWaySign()) {
-    return `Pronto!\n\nSe precisar de acesso ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
+    const ci = usuarioPodePagamentosCi() ? `\n\n${TEXTO_FLUXO_PAGAMENTOS_CI}` : ''
+    return `Pronto!${ci}\n\nSe precisar de acesso ao ${NOME_MODULO_ASSINATURA}, abra um chamado no Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
   }
   let texto =
     `Pronto! Recapitulando:\n\n• Documentos: o que está pendente. Meus documentos: o que já foi finalizado.\n• Novo → Aprovação interna: documento com aprovadores em níveis.\n• Busca, Solicitante e Filtros (Status, Origem e Visão) refinam a lista.\n• Na linha do documento: Assinar, Documento, Imprimir, Anexos, Aprovações e Aprovar/Reprovar.`
   if (usuarioPodePlugSign()) {
     texto +=
       '\n• Novo → Enviar para assinatura (PlugSign): para quem é de fora da empresa.\n• Solicitações: Enviadas, Recebidas e Histórico, com Detalhes e Lembrete.\n• Clientes e parceiros, Templates, Painel, Relatório e Mensagens completam o acompanhamento.'
+  }
+  if (usuarioPodePagamentosCi()) {
+    texto += `\n• ${TEXTO_FLUXO_PAGAMENTOS_CI}`
   }
   return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
@@ -651,6 +666,8 @@ export default function RafaelaTour() {
 
     const steps: DriveStep[] = passos.map((p) => {
       const sel = p.seletorCss!.trim()
+      const glpi = passoEhGlpi(p)
+      const descricao = normalizarTextoTour(p.mensagem).replace(/\n/g, '<br/>')
       return {
         element: () => {
           const alvo = document.querySelector(sel) as Element | null
@@ -667,7 +684,7 @@ export default function RafaelaTour() {
         },
         popover: {
           title: normalizarTextoTour(p.titulo || tour.titulo || 'Novidade'),
-          description: normalizarTextoTour(p.mensagem).replace(/\n/g, '<br/>'),
+          description: glpi ? APRESENTACAO_KAZUO_GLPI + descricao + AVISO_CHAMADO_GLPI : descricao,
           side: ladoDriver(p.lado),
           align: 'start',
         },
@@ -878,6 +895,12 @@ export default function RafaelaTour() {
     if (fase === 'fim') fecharSolicitarSeAberto()
   }, [fase])
 
+  useEffect(() => {
+    marcarTourRaphaelaAberto(aberto)
+  }, [aberto])
+
+  useEffect(() => () => marcarTourRaphaelaAberto(false), [])
+
   if (!aberto || !tour || fase === 'idle') return null
 
   const tituloTour =
@@ -1007,6 +1030,10 @@ export default function RafaelaTour() {
         }
         .rafaela-balloon {
           position: relative;
+          display: flex;
+          flex-direction: column;
+          /* Cabe acima do avatar (104px + gap + margens) sem passar do topo da tela. */
+          max-height: calc(100vh - 104px - 3rem);
           width: min(340px, calc(100vw - 2rem));
           background: rgba(255, 255, 255, 0.94);
           backdrop-filter: blur(10px);
@@ -1047,6 +1074,9 @@ export default function RafaelaTour() {
           font-size: 0.92rem;
           line-height: 1.45;
           color: #1e293b;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 0.25rem;
         }
         .rafaela-balloon-text p {
           margin: 0 0 0.35rem;
@@ -1158,6 +1188,19 @@ export default function RafaelaTour() {
           color: #1d4ed8 !important;
           font-weight: 700 !important;
         }
+        .tour-kazuo {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 0.6rem;
+        }
+        .tour-kazuo-foto {
+          width: 72px;
+          height: 72px;
+          flex-shrink: 0;
+          border-radius: 999px;
+          object-fit: cover;
+        }
         .driver-popover-next-btn,
         .driver-popover-done-btn {
           background: #1d4ed8 !important;
@@ -1179,6 +1222,9 @@ export default function RafaelaTour() {
           .rafaela-avatar {
             width: 76px;
             height: 76px;
+          }
+          .rafaela-balloon {
+            max-height: calc(100vh - 76px - 2.5rem);
           }
         }
       `}</style>

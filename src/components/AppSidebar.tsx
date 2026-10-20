@@ -30,6 +30,7 @@ import {
   ClipboardList,
   Inbox,
   Ruler,
+  FileSignature,
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -76,6 +77,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
   const [userReceitas, setUserReceitas] = useState(false)
   const [userExtratoGestor, setUserExtratoGestor] = useState(false)
   const [userControleMedicao, setUserControleMedicao] = useState(false)
+  const [userModuloContratos, setUserModuloContratos] = useState(false)
   const [configSession, setConfigSession] = useState<ConfigMenuSession>({ admin: false })
   const [configOpen, setConfigOpen] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
@@ -113,6 +115,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
       setUserReceitas(user.receitas);
       setUserExtratoGestor(Boolean(user.extrato_gestor));
       setUserControleMedicao(Boolean(user.controle_medicao));
+      setUserModuloContratos(Boolean(user.modulo_contratos));
       setConfigSession({
         admin: Boolean(user.admin),
         unidade: String(user.unidade ?? ''),
@@ -167,6 +170,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
     'Receitas': <CircleDollarSign className="w-5 h-5" />,
     'Extrato gestor': <ClipboardList className="w-5 h-5" />,
     'Controle medição': <Ruler className="w-5 h-5" />,
+    'Contratos': <FileSignature className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -296,6 +300,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                       if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;
                       if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
                       if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
+                      if (item.url === "/contratos" && !userModuloContratos && !userAdmin) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações
                       // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
                       if (!userAdmin && !userFinanceiro) {

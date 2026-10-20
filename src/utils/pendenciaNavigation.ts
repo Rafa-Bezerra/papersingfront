@@ -253,6 +253,26 @@ export function markPendenciasModalDismissed(): void {
   }
 }
 
+export const TOUR_RAPHAELA_ENCERRADO_EVENT = "papersign-tour-raphaela-encerrado";
+
+let tourRaphaelaAberto = false;
+
+/** O modal de pendências é modal (bloqueia cliques fora): não pode abrir por cima do tour. */
+export function marcarTourRaphaelaAberto(aberto: boolean): void {
+  if (tourRaphaelaAberto === aberto) return;
+  tourRaphaelaAberto = aberto;
+  if (aberto) return;
+  try {
+    window.dispatchEvent(new Event(TOUR_RAPHAELA_ENCERRADO_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function tourRaphaelaEstaAberto(): boolean {
+  return tourRaphaelaAberto;
+}
+
 /** Dispara quando o fluxo do modal de pendências terminou (fechou ou não abriu). O tour Raphaela escuta isso. */
 export function notificarPendenciasModalResolvido(): void {
   try {

@@ -76,7 +76,7 @@ export default function Page() {
       cargo: '',
       nivel: 1,
       valor_inicial: 0,
-      valor_final: 0,
+      valor_final: 9999999,
     }
   })
 
@@ -172,7 +172,7 @@ export default function Page() {
       cargo: '',
       nivel: 1,
       valor_inicial: 0,
-      valor_final: 0,
+      valor_final: 9999999,
     })
     setUpdateMode(false)
     setIsModalOpen(true)
@@ -408,6 +408,7 @@ export default function Page() {
                     validate: (v, valores) => {
                         const fim = Number(v)
                         if (fim === 1) return 'Valor final não pode ser 1. Sem limite: use um valor alto (ex.: 9999999).'
+                        if (fim > 99999999.99) return 'Valor final passa do limite do cadastro (99.999.999,99). Use 9999999 para sem limite.'
                         if (fim <= Number(valores.valor_inicial)) return 'Valor final tem que ser maior que o valor inicial.'
                         return true
                     },

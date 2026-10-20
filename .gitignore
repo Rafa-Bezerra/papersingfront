@@ -33,7 +33,6 @@ dev-*.log
 
 # Next.js dev gera para IAs (nao versionar)
 AGENTS.md
-CLAUDE.md
 
 # misc
 .DS_Store

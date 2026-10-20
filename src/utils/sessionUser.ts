@@ -37,6 +37,15 @@ export function readControleMedicaoFromApi(apiData: Record<string, unknown>): bo
   return false
 }
 
+export function readModuloContratosFromApi(apiData: Record<string, unknown>): boolean {
+  for (const [k, v] of Object.entries(apiData)) {
+    if (k.replace(/_/g, '').toLowerCase() === 'modulocontratos') {
+      return apiBool(v)
+    }
+  }
+  return false
+}
+
 const CSC_EMPRESA = '57.582.342'
 
 /** CSC: menu de cópia de permissões e listagem multi-base. */
@@ -124,6 +133,7 @@ export function syncSessionUserFromUsuario(saved: Usuario): void {
       receitas: saved.receitas,
       extrato_gestor: saved.extrato_gestor,
       controle_medicao: saved.controle_medicao,
+      modulo_contratos: saved.modulo_contratos,
       relatorio_mensal: (saved as Usuario & { relatorio_mensal?: boolean }).relatorio_mensal,
       ...configFlags,
       ccusto: configFlags.ccusto || saved.ccusto,
