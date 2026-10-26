@@ -14,10 +14,13 @@ import { Badge } from '@/components/ui/badge'
 import {
     listarAcoesHistoricoDocumentos,
     restaurarDocumento,
+    getById,
     type DocumentoInternoAcaoHistorico,
 } from '@/services/documentoService'
 import { safeDateLabel } from '@/utils/functions'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import PdfViewerDialog from './PdfViewerDialog'
+import { normalizarPdfDataUrl, base64PdfEhValido } from '@/services/documentoService'
 
 const TIPO_OPCOES = [
     { value: '', label: 'Todos' },
@@ -51,6 +54,10 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
     const [carregandoRestauracao, setCarregandoRestauracao] = useState(false)
     const [visualizandoId, setVisualizandoId] = useState<number | null>(null)
     const documentoVisualizado = itens.find(i => i.iddocumento === visualizandoId)
+    const [carregandoDocumento, setCarregandoDocumento] = useState(false)
+    const [pdfParaVisualizar, setPdfParaVisualizar] = useState<string | null>(null)
+    const [nomeDocumentoVisualizar, setNomeDocumentoVisualizar] = useState<string>('')
+    const [isModalPdfOpen, setIsModalPdfOpen] = useState(false)
 
     const carregar = useCallback(async () => {
         setCarregando(true)
@@ -96,6 +103,33 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
             toast.error((err as Error).message)
         } finally {
             setCarregandoRestauracao(false)
+        }
+    }
+
+    async function handleAbrirDocumento() {
+        if (!visualizandoId) return
+        setCarregandoDocumento(true)
+        try {
+            const doc = await getById(visualizandoId)
+            const anexoPrincipal = doc.anexos?.find(a => a.documento_principal)
+            if (!anexoPrincipal) {
+                toast.error('Documento não possui anexo principal')
+                return
+            }
+            let arquivo = anexoPrincipal.anexo
+            if (arquivo.startsWith('data:') || (arquivo.length > 500 && !arquivo.startsWith('/anexos/'))) {
+                arquivo = normalizarPdfDataUrl(arquivo)
+            }
+            if (!base64PdfEhValido(arquivo)) {
+                throw new Error('PDF inválido ou corrompido')
+            }
+            setPdfParaVisualizar(arquivo)
+            setNomeDocumentoVisualizar(anexoPrincipal.nome || `Documento ${visualizandoId}`)
+            setIsModalPdfOpen(true)
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setCarregandoDocumento(false)
         }
     }
 
@@ -298,6 +332,9 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
                             <Button variant="outline" onClick={() => setVisualizandoId(null)}>
                                 Fechar
                             </Button>
+                            <Button onClick={handleAbrirDocumento} disabled={carregandoDocumento}>
+                                {carregandoDocumento ? 'Carregando…' : 'Abrir documento'}
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -326,6 +363,22 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
                         </div>
                     </DialogContent>
                 </Dialog>
+            )}
+
+            {pdfParaVisualizar && (
+                <PdfViewerDialog
+                    open={isModalPdfOpen}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setPdfParaVisualizar(null)
+                            setIsModalPdfOpen(false)
+                        }
+                    }}
+                    title={`Documento: ${nomeDocumentoVisualizar}`}
+                    pdfBase64={pdfParaVisualizar}
+                    canSign={false}
+                    isLoading={false}
+                />
             )}
         </>
     )
