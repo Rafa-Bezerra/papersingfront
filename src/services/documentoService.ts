@@ -97,7 +97,11 @@ export async function listarAcoesHistoricoDocumentos(
         const msg = await res.text()
         throw new Error(`Erro ${res.status} ao buscar histórico: ${msg}`)
     }
-    return res.json() as Promise<DocumentoInternoAcaoHistoricoResposta>
+    const raw = (await res.json()) as Record<string, unknown>
+    const itensRaw = raw.itens ?? raw.Itens
+    const itens = Array.isArray(itensRaw) ? (itensRaw as DocumentoInternoAcaoHistorico[]) : []
+    const unidade = String(raw.unidade ?? raw.Unidade ?? '')
+    return { unidade, itens }
 }
 
 export async function cancelarDocumento(id: number): Promise<void> {

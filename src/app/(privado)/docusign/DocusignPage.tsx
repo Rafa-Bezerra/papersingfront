@@ -151,6 +151,8 @@ export default function Page() {
     // Lista única: cada linha chama a API do próprio módulo (WaySign = api/Docusign, Documentos internos = api/Documentos).
     const origemAtual = useRef<string>('INTERNO')
     const ehDocInterno = () => origemAtual.current === 'DOCINTERNO'
+    const exclusaoDocInternoModulo = (origem?: string | null) =>
+        (origem ?? origemAtual.current) === 'DOCINTERNO'
     const servico = () => (ehDocInterno()
         ? documentoService
         : { getAnexo, assinar, aprovar, deleteElement, createElement, adicionarAprovador })
@@ -188,8 +190,10 @@ export default function Page() {
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateDocumentoMode, setUpdateDocumentoMode] = useState(false)
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
+    const [deleteDocumentoOrigem, setDeleteDocumentoOrigem] = useState<string | null>(null);
     const [motivoExclusao, setMotivoExclusao] = useState('');
     const [cancelDocumentoId, setCancelDocumentoId] = useState<number | null>(null);
+    const [cancelDocumentoOrigem, setCancelDocumentoOrigem] = useState<string | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
@@ -604,18 +608,22 @@ export default function Page() {
     async function handleExcluirDocumento() {
         if (!deleteDocumentoId) return
         try {
-            if (ehDocInterno()) {
-                const motivo = motivoExclusao.trim()
-                if (motivo.length < 3) {
-                    toast.error('Informe o motivo da exclusão (mínimo 3 caracteres).')
-                    return
-                }
-                await documentoService.excluirDocumento(deleteDocumentoId, motivo)
-            } else {
-                await servico().deleteElement(deleteDocumentoId)
+            if (!exclusaoDocInternoModulo(deleteDocumentoOrigem)) {
+                toast.error(
+                    'Exclusão com motivo e histórico vale só para documentos internos (origem DOCINTERNO). ' +
+                        'Este item é do fluxo WaySign interno (DOCUSIGN).'
+                )
+                return
             }
+            const motivo = motivoExclusao.trim()
+            if (motivo.length < 3) {
+                toast.error('Informe o motivo da exclusão (mínimo 3 caracteres).')
+                return
+            }
+            await documentoService.excluirDocumento(deleteDocumentoId, motivo)
             toast.success('Documento excluído')
             setDeleteDocumentoId(null)
+            setDeleteDocumentoOrigem(null)
             setMotivoExclusao('')
             await handleSearchClick()
         } catch (err) {
@@ -625,10 +633,15 @@ export default function Page() {
 
     async function handleCancelarSolicitacao() {
         if (!cancelDocumentoId) return
+        if (!exclusaoDocInternoModulo(cancelDocumentoOrigem)) {
+            toast.error('Cancelamento com histórico vale só para documentos internos (origem DOCINTERNO).')
+            return
+        }
         try {
             await documentoService.cancelarDocumento(cancelDocumentoId)
             toast.success('Solicitação cancelada')
             setCancelDocumentoId(null)
+            setCancelDocumentoOrigem(null)
             await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
@@ -898,9 +911,10 @@ export default function Page() {
                     const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
                     const origemItem = (row.original as ItemWaySign).origem
-                    const ehInternoModulo =
-                        origemItem === 'DOCINTERNO' || origemItem === 'INTERNO'
-                    const podeExcluir = ehInternoModulo && podeExcluirDocumentoCriador({
+                    /* Excluir/cancelar com motivo e histórico só em DOCUMENTOS_INTERNOS_* (DOCINTERNO).
+                       ORIGEM INTERNO = fila antiga DOCUSIGN_* (delete físico, sem log). */
+                    const ehDocInternoLista = origemItem === 'DOCINTERNO'
+                    const podeExcluir = ehDocInternoLista && podeExcluirDocumentoCriador({
                         usuario_criacao: row.original.usuario_criacao,
                         usuario_nome: row.original.usuario_nome,
                         userCodusuario,
@@ -909,7 +923,7 @@ export default function Page() {
                         situacao: row.original.situacao,
                         isAdmin: isAdminUser,
                     });
-                    const podeCancelar = ehInternoModulo && podeCancelarDocumentoCriador({
+                    const podeCancelar = ehDocInternoLista && podeCancelarDocumentoCriador({
                         usuario_criacao: row.original.usuario_criacao,
                         usuario_nome: row.original.usuario_nome,
                         userCodusuario,
@@ -987,7 +1001,11 @@ export default function Page() {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setCancelDocumentoId(row.original.id)}
+                                    onClick={() => {
+                                        marcarOrigem(row.original)
+                                        setCancelDocumentoOrigem(origemItem)
+                                        setCancelDocumentoId(row.original.id)
+                                    }}
                                 >
                                     Cancelar solicitação
                                 </Button>
@@ -998,6 +1016,7 @@ export default function Page() {
                                 variant="destructive"
                                 onClick={() => {
                                     marcarOrigem(row.original)
+                                    setDeleteDocumentoOrigem(origemItem)
                                     setMotivoExclusao('')
                                     setDeleteDocumentoId(row.original.id)
                                 }}
@@ -1128,7 +1147,7 @@ export default function Page() {
                 setAba('solicitacoes')
             } else if (detail === 'fornecedor' || detail === 'clientes') {
                 setAba('clientes')
-            } else if (['templates', 'painel', 'relatorio', 'mensagens', 'lotes', 'admin'].includes(detail)) {
+            } else if (['templates', 'painel', 'relatorio', 'mensagens', 'lotes', 'admin', 'doc-acoes'].includes(detail)) {
                 setAba(detail)
             }
         }
@@ -1199,7 +1218,7 @@ export default function Page() {
                     )}
                     </>
                     )}
-                    {isAdminUser && (temWaySign || temDocumentos) && (
+                    {isAdminUser && (
                         <TabsTrigger id="tour-plugsign-doc-acoes" value="doc-acoes">
                             <ClipboardList className="w-4 h-4" /> Motivos doc. internos
                         </TabsTrigger>
@@ -1243,7 +1262,7 @@ export default function Page() {
                     </TabsContent>
                 )}
 
-                {isAdminUser && (temWaySign || temDocumentos) && (
+                {isAdminUser && (
                     <TabsContent value="doc-acoes" className="mt-0">
                         <WaySignDocumentosInternosAcoesPanel />
                     </TabsContent>
@@ -1317,7 +1336,7 @@ export default function Page() {
                             WaySign
                         </a>
                     </div>
-                    <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
+                    <div id="tour-plugsign-doc-toolbar" className="flex flex-wrap justify-end items-end gap-3">
                         <WaySignAlertasBotao
                             id="tour-plugsign-alertas"
                             onAbrirDocumento={(key) => {
@@ -1835,27 +1854,32 @@ export default function Page() {
                             Excluir documento
                         </h3>
                         <p className="mb-3 text-sm text-muted-foreground">
-                            {ehDocInterno()
-                                ? `O documento #${deleteDocumentoId} sairá da lista. Informe o motivo (registrado no seu histórico).`
-                                : `Tem certeza que deseja excluir o documento #${deleteDocumentoId}?`}
+                            {exclusaoDocInternoModulo(deleteDocumentoOrigem)
+                                ? `O documento #${deleteDocumentoId} sairá da lista. Informe o motivo (obrigatório; fica no histórico Admin).`
+                                : `Este item não é documento interno (DOCINTERNO). Use o fluxo correto na coluna Origem.`}
                         </p>
-                        {ehDocInterno() && (
+                        {exclusaoDocInternoModulo(deleteDocumentoOrigem) && (
                             <>
-                                <Label htmlFor="motivo-exclusao-ws" className="text-sm">Motivo</Label>
+                                <Label htmlFor="motivo-exclusao-ws" className="text-sm">Motivo (obrigatório)</Label>
                                 <textarea
                                     id="motivo-exclusao-ws"
                                     className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm"
                                     value={motivoExclusao}
                                     onChange={(e) => setMotivoExclusao(e.target.value)}
                                     maxLength={500}
+                                    placeholder="Descreva por que este documento está sendo excluído"
                                 />
                             </>
                         )}
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => { setDeleteDocumentoId(null); setMotivoExclusao('') }}>
+                            <Button variant="outline" onClick={() => { setDeleteDocumentoId(null); setDeleteDocumentoOrigem(null); setMotivoExclusao('') }}>
                                 Voltar
                             </Button>
-                            <Button variant="destructive" onClick={handleExcluirDocumento}>
+                            <Button
+                                variant="destructive"
+                                disabled={!exclusaoDocInternoModulo(deleteDocumentoOrigem) || motivoExclusao.trim().length < 3}
+                                onClick={handleExcluirDocumento}
+                            >
                                 Excluir
                             </Button>
                         </div>

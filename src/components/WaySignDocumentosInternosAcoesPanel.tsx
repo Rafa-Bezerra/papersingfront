@@ -32,10 +32,10 @@ function rotuloAcao(tipo: string) {
 
 export function WaySignDocumentosInternosAcoesPanel() {
     const hoje = new Date()
-    const quinzeDias = new Date(hoje)
-    quinzeDias.setDate(hoje.getDate() - 15)
+    const noventaDias = new Date(hoje)
+    noventaDias.setDate(hoje.getDate() - 90)
 
-    const [dateFrom, setDateFrom] = useState(quinzeDias.toISOString().substring(0, 10))
+    const [dateFrom, setDateFrom] = useState(noventaDias.toISOString().substring(0, 10))
     const [dateTo, setDateTo] = useState(hoje.toISOString().substring(0, 10))
     const [tipo, setTipo] = useState('')
     const [unidade, setUnidade] = useState('')
@@ -181,7 +181,10 @@ export function WaySignDocumentosInternosAcoesPanel() {
                 )}
 
                 {!carregando && itens.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Nenhum registro no período.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Nenhum registro no período (exclusões e cancelamentos feitos depois do deploy e do DDL).
+                        Amplie as datas ou confira no banco a tabela DOCUMENTOS_INTERNOS_ACAO_HISTORICO.
+                    </p>
                 )}
             </CardContent>
         </Card>
