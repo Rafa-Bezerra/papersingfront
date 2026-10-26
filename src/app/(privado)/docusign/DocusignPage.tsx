@@ -10,7 +10,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { BarChart3, Bell, Boxes, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, FolderCheck, History, LayoutTemplate, Mail, Printer, SearchIcon, Settings, ShieldCheck, SquarePlus, Table2, Trash2, UserPlus, X } from 'lucide-react'
+import { BarChart3, Bell, Boxes, Check, ChevronsUpDown, ClipboardList, ExternalLink, Eye, FileSignature, Filter, FolderCheck, History, LayoutTemplate, Mail, Printer, SearchIcon, Settings, ShieldCheck, SquarePlus, Table2, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { base64ParaImpressao, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
+import { base64ParaImpressao, podeCancelarDocumentoCriador, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
 import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
@@ -44,6 +44,7 @@ import {
     CertificadoA1Status,
     createElement,
     deleteElement,
+    removerAprovador,
     Documento,
     DocumentoAprovacao,
     getAnexo,
@@ -89,6 +90,7 @@ import SolicitacaoAssinaturaPanel from '@/components/SolicitacaoAssinaturaPanel'
 import FornecedorParceiroPanel from '@/components/FornecedorParceiroPanel'
 import WaySignPlugSignAcoes from '@/components/WaySignPlugSignAcoes'
 import WaySignAdminPanel, { ClientesSecao } from '@/components/WaySignAdminPanel'
+import { WaySignDocumentosInternosAcoesPanel } from '@/components/WaySignDocumentosInternosAcoesPanel'
 import * as documentoService from '@/services/documentoService'
 import { listarAlertas } from '@/services/waySignService'
 import WaySignTemplatesPanel from '@/components/WaySignTemplatesPanel'
@@ -97,6 +99,7 @@ import { WaySignAlertasBotao, WaySignMensagens, WaySignPainel, WaySignRelatorio 
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getPendenciaIdFromSearchParams, isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
+import { isAdminSession, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
 
 const TAMANHOS_PAGINA = [10, 20, 50, 100]
 const ROTULO_ORIGEM: Record<string, string> = {
@@ -133,7 +136,9 @@ export default function Page() {
     const [totalItens, setTotalItens] = useState(0)
     const [ultimaPagina, setUltimaPagina] = useState(1)
     const [avisoLista, setAvisoLista] = useState<string | null>(null)
-    const [isAdminUser, setIsAdminUser] = useState(false)
+    const [isAdminUser, setIsAdminUser] = useState(() =>
+        typeof window !== 'undefined' ? isAdminSession() : false
+    )
     // Unificação Documentos × WaySign: quem tem só "Documentos" entra no módulo e vê só "Documentos internos".
     // null = ainda lendo a sessão (evita buscar a lista do WaySign sem saber se pode).
     const [temWaySign, setTemWaySign] = useState<boolean | null>(null)
@@ -183,6 +188,8 @@ export default function Page() {
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateDocumentoMode, setUpdateDocumentoMode] = useState(false)
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
+    const [motivoExclusao, setMotivoExclusao] = useState('');
+    const [cancelDocumentoId, setCancelDocumentoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
@@ -344,6 +351,13 @@ export default function Page() {
     }
 
     useEffect(() => {
+        setIsAdminUser(isAdminSession());
+        const onUserUpdated = () => setIsAdminUser(isAdminSession());
+        window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+        return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+    }, []);
+
+    useEffect(() => {
         if (isPendentesFromUrl(searchParams)) {
             setSituacaoFiltrada("PENDENTE");
         }
@@ -357,8 +371,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(String(user.nome ?? user.NOME ?? '').toUpperCase());
             setCodusuario(String(user.codusuario ?? user.CODUSUARIO ?? '').toUpperCase());
-            setIsAdminUser(Boolean(user.admin));
-            const adminOuFinanceiro = Boolean(user.admin) || Boolean(user.financeiro);
+            const adminOuFinanceiro = isAdminSession() || Boolean(user.financeiro);
             const podeWaySign = adminOuFinanceiro || Boolean(user.docusign);
             setTemWaySign(podeWaySign);
             setTemDocumentos(adminOuFinanceiro || Boolean(user.documentos));
@@ -591,13 +604,34 @@ export default function Page() {
     async function handleExcluirDocumento() {
         if (!deleteDocumentoId) return
         try {
-            await servico().deleteElement(deleteDocumentoId)
+            if (ehDocInterno()) {
+                const motivo = motivoExclusao.trim()
+                if (motivo.length < 3) {
+                    toast.error('Informe o motivo da exclusão (mínimo 3 caracteres).')
+                    return
+                }
+                await documentoService.excluirDocumento(deleteDocumentoId, motivo)
+            } else {
+                await servico().deleteElement(deleteDocumentoId)
+            }
+            toast.success('Documento excluído')
+            setDeleteDocumentoId(null)
+            setMotivoExclusao('')
+            await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
-        } finally {
-            toast.success(`Documento excluído`)
-            setDeleteDocumentoId(null)
+        }
+    }
+
+    async function handleCancelarSolicitacao() {
+        if (!cancelDocumentoId) return
+        try {
+            await documentoService.cancelarDocumento(cancelDocumentoId)
+            toast.success('Solicitação cancelada')
+            setCancelDocumentoId(null)
             await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
 
@@ -636,7 +670,11 @@ export default function Page() {
     async function handleExcluirAprovador() {
         if (!deleteAprovadorId) return
         try {
-            await servico().deleteElement(deleteAprovadorId)
+            if (ehDocInterno()) {
+                await documentoService.removerAprovador(deleteAprovadorId)
+            } else {
+                await removerAprovador(deleteAprovadorId)
+            }
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -855,15 +893,30 @@ export default function Page() {
                         stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
+                    const status_liberado = ['EM ANDAMENTO', 'PENDENTE'].includes(row.original.situacao)
+                        && row.original.situacao !== 'CANCELADO';
                     const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
-                    const podeExcluir = podeExcluirDocumentoCriador({
+                    const origemItem = (row.original as ItemWaySign).origem
+                    const ehInternoModulo =
+                        origemItem === 'DOCINTERNO' || origemItem === 'INTERNO'
+                    const podeExcluir = ehInternoModulo && podeExcluirDocumentoCriador({
                         usuario_criacao: row.original.usuario_criacao,
                         usuario_nome: row.original.usuario_nome,
                         userCodusuario,
                         userName,
-                        aprovadores: row.original.aprovadores,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
+                    });
+                    const podeCancelar = ehInternoModulo && podeCancelarDocumentoCriador({
+                        usuario_criacao: row.original.usuario_criacao,
+                        usuario_nome: row.original.usuario_nome,
+                        userCodusuario,
+                        userName,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
                     });
 
                     const anexoDocumento = resolverAnexoDocumento(row.original.anexos)
@@ -930,10 +983,24 @@ export default function Page() {
                                 </Button>
                             )}
 
+                            {podeCancelar && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setCancelDocumentoId(row.original.id)}
+                                >
+                                    Cancelar solicitação
+                                </Button>
+                            )}
+
                             {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => { marcarOrigem(row.original); setDeleteDocumentoId(row.original.id); }}
+                                onClick={() => {
+                                    marcarOrigem(row.original)
+                                    setMotivoExclusao('')
+                                    setDeleteDocumentoId(row.original.id)
+                                }}
                             >
                                 Excluir
                             </Button>)}
@@ -1132,6 +1199,11 @@ export default function Page() {
                     )}
                     </>
                     )}
+                    {isAdminUser && (temWaySign || temDocumentos) && (
+                        <TabsTrigger id="tour-plugsign-doc-acoes" value="doc-acoes">
+                            <ClipboardList className="w-4 h-4" /> Motivos doc. internos
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <TabsContent value="clientes" className="mt-0 space-y-4">
@@ -1168,6 +1240,12 @@ export default function Page() {
                 {isAdminUser && (
                     <TabsContent value="admin" className="mt-0">
                         <WaySignAdminPanel />
+                    </TabsContent>
+                )}
+
+                {isAdminUser && (temWaySign || temDocumentos) && (
+                    <TabsContent value="doc-acoes" className="mt-0">
+                        <WaySignDocumentosInternosAcoesPanel />
                     </TabsContent>
                 )}
 
@@ -1752,20 +1830,49 @@ export default function Page() {
             {/* Confirmação de exclusão */}
             {deleteDocumentoId !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+                    <div className="w-full max-w-md rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Excluir documento
                         </h3>
-                        <p className="mb-4 text-sm text-muted-foreground">
-                            Tem certeza que deseja excluir o documento #{deleteDocumentoId}?
+                        <p className="mb-3 text-sm text-muted-foreground">
+                            {ehDocInterno()
+                                ? `O documento #${deleteDocumentoId} sairá da lista. Informe o motivo (registrado no seu histórico).`
+                                : `Tem certeza que deseja excluir o documento #${deleteDocumentoId}?`}
                         </p>
+                        {ehDocInterno() && (
+                            <>
+                                <Label htmlFor="motivo-exclusao-ws" className="text-sm">Motivo</Label>
+                                <textarea
+                                    id="motivo-exclusao-ws"
+                                    className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    value={motivoExclusao}
+                                    onChange={(e) => setMotivoExclusao(e.target.value)}
+                                    maxLength={500}
+                                />
+                            </>
+                        )}
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setDeleteDocumentoId(null)}>
-                                Cancelar
+                            <Button variant="outline" onClick={() => { setDeleteDocumentoId(null); setMotivoExclusao('') }}>
+                                Voltar
                             </Button>
                             <Button variant="destructive" onClick={handleExcluirDocumento}>
                                 Excluir
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {cancelDocumentoId !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+                        <h3 className="mb-2 text-base font-semibold">Cancelar solicitação</h3>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Ninguém poderá mais aprovar ou assinar o documento #{cancelDocumentoId}; ele permanece visível como cancelado.
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setCancelDocumentoId(null)}>Voltar</Button>
+                            <Button variant="destructive" onClick={handleCancelarSolicitacao}>Cancelar solicitação</Button>
                         </div>
                     </div>
                 </div>

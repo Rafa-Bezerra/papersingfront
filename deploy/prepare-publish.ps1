@@ -33,6 +33,27 @@ if (Test-Path $zip) { Remove-Item $zip -Force }
 $exportWeb = Join-Path $dist "web.config"
 if (Test-Path $exportWeb) { Remove-Item $exportWeb -Force }
 
+$buildStamp = "papersign-front " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+$buildInfo = Join-Path $dist "build-info.txt"
+Set-Content -Path $buildInfo -Value $buildStamp
+foreach ($htmlRel in @("home\index.html", "login\index.html")) {
+    $htmlPath = Join-Path $dist $htmlRel
+    if (-not (Test-Path $htmlPath)) { continue }
+    $html = Get-Content $htmlPath -Raw
+    $html = $html -replace "<!-- papersign-build:[^>]*-->\s*", ""
+    if ($html -match "<head>") {
+        $html = $html -replace "<head>", "<head><!-- papersign-build: $buildStamp -->"
+        Set-Content -Path $htmlPath -Value $html -NoNewline
+    }
+}
+
+$docChunks = Get-ChildItem -Path (Join-Path $dist "_next\static\chunks\app\(privado)\documentos") -Filter "page-*.js" -ErrorAction SilentlyContinue
+$docOk = $false
+foreach ($f in $docChunks) {
+    if ((Get-Content $f.FullName -Raw) -match 'excluirDocumento') { $docOk = $true; break }
+}
+if (-not $docOk) { throw "Build sem excluir/cancelar documentos: chunk documentos/page-*.js nao contem excluirDocumento." }
+
 Copy-Item (Join-Path $PSScriptRoot "aplicar-front.ps1") $dist -Force
 Compress-Archive -Path (Join-Path $dist "*") -DestinationPath $zip -CompressionLevel Optimal
 
@@ -40,3 +61,4 @@ $sizeMb = [math]::Round((Get-Item $zip).Length / 1MB, 2)
 Write-Host "ZIP pronto: $zip ($sizeMb MB)"
 Write-Host "Contem receitas/: $(Test-Path (Join-Path $dist 'receitas\index.html'))"
 Write-Host "Copie para: C:\inetpub\wwwroot\papersign\papersignfront-dist.zip"
+Write-Host "Apos apply, confira: https://papersign.grupowaybrasil.com.br:5063/build-info.txt"

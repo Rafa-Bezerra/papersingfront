@@ -49,12 +49,71 @@ export async function updateElement(data: DocumentoAssinar): Promise<void> {
     }
 }
   
-export async function deleteElement(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "POST", headers: headers() });
+export async function excluirDocumento(id: number, motivo: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/excluir/${id}`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ motivo: motivo.trim() }),
+    });
     if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao excluir ${elemento_singular}: ${msg}`);
     }
+}
+
+export type DocumentoInternoAcaoHistorico = {
+    id: number
+    unidade: string
+    iddocumento: number
+    nome_documento?: string | null
+    tipo_acao: string
+    usuario: string
+    usuario_nome?: string | null
+    motivo?: string | null
+    data_hora: string
+}
+
+export type DocumentoInternoAcaoHistoricoResposta = {
+    unidade: string
+    itens: DocumentoInternoAcaoHistorico[]
+}
+
+export type DocumentoInternoAcaoHistoricoFiltro = {
+    dateFrom?: string
+    dateTo?: string
+    tipo?: string
+}
+
+/** Admin: histórico de exclusões/cancelamentos da unidade logada. */
+export async function listarAcoesHistoricoDocumentos(
+    filtro?: DocumentoInternoAcaoHistoricoFiltro
+): Promise<DocumentoInternoAcaoHistoricoResposta> {
+    const url = new URL(`${API_BASE}/api/${caminho}/acoes-historico`)
+    if (filtro?.dateFrom) url.searchParams.set('dateFrom', filtro.dateFrom)
+    if (filtro?.dateTo) url.searchParams.set('dateTo', filtro.dateTo)
+    if (filtro?.tipo) url.searchParams.set('tipo', filtro.tipo)
+    const res = await apiFetch(url.toString(), { headers: headers() })
+    if (!res.ok) {
+        const msg = await res.text()
+        throw new Error(`Erro ${res.status} ao buscar histórico: ${msg}`)
+    }
+    return res.json() as Promise<DocumentoInternoAcaoHistoricoResposta>
+}
+
+export async function cancelarDocumento(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/cancelar/${id}`, {
+        method: "POST",
+        headers: headers(),
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao cancelar ${elemento_singular}: ${msg}`);
+    }
+}
+
+/** @deprecated Use excluirDocumento com motivo. */
+export async function deleteElement(id: number): Promise<void> {
+    return excluirDocumento(id, "Exclusão via fluxo legado");
 }
 
 export async function getAllAprovadores(id: number): Promise<DocumentoAprovacao[]> {

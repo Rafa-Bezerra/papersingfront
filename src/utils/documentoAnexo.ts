@@ -96,18 +96,42 @@ export function usuarioParticipaDocumento(opts: {
     return false
 }
 
-/** Criador pode excluir até outro usuário aprovar/reprovar. */
+function documentoJaCancelado(opts: { cancelado?: number | null; situacao?: string | null }): boolean {
+    if (opts.cancelado === 1) return true
+    return (opts.situacao ?? '').trim().toUpperCase() === 'CANCELADO'
+}
+
+/** Criador ou Admin: excluir (some da lista) com motivo registrado. */
 export function podeExcluirDocumentoCriador(opts: {
     usuario_criacao?: string | null
     usuario_nome?: string | null
     userCodusuario?: string | null
     userName?: string | null
-    aprovadores?: DocumentoAprovacao[]
+    cancelado?: number | null
+    situacao?: string | null
+    isAdmin?: boolean
 }): boolean {
+    const admin = opts.isAdmin === true
+    if (!admin && !ehCriadorDocumento(opts)) return false
+    if (!admin && documentoJaCancelado(opts)) return false
+    return true
+}
+
+/** Criador ou Admin: cancelar solicitação (permanece visível). Admin pode mesmo após aprovação. */
+export function podeCancelarDocumentoCriador(opts: {
+    usuario_criacao?: string | null
+    usuario_nome?: string | null
+    userCodusuario?: string | null
+    userName?: string | null
+    cancelado?: number | null
+    situacao?: string | null
+    isAdmin?: boolean
+}): boolean {
+    const admin = opts.isAdmin === true
+    if (documentoJaCancelado(opts)) return false
+    if (admin) return true
     if (!ehCriadorDocumento(opts)) return false
-    return !outroUsuarioDecidiuAprovacao(opts.aprovadores, {
-        userCodusuario: opts.userCodusuario,
-        usuario_criacao: opts.usuario_criacao,
-        userName: opts.userName,
-    })
+    const sit = (opts.situacao ?? '').trim().toUpperCase()
+    if (sit === 'APROVADO') return false
+    return true
 }

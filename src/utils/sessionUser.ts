@@ -49,6 +49,37 @@ export function readModuloContratosFromApi(apiData: Record<string, unknown>): bo
 const CSC_EMPRESA = '57.582.342'
 
 /** CSC: menu de cópia de permissões e listagem multi-base. */
+/** Admin PaperSign (GUSUARIO.ADMIN ou claim Role=Admin no JWT). */
+export function isAdminSession(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = sessionStorage.getItem('userData')
+    if (raw) {
+      const u = JSON.parse(raw) as Record<string, unknown>
+      if (apiBool(u.admin ?? u.ADMIN)) return true
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const token = sessionStorage.getItem('authToken')
+    if (!token) return false
+    const part = token.split('.')[1]
+    if (!part) return false
+    const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as Record<
+      string,
+      unknown
+    >
+    const role =
+      payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ??
+      payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role'] ??
+      payload.role
+    return String(role ?? '').trim().toLowerCase() === 'admin'
+  } catch {
+    return false
+  }
+}
+
 export function canRelatorioMensalSession(): boolean {
   if (typeof window === 'undefined') return false
   try {
