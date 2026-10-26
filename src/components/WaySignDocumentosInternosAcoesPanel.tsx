@@ -49,6 +49,8 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
     const [buildFront, setBuildFront] = useState<string | null>(null)
     const [restaurandoId, setRestaurdandoId] = useState<number | null>(null)
     const [carregandoRestauracao, setCarregandoRestauracao] = useState(false)
+    const [visualizandoId, setVisualizandoId] = useState<number | null>(null)
+    const documentoVisualizado = itens.find(i => i.iddocumento === visualizandoId)
 
     const carregar = useCallback(async () => {
         setCarregando(true)
@@ -149,13 +151,22 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
                     const isExclusao = row.original.tipo_acao?.toUpperCase() === 'EXCLUIR'
                     if (!isExclusao) return null
                     return (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => setRestaurdandoId(row.original.iddocumento)}
-                        >
-                            Restaurar
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setVisualizandoId(row.original.iddocumento)}
+                            >
+                                Visualizar
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setRestaurdandoId(row.original.iddocumento)}
+                            >
+                                Restaurar
+                            </Button>
+                        </div>
                     )
                 },
             },
@@ -164,115 +175,158 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
     )
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                <div>
-                    <CardTitle>Motivos — documentos internos</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Exclusões e cancelamentos registrados na unidade
-                        {unidade ? ` ${unidade}` : ''}. Somente Admin.
-                    </p>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => void carregar()} disabled={carregando}>
-                    {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    <span className="ml-2">Atualizar</span>
-                </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-end gap-3">
+        <>
+            <Card>
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
                     <div>
-                        <Label htmlFor="acoes-de">De</Label>
-                        <Input
-                            id="acoes-de"
-                            type="date"
-                            className="w-[160px]"
-                            value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                        />
+                        <CardTitle>Motivos — documentos internos</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Exclusões e cancelamentos registrados na unidade
+                            {unidade ? ` ${unidade}` : ''}. Somente Admin.
+                        </p>
                     </div>
-                    <div>
-                        <Label htmlFor="acoes-ate">Até</Label>
-                        <Input
-                            id="acoes-ate"
-                            type="date"
-                            className="w-[160px]"
-                            value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="acoes-tipo">Tipo</Label>
-                        <select
-                            id="acoes-tipo"
-                            className="flex h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm"
-                            value={tipo}
-                            onChange={(e) => setTipo(e.target.value)}
-                        >
-                            {TIPO_OPCOES.map((o) => (
-                                <option key={o.value || 'todos'} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <Button type="button" onClick={() => void carregar()} disabled={carregando}>
-                        <SearchIcon className="h-4 w-4 mr-2" />
-                        Buscar
+                    <Button type="button" variant="outline" size="sm" onClick={() => void carregar()} disabled={carregando}>
+                        {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        <span className="ml-2">Atualizar</span>
                     </Button>
-                </div>
-
-                {carregando && itens.length === 0 ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando…
-                    </div>
-                ) : (
-                    <DataTable columns={colunas} data={itens} />
-                )}
-
-                {erroApi && (
-                    <p className="text-sm text-destructive">
-                        {erroApi.includes('404')
-                            ? 'A API em produção não expõe GET /api/Documentos/acoes-historico — faça deploy da API (papersingapi-update.zip) além do front.'
-                            : erroApi}
-                    </p>
-                )}
-                {!carregando && itens.length === 0 && !erroApi && (
-                    <p className="text-sm text-muted-foreground">
-                        Nenhum registro no período. Só entram exclusões via POST /api/Documentos/excluir/{'{id}'} com motivo
-                        (origem <strong>Documentos internos</strong> / DOCINTERNO). Origem INTERNO não grava aqui.
-                        Amplie as datas ou confira DOCUMENTOS_INTERNOS_ACAO_HISTORICO no banco.
-                    </p>
-                )}
-                {buildFront && (
-                    <p className="text-xs text-muted-foreground">Front IIS: {buildFront}</p>
-                )}
-            </CardContent>
-        </Card>
-
-        {restaurandoId !== null && (
-            <Dialog open={restaurandoId !== null} onOpenChange={(open) => { if (!open) setRestaurdandoId(null) }}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Restaurar documento</DialogTitle>
-                    </DialogHeader>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Tem certeza que deseja restaurar o documento #{restaurandoId}?
-                    </p>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setRestaurdandoId(null)}>
-                            Voltar
-                        </Button>
-                        <Button
-                            onClick={handleRestaurar}
-                            disabled={carregandoRestauracao}
-                            className="disabled:cursor-not-allowed"
-                        >
-                            {carregandoRestauracao ? 'Restaurando…' : 'Restaurar'}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div>
+                            <Label htmlFor="acoes-de">De</Label>
+                            <Input
+                                id="acoes-de"
+                                type="date"
+                                className="w-[160px]"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="acoes-ate">Até</Label>
+                            <Input
+                                id="acoes-ate"
+                                type="date"
+                                className="w-[160px]"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="acoes-tipo">Tipo</Label>
+                            <select
+                                id="acoes-tipo"
+                                className="flex h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm"
+                                value={tipo}
+                                onChange={(e) => setTipo(e.target.value)}
+                            >
+                                {TIPO_OPCOES.map((o) => (
+                                    <option key={o.value || 'todos'} value={o.value}>
+                                        {o.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <Button type="button" onClick={() => void carregar()} disabled={carregando}>
+                            <SearchIcon className="h-4 w-4 mr-2" />
+                            Buscar
                         </Button>
                     </div>
-                </DialogContent>
-            </Dialog>
-        )}
+
+                    {carregando && itens.length === 0 ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Carregando…
+                        </div>
+                    ) : (
+                        <DataTable columns={colunas} data={itens} />
+                    )}
+
+                    {erroApi && (
+                        <p className="text-sm text-destructive">
+                            {erroApi.includes('404')
+                                ? 'A API em produção não expõe GET /api/Documentos/acoes-historico — faça deploy da API (papersingapi-update.zip) além do front.'
+                                : erroApi}
+                        </p>
+                    )}
+                    {!carregando && itens.length === 0 && !erroApi && (
+                        <p className="text-sm text-muted-foreground">
+                            Nenhum registro no período. Só entram exclusões via POST /api/Documentos/excluir/{'{id}'} com motivo
+                            (origem <strong>Documentos internos</strong> / DOCINTERNO). Origem INTERNO não grava aqui.
+                            Amplie as datas ou confira DOCUMENTOS_INTERNOS_ACAO_HISTORICO no banco.
+                        </p>
+                    )}
+                    {buildFront && (
+                        <p className="text-xs text-muted-foreground">Front IIS: {buildFront}</p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {documentoVisualizado && (
+                <Dialog open={visualizandoId !== null} onOpenChange={(open) => { if (!open) setVisualizandoId(null) }}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Detalhes da exclusão</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">ID do documento</p>
+                                <p className="text-sm">{documentoVisualizado.iddocumento}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">Documento</p>
+                                <p className="text-sm">{documentoVisualizado.nome_documento || '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">Data/hora</p>
+                                <p className="text-sm">{safeDateLabel(documentoVisualizado.data_hora)}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">Usuário</p>
+                                <p className="text-sm">
+                                    {documentoVisualizado.usuario_nome && documentoVisualizado.usuario_nome.toLowerCase() !== documentoVisualizado.usuario?.toLowerCase()
+                                        ? `${documentoVisualizado.usuario_nome} (${documentoVisualizado.usuario})`
+                                        : documentoVisualizado.usuario_nome || documentoVisualizado.usuario || '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground">Motivo</p>
+                                <p className="text-sm">{documentoVisualizado.motivo?.trim() || '—'}</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="outline" onClick={() => setVisualizandoId(null)}>
+                                Fechar
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {restaurandoId !== null && (
+                <Dialog open={restaurandoId !== null} onOpenChange={(open) => { if (!open) setRestaurdandoId(null) }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Restaurar documento</DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Tem certeza que deseja restaurar o documento #{restaurandoId}?
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setRestaurdandoId(null)}>
+                                Voltar
+                            </Button>
+                            <Button
+                                onClick={handleRestaurar}
+                                disabled={carregandoRestauracao}
+                                className="disabled:cursor-not-allowed"
+                            >
+                                {carregandoRestauracao ? 'Restaurando…' : 'Restaurar'}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </>
     )
 }
