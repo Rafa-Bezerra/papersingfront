@@ -13,9 +13,11 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
     listarAcoesHistoricoDocumentos,
+    restaurarDocumento,
     type DocumentoInternoAcaoHistorico,
 } from '@/services/documentoService'
 import { safeDateLabel } from '@/utils/functions'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const TIPO_OPCOES = [
     { value: '', label: 'Todos' },
@@ -45,6 +47,8 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
     const [carregando, setCarregando] = useState(false)
     const [erroApi, setErroApi] = useState<string | null>(null)
     const [buildFront, setBuildFront] = useState<string | null>(null)
+    const [restaurandoId, setRestaurdandoId] = useState<number | null>(null)
+    const [carregandoRestauracao, setCarregandoRestauracao] = useState(false)
 
     const carregar = useCallback(async () => {
         setCarregando(true)
@@ -77,6 +81,21 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
     useEffect(() => {
         void carregar()
     }, [carregar, refreshToken])
+
+    async function handleRestaurar() {
+        if (!restaurandoId) return
+        setCarregandoRestauracao(true)
+        try {
+            await restaurarDocumento(restaurandoId)
+            toast.success('Documento restaurado')
+            setRestaurdandoId(null)
+            await carregar()
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            setCarregandoRestauracao(false)
+        }
+    }
 
     const colunas = useMemo<ColumnDef<DocumentoInternoAcaoHistorico>[]>(
         () => [
@@ -121,6 +140,23 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
                     return row.original.tipo_acao?.toUpperCase() === 'CANCELAR'
                         ? '—'
                         : '—'
+                },
+            },
+            {
+                id: 'actions',
+                header: 'Ações',
+                cell: ({ row }) => {
+                    const isExclusao = row.original.tipo_acao?.toUpperCase() === 'EXCLUIR'
+                    if (!isExclusao) return null
+                    return (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRestaurdandoId(row.original.iddocumento)}
+                        >
+                            Restaurar
+                        </Button>
+                    )
                 },
             },
         ],
@@ -213,5 +249,30 @@ export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props)
                 )}
             </CardContent>
         </Card>
+
+        {restaurandoId !== null && (
+            <Dialog open={restaurandoId !== null} onOpenChange={(open) => { if (!open) setRestaurdandoId(null) }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Restaurar documento</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Tem certeza que deseja restaurar o documento #{restaurandoId}?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setRestaurdandoId(null)}>
+                            Voltar
+                        </Button>
+                        <Button
+                            onClick={handleRestaurar}
+                            disabled={carregandoRestauracao}
+                            className="disabled:cursor-not-allowed"
+                        >
+                            {carregandoRestauracao ? 'Restaurando…' : 'Restaurar'}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )}
     )
 }
