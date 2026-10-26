@@ -54,6 +54,13 @@ foreach ($f in $docChunks) {
 }
 if (-not $docOk) { throw "Build sem excluir/cancelar documentos: chunk documentos/page-*.js nao contem excluirDocumento." }
 
+$docusignChunks = Get-ChildItem -Path (Join-Path $dist "_next\static\chunks\app\(privado)\docusign") -Filter "page-*.js" -ErrorAction SilentlyContinue
+$docusignOk = $false
+foreach ($f in $docusignChunks) {
+    if ((Get-Content $f.FullName -Raw) -match 'exclusaoDocInternoModulo') { $docusignOk = $true; break }
+}
+if (-not $docusignOk) { throw "Build sem fix DOCINTERNO: chunk docusign/page-*.js nao contem exclusaoDocInternoModulo." }
+
 Copy-Item (Join-Path $PSScriptRoot "aplicar-front.ps1") $dist -Force
 Compress-Archive -Path (Join-Path $dist "*") -DestinationPath $zip -CompressionLevel Optimal
 

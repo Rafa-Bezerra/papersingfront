@@ -1165,7 +1165,11 @@ export default function Page() {
                             <Button variant="outline" onClick={() => { setDeleteDocumentoId(null); setMotivoExclusao('') }}>
                                 Voltar
                             </Button>
-                            <Button variant="destructive" onClick={handleExcluirDocumento}>
+                            <Button
+                                variant="destructive"
+                                disabled={motivoExclusao.trim().length < 3}
+                                onClick={handleExcluirDocumento}
+                            >
                                 Excluir
                             </Button>
                         </div>
