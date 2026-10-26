@@ -37,8 +37,9 @@ export function installWayoneShellNavListener(): void {
     const raw = String(data.path || '/home').trim() || '/home';
     const target = withWayoneEmbed(raw.startsWith('/') ? raw : '/home');
     const current = `${window.location.pathname}${window.location.search}`;
-    if (current !== target) {
-      window.location.assign(target);
-    }
+    if (current === target) return;
+    window.dispatchEvent(
+      new CustomEvent('papersign-wayone-spa-navigate', { detail: { path: target } }),
+    );
   });
 }

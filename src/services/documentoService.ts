@@ -53,7 +53,7 @@ export async function excluirDocumento(id: number, motivo: string): Promise<void
     const res = await fetch(`${API_BASE}/api/${caminho}/excluir/${id}`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({ motivo: motivo.trim() }),
+        body: JSON.stringify({ motivo: motivo.trim(), Motivo: motivo.trim() }),
     });
     if (!res.ok) {
         const msg = await res.text();
@@ -104,14 +104,26 @@ export async function listarAcoesHistoricoDocumentos(
     return { unidade, itens }
 }
 
-export async function cancelarDocumento(id: number): Promise<void> {
+export async function cancelarDocumento(id: number, motivo?: string): Promise<void> {
     const res = await fetch(`${API_BASE}/api/${caminho}/cancelar/${id}`, {
+        method: "POST",
+        headers: headers(),
+        body: motivo ? JSON.stringify({ motivo: motivo.trim() }) : undefined,
+    });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao cancelar ${elemento_singular}: ${msg}`);
+    }
+}
+
+export async function restaurarDocumento(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/restaurar/${id}`, {
         method: "POST",
         headers: headers(),
     });
     if (!res.ok) {
         const msg = await res.text();
-        throw new Error(`Erro ${res.status} ao cancelar ${elemento_singular}: ${msg}`);
+        throw new Error(`Erro ${res.status} ao restaurar ${elemento_singular}: ${msg}`);
     }
 }
 

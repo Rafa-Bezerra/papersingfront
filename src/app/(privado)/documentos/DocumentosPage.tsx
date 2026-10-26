@@ -42,6 +42,7 @@ import {
     createElement,
     excluirDocumento,
     removerAprovador,
+    restaurarDocumento,
     Documento,
     DocumentoAprovacao,
     getAll,
@@ -133,6 +134,9 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [openUsuarioAprovadorSearch, setOpenUsuarioAprovadorSearch] = useState(false)
+    const [mostraExcluidos, setMostraExcluidos] = useState(false)
+    const [restaurandoId, setRestaurdandoId] = useState<number | null>(null)
+    const [motivoCancelamento, setMotivoCancelamento] = useState('')
 
     const form = useForm<Documento>({
         defaultValues: {
@@ -262,8 +266,9 @@ export default function Page() {
                 const isPendente = situacaoNorm === "EM ANDAMENTO"
                 const matchDateFrom = isPendente || dateFrom === "" || new Date(d.data_criacao) >= new Date(dateFrom)
                 const matchDateTo = isPendente || dateTo === "" || new Date(d.data_criacao) <= new Date(dateTo + "T23:59:59")
+                const matchExcluido = mostraExcluidos ? true : !d.excluido
                 // Visibilidade já vem filtrada pela API (inclui chapa x login nominal).
-                return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo
+                return matchQuery && matchSituacao && matchSolicitante && matchDateFrom && matchDateTo && matchExcluido
             })
 
             setResults(filtrados)
@@ -400,10 +405,28 @@ export default function Page() {
 
     async function handleCancelarSolicitacao() {
         if (!cancelDocumentoId) return
+        const motivo = motivoCancelamento.trim()
+        if (motivo.length < 3) {
+            toast.error('Informe o motivo do cancelamento (mínimo 3 caracteres).')
+            return
+        }
         try {
-            await cancelarDocumento(cancelDocumentoId)
+            await cancelarDocumento(cancelDocumentoId, motivo)
             toast.success('Solicitação cancelada')
             setCancelDocumentoId(null)
+            setMotivoCancelamento('')
+            await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
+    async function handleRestaurarDocumento() {
+        if (!restaurandoId) return
+        try {
+            await restaurarDocumento(restaurandoId)
+            toast.success('Documento restaurado')
+            setRestaurdandoId(null)
             await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
@@ -687,6 +710,16 @@ export default function Page() {
                             >
                                 Excluir
                             </Button>)}
+
+                            {row.original.excluido && isAdminUser && (
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setRestaurdandoId(row.original.id)}
+                                >
+                                    Restaurar
+                                </Button>
+                            )}
                         </div>
                     );
                 }
@@ -855,6 +888,17 @@ export default function Page() {
                                     onCheckedChange={() => setSituacaoFiltrada("CANCELADO")}
                                 >Cancelado</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
+                                {isAdminUser && (
+                                    <>
+                                        <DropdownMenuLabel className="mt-2">Opções Admin</DropdownMenuLabel>
+                                        <DropdownMenuCheckboxItem
+                                            checked={mostraExcluidos}
+                                            onCheckedChange={(checked) => setMostraExcluidos(!!checked)}
+                                        >
+                                            Mostrar excluídos
+                                        </DropdownMenuCheckboxItem>
+                                    </>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -1144,7 +1188,7 @@ export default function Page() {
 
             {/* Confirmação de exclusão */}
             {deleteDocumentoId !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
                     <div className="w-full max-w-md rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Excluir documento
@@ -1155,7 +1199,7 @@ export default function Page() {
                         <Label htmlFor="motivo-exclusao-doc" className="text-sm">Motivo</Label>
                         <textarea
                             id="motivo-exclusao-doc"
-                            className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm cursor-text"
                             value={motivoExclusao}
                             onChange={(e) => setMotivoExclusao(e.target.value)}
                             maxLength={500}
@@ -1169,6 +1213,7 @@ export default function Page() {
                                 variant="destructive"
                                 disabled={motivoExclusao.trim().length < 3}
                                 onClick={handleExcluirDocumento}
+                                className="disabled:cursor-not-allowed"
                             >
                                 Excluir
                             </Button>
@@ -1178,19 +1223,33 @@ export default function Page() {
             )}
 
             {cancelDocumentoId !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
+                    <div className="w-full max-w-md rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Cancelar solicitação
                         </h3>
-                        <p className="mb-4 text-sm text-muted-foreground">
-                            Ninguém poderá mais aprovar ou assinar o documento #{cancelDocumentoId}, mas ele continuará visível na lista como cancelado.
+                        <p className="mb-3 text-sm text-muted-foreground">
+                            Ninguém poderá mais aprovar ou assinar o documento #{cancelDocumentoId}, mas ele continuará visível na lista como cancelado. Informe o motivo.
                         </p>
+                        <Label htmlFor="motivo-cancelamento-doc" className="text-sm">Motivo</Label>
+                        <textarea
+                            id="motivo-cancelamento-doc"
+                            className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm cursor-text"
+                            value={motivoCancelamento}
+                            onChange={(e) => setMotivoCancelamento(e.target.value)}
+                            maxLength={500}
+                            placeholder="Descreva por que está cancelando esta solicitação"
+                        />
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setCancelDocumentoId(null)}>
+                            <Button variant="outline" onClick={() => { setCancelDocumentoId(null); setMotivoCancelamento('') }}>
                                 Voltar
                             </Button>
-                            <Button variant="destructive" onClick={handleCancelarSolicitacao}>
+                            <Button
+                                variant="destructive"
+                                disabled={motivoCancelamento.trim().length < 3}
+                                onClick={handleCancelarSolicitacao}
+                                className="disabled:cursor-not-allowed"
+                            >
                                 Cancelar solicitação
                             </Button>
                         </div>
@@ -1200,7 +1259,7 @@ export default function Page() {
 
             {/* Confirmação de exclusão aprovadores */}
             {deleteAprovadorId !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
                     <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Excluir aprovador
@@ -1212,8 +1271,30 @@ export default function Page() {
                             <Button variant="outline" onClick={() => setDeleteAprovadorId(null)}>
                                 Cancelar
                             </Button>
-                            <Button variant="destructive" onClick={handleExcluirAprovador}>
+                            <Button variant="destructive" onClick={handleExcluirAprovador} className="disabled:cursor-not-allowed">
                                 Excluir
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmação de restauração */}
+            {restaurandoId !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
+                    <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+                        <h3 className="mb-2 text-base font-semibold">
+                            Restaurar documento
+                        </h3>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Tem certeza que deseja restaurar o documento #{restaurandoId}?
+                        </p>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setRestaurdandoId(null)}>
+                                Voltar
+                            </Button>
+                            <Button onClick={handleRestaurarDocumento} className="disabled:cursor-not-allowed">
+                                Restaurar
                             </Button>
                         </div>
                     </div>

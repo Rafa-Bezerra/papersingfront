@@ -30,7 +30,9 @@ function rotuloAcao(tipo: string) {
     return tipo
 }
 
-export function WaySignDocumentosInternosAcoesPanel() {
+type Props = { refreshToken?: number }
+
+export function WaySignDocumentosInternosAcoesPanel({ refreshToken = 0 }: Props) {
     const hoje = new Date()
     const noventaDias = new Date(hoje)
     noventaDias.setDate(hoje.getDate() - 90)
@@ -41,9 +43,12 @@ export function WaySignDocumentosInternosAcoesPanel() {
     const [unidade, setUnidade] = useState('')
     const [itens, setItens] = useState<DocumentoInternoAcaoHistorico[]>([])
     const [carregando, setCarregando] = useState(false)
+    const [erroApi, setErroApi] = useState<string | null>(null)
+    const [buildFront, setBuildFront] = useState<string | null>(null)
 
     const carregar = useCallback(async () => {
         setCarregando(true)
+        setErroApi(null)
         try {
             const res = await listarAcoesHistoricoDocumentos({
                 dateFrom: dateFrom || undefined,
@@ -53,7 +58,9 @@ export function WaySignDocumentosInternosAcoesPanel() {
             setUnidade(res.unidade ?? '')
             setItens(res.itens ?? [])
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Falha ao carregar histórico.')
+            const msg = e instanceof Error ? e.message : 'Falha ao carregar histórico.'
+            setErroApi(msg)
+            toast.error(msg)
             setItens([])
         } finally {
             setCarregando(false)
@@ -61,8 +68,15 @@ export function WaySignDocumentosInternosAcoesPanel() {
     }, [dateFrom, dateTo, tipo])
 
     useEffect(() => {
+        fetch('/build-info.txt', { cache: 'no-store' })
+            .then((r) => (r.ok ? r.text() : ''))
+            .then((t) => setBuildFront(t.trim() || null))
+            .catch(() => setBuildFront(null))
+    }, [])
+
+    useEffect(() => {
         void carregar()
-    }, [carregar])
+    }, [carregar, refreshToken])
 
     const colunas = useMemo<ColumnDef<DocumentoInternoAcaoHistorico>[]>(
         () => [
@@ -180,11 +194,22 @@ export function WaySignDocumentosInternosAcoesPanel() {
                     <DataTable columns={colunas} data={itens} />
                 )}
 
-                {!carregando && itens.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                        Nenhum registro no período (exclusões e cancelamentos feitos depois do deploy e do DDL).
-                        Amplie as datas ou confira no banco a tabela DOCUMENTOS_INTERNOS_ACAO_HISTORICO.
+                {erroApi && (
+                    <p className="text-sm text-destructive">
+                        {erroApi.includes('404')
+                            ? 'A API em produção não expõe GET /api/Documentos/acoes-historico — faça deploy da API (papersingapi-update.zip) além do front.'
+                            : erroApi}
                     </p>
+                )}
+                {!carregando && itens.length === 0 && !erroApi && (
+                    <p className="text-sm text-muted-foreground">
+                        Nenhum registro no período. Só entram exclusões via POST /api/Documentos/excluir/{'{id}'} com motivo
+                        (origem <strong>Documentos internos</strong> / DOCINTERNO). Origem INTERNO não grava aqui.
+                        Amplie as datas ou confira DOCUMENTOS_INTERNOS_ACAO_HISTORICO no banco.
+                    </p>
+                )}
+                {buildFront && (
+                    <p className="text-xs text-muted-foreground">Front IIS: {buildFront}</p>
                 )}
             </CardContent>
         </Card>

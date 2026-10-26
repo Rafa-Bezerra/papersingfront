@@ -26,6 +26,38 @@ Show-FileAge $ApiZip "ZIP API"
 Show-FileAge (Join-Path $FrontDir "build-info.txt") "build-info.txt (site)"
 Show-FileAge (Join-Path $FrontDir "home\index.html") "home\index.html"
 Show-FileAge (Join-Path $FrontDir "documentos\index.html") "documentos\index.html"
+Show-FileAge (Join-Path $FrontDir "docusign\index.html") "docusign\index.html"
+
+$buildInfoPath = Join-Path $FrontDir "build-info.txt"
+if (Test-Path $buildInfoPath) {
+    Write-Host "build-info conteudo: $(Get-Content $buildInfoPath -Raw).Trim()" -ForegroundColor Cyan
+}
+
+function Test-ChunkExclusaoDocInternos($htmlPath, $routeFolder, $label) {
+    if (-not (Test-Path $htmlPath)) { return }
+    $html = Get-Content $htmlPath -Raw
+    if ($html -notmatch "$routeFolder/page-([a-f0-9]+)\.js") {
+        Write-Host "AVISO: nao achei hash de chunk em $htmlPath" -ForegroundColor Yellow
+        return
+    }
+    $chunk = $Matches[1]
+    $chunkPath = Join-Path $FrontDir "_next\static\chunks\app\(privado)\$routeFolder\page-$chunk.js"
+    if (-not (Test-Path $chunkPath)) {
+        Write-Host "FALTA chunk no disco: $chunkPath" -ForegroundColor Red
+        return
+    }
+    $js = Get-Content $chunkPath -Raw
+    $temExcluir = $js.Contains("excluirDocumento")
+    $temMotivo = $js.Contains("Informe o motivo")
+    $modalAntigo = $js.Contains("Tem certeza que deseja excluir o documento")
+    if ($temExcluir -and $temMotivo -and -not $modalAntigo) {
+        Write-Host "OK $label exclusao DOCINTERNO (page-$chunk.js)" -ForegroundColor Green
+    } elseif ($modalAntigo) {
+        Write-Host "ANTIGO $label ainda tem modal 'Tem certeza...' (page-$chunk.js) — regenere ZIP e aplicar-front.ps1" -ForegroundColor Red
+    } else {
+        Write-Host "INCERTO $label (page-$chunk.js): excluir=$temExcluir motivo=$temMotivo" -ForegroundColor Yellow
+    }
+}
 
 $docHtml = Join-Path $FrontDir "documentos\index.html"
 if (Test-Path $docHtml) {
@@ -46,6 +78,8 @@ if (Test-Path $docHtml) {
         }
     }
 }
+
+Test-ChunkExclusaoDocInternos (Join-Path $FrontDir "docusign\index.html") "docusign" "WaySign/docusign"
 
 $apiDll = Join-Path $ApiDir "papersing.dll"
 if (Test-Path $apiDll) {

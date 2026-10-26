@@ -3,6 +3,7 @@ import { ReactNode } from 'react'
 import type { Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
 import UrlSanitizer from '@/components/UrlSanitizer'
+import { WayoneEmbedBoot } from '@/components/wayone/WayoneEmbedBoot'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="pt-BR" suppressHydrationWarning>
       <body>
         <UrlSanitizer />
+        <WayoneEmbedBoot />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
