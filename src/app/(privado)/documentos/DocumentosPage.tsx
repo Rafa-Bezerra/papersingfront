@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { podeCancelarDocumentoCriador, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
 import { isAdminSession, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
-import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, normalizeUserCode, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, buildCodigosAprovacaoFromSession } from '@/utils/usuarioAprovacaoMovimento'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import {
@@ -85,9 +86,9 @@ function usuarioPodeAssinarDocumento(doc: Documento | undefined, userCodusuario:
     const cod = stripDiacritics(userCodusuario.toLowerCase().trim())
     const criador = stripDiacritics(String(doc.usuario_criacao ?? '').toLowerCase().trim())
     if (criador && cod === criador) return true
-    return (doc.aprovadores ?? []).some(
-        (ap) => stripDiacritics(ap.usuario.toLowerCase().trim()) === cod
-    )
+    const logados = buildCodigosAprovacaoFromSession()
+    logados.add(normalizeUserCode(userCodusuario))
+    return (doc.aprovadores ?? []).some((ap) => aprovadorEhUsuarioLogado(ap.usuario, logados))
 }
 
 export default function Page() {
@@ -97,6 +98,12 @@ export default function Page() {
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
+    const codigosAprovacao = useMemo(() => {
+        const codigos = buildCodigosAprovacaoFromSession()
+        const login = normalizeUserCode(userCodusuario)
+        if (login) codigos.add(login)
+        return codigos
+    }, [userCodusuario])
     const [isAdminUser, setIsAdminUser] = useState(() =>
         typeof window !== 'undefined' ? isAdminSession() : false
     );
@@ -597,15 +604,15 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => {
                     const usuarioAprovador = row.original.aprovadores.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     );
                     const nivelUsuario = row.original.aprovadores.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     )?.ordem ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                        aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
                     const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao)
@@ -699,7 +706,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userCodusuario, isAdminUser]
+        [userName, userCodusuario, isAdminUser, codigosAprovacao]
     )
 
     async function handleNotificarAprovador(usuario: string) {

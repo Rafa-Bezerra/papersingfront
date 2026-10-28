@@ -34,7 +34,8 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { base64ParaImpressao, podeCancelarDocumentoCriador, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
-import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { imprimirPdfBase64, normalizeUserCode, safeDateLabel, safeDateLabelAprovacao, toBase64 } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, buildCodigosAprovacaoFromSession } from '@/utils/usuarioAprovacaoMovimento'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import {
@@ -166,11 +167,16 @@ export default function Page() {
         : { getAnexo, assinar, aprovar, deleteElement, createElement, adicionarAprovador })
     // Só assina quem está no fluxo de aprovação (vale também para Admin); os demais só visualizam.
     // eu_destinatario vem do servidor (login ou chapa com o mesmo e-mail); o servidor confere de novo ao assinar.
+    const codigosAprovacao = useMemo(() => {
+        const codigos = buildCodigosAprovacaoFromSession()
+        const login = normalizeUserCode(userCodusuario)
+        if (login) codigos.add(login)
+        return codigos
+    }, [userCodusuario])
     const estaNoFluxo = (doc?: Documento | null) => {
         if (!doc) return false
         if ((doc as ItemWaySign).eu_destinatario) return true
-        const eu = stripDiacritics(userCodusuario.toLowerCase().trim())
-        return (doc.aprovadores ?? []).some((ap) => stripDiacritics((ap.usuario ?? '').toLowerCase().trim()) === eu)
+        return (doc.aprovadores ?? []).some((ap) => aprovadorEhUsuarioLogado(ap.usuario ?? '', codigosAprovacao))
     }
     const marcarOrigem = (doc?: Documento | null) => {
         const o = codigoOrigem((doc as ItemWaySign | undefined)?.origem)
@@ -934,15 +940,15 @@ export default function Page() {
                         )
                     }
                     const usuarioAprovador = row.original.aprovadores.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     );
                     const nivelUsuario = row.original.aprovadores.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     )?.ordem ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                        aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
                     const status_liberado = ['EM ANDAMENTO', 'PENDENTE'].includes(row.original.situacao)
@@ -1068,7 +1074,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userCodusuario, isAdminUser, assinarHabilitado]
+        [userName, userCodusuario, isAdminUser, assinarHabilitado, codigosAprovacao]
     )
 
     async function handleNotificarAprovador(usuario: string) {
