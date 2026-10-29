@@ -588,12 +588,12 @@ export default function Page() {
                                 Liberação de acesso ({liberacaoAcesso.length})
                             </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => setOpenCompliance(true)}>
-                                Compliance ({compliance.length})
+                                Avaliação de compliance ({compliance.length})
                             </Button>
                         </div>
                         {[
                             { titulo: 'Liberação de acesso', lista: liberacaoAcesso, setLista: setLiberacaoAcesso },
-                            { titulo: 'Compliance', lista: compliance, setLista: setCompliance },
+                            { titulo: 'Avaliação de compliance', lista: compliance, setLista: setCompliance },
                         ].filter(g => g.lista.length > 0).map(g => (
                             <div key={g.titulo} className="grid gap-1">
                                 <span className="text-sm font-medium">{g.titulo}</span>
@@ -623,7 +623,7 @@ export default function Page() {
                             onChange={setLiberacaoAcesso}
                         />
                         <SelecionarUsuariosDialog
-                            titulo="Compliance"
+                            titulo="Avaliação de compliance"
                             open={openCompliance}
                             onOpenChange={setOpenCompliance}
                             usuarios={usuarios}
