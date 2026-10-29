@@ -178,15 +178,17 @@ export const CONFIG_MENU_FORM_FIELDS: { name: ConfigMenuPermKey; label: string }
   { name: 'config_status_pedido', label: 'Status do pedido (CSC)' },
 ]
 
-export type PermissaoLoteKey = ConfigMenuPermKey | 'admin'
+export type PermissaoLoteKey = ConfigMenuPermKey | 'admin' | 'modulo_contratos' | 'frotas'
 
 export const PERMISSOES_LOTE_CAMPOS: { name: PermissaoLoteKey; label: string }[] = [
   { name: 'admin', label: 'Admin (acesso total)' },
   ...CONFIG_MENU_FORM_FIELDS,
+  { name: 'modulo_contratos', label: 'Módulo Contratos' },
+  { name: 'frotas', label: 'Frotas' },
 ]
 
 export function usuarioTemPermissaoLote(
-  u: { admin?: boolean } & Partial<Record<ConfigMenuPermKey, boolean>>,
+  u: { admin?: boolean; modulo_contratos?: boolean; frotas?: boolean } & Partial<Record<ConfigMenuPermKey, boolean>>,
   key: PermissaoLoteKey
 ): boolean {
   if (key === 'admin') return Boolean(u.admin)
