@@ -1,3 +1,5 @@
+export const WAYONE_EMBED_SESSION_EVENT = 'papersign-wayone-session-ready';
+
 const ALLOWED_PARENT_ORIGINS = new Set([
   'http://localhost:5174',
   'http://127.0.0.1:5174',

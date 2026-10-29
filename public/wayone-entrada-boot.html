@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>WayOne · PaperSign</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        background: #0b1120;
+        color: #94a3b8;
+      }
+      #msg {
+        padding: 1rem;
+        text-align: center;
+        font-size: 0.875rem;
+      }
+      #msg.err {
+        color: #f87171;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Abrindo PaperSign…</p>
+    <script>
+      (function () {
+        var ALLOWED = ["http://localhost:5174", "http://127.0.0.1:5174"];
+
+        function allowedOrigin(origin) {
+          if (ALLOWED.indexOf(origin) !== -1) return true;
+          try {
+            var h = new URL(origin).hostname;
+            return h === "localhost" || h === "127.0.0.1" || h.slice(-20) === ".grupowaybrasil.com.br";
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function fail(text) {
+          var el = document.getElementById("msg");
+          el.textContent = text;
+          el.className = "err";
+        }
+
+        function go(user, next) {
+          var token = String((user && user.token) || "").trim();
+          if (!token || !user) {
+            fail("Sessão do PaperSign não encontrada. Saia e entre de novo no WayOne.");
+            return;
+          }
+          try {
+            sessionStorage.setItem("authToken", token);
+            sessionStorage.setItem("userData", JSON.stringify(user));
+            localStorage.setItem("papersign-auth-cutover", "ms-sso-v1");
+            sessionStorage.setItem("papersign-wayone-embed", "1");
+            try {
+              window.dispatchEvent(new Event("papersign-wayone-session-ready"));
+            } catch (e2) {
+              /* ignore */
+            }
+          } catch (e) {
+            fail("Não foi possível gravar a sessão do PaperSign.");
+            return;
+          }
+          var target = next || "/home/?wayoneEmbed=1";
+          if (target.charAt(0) !== "/") target = "/home/?wayoneEmbed=1";
+          window.location.replace(target);
+        }
+
+        function fromHash() {
+          var raw = String(window.location.hash || "").replace(/^#/, "");
+          if (!raw) return false;
+          try {
+            var data = JSON.parse(decodeURIComponent(raw));
+            go(data.user, data.next);
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        window.addEventListener("message", function (event) {
+          if (!allowedOrigin(event.origin)) return;
+          var data = event.data;
+          if (!data || data.type !== "wayone-papersign-auth") return;
+          go(data.user, data.next);
+        });
+
+        if (!fromHash()) {
+          try {
+            window.parent.postMessage({ type: "wayone-papersign-ready" }, "*");
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

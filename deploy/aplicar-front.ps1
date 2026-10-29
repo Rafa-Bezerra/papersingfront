@@ -6,8 +6,8 @@ param(
     [string]$TargetDir = "C:\inetpub\wwwroot\papersign"
 )
 $ErrorActionPreference = "Stop"
-if (-not (Test-Path $ZipPath)) { throw "ZIP nao encontrado: $ZipPath" }
-if (-not (Test-Path $TargetDir)) { throw "Pasta do front nao encontrada: $TargetDir" }
+if (-not (Test-Path -LiteralPath $ZipPath)) { throw "ZIP nao encontrado: $ZipPath" }
+if (-not (Test-Path -LiteralPath $TargetDir)) { throw "Pasta do front nao encontrada: $TargetDir" }
 
 $preserve = @(
     "web.config",
@@ -18,76 +18,159 @@ $preserve = @(
     "_staging_update"
 )
 
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$backup = Join-Path $TargetDir "_backup\$stamp"
-$staging = Join-Path $TargetDir "_staging_update"
-New-Item -ItemType Directory -Force -Path $backup | Out-Null
-if (Test-Path (Join-Path $TargetDir "web.config")) {
-    Copy-Item (Join-Path $TargetDir "web.config") $backup -Force
+function Stop-PapersignAppPool {
+    try {
+        Import-Module WebAdministration -ErrorAction Stop
+        foreach ($pool in @("papersign", "DefaultAppPool")) {
+            if (Get-WebAppPoolState -Name $pool -ErrorAction SilentlyContinue) {
+                if ((Get-WebAppPoolState -Name $pool).Value -ne "Stopped") {
+                    Stop-WebAppPool -Name $pool
+                    Write-Host "App pool parado: $pool (libera _next para exclusao)"
+                }
+                return $pool
+            }
+        }
+    } catch {
+        Write-Warning "Nao foi possivel parar o app pool. Se Remove-Item falhar, rode iisreset antes do script."
+    }
+    return $null
 }
 
-if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $staging | Out-Null
-Expand-Archive -Path $ZipPath -DestinationPath $staging -Force
+function Start-PapersignAppPool([string]$poolName) {
+    if (-not $poolName) { return }
+    try {
+        Import-Module WebAdministration -ErrorAction Stop
+        Start-WebAppPool -Name $poolName
+        Write-Host "App pool iniciado: $poolName"
+    } catch {
+        Write-Warning "Nao foi possivel iniciar o app pool. Rode iisreset manualmente."
+    }
+}
 
-if (-not (Test-Path (Join-Path $staging "_next"))) {
+function Remove-TreeLiteral([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return }
+    $lastErr = $null
+    for ($try = 1; $try -le 4; $try++) {
+        try {
+            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            $lastErr = $_
+            Start-Sleep -Seconds 2
+        }
+    }
+    $null = cmd /c "rmdir /s /q `"$path`""
+    if (Test-Path -LiteralPath $path) {
+        throw "Nao foi possivel apagar: $path. Pare o IIS (iisreset /stop), apague _next manualmente e rode de novo. Detalhe: $lastErr"
+    }
+}
+
+function Test-IndexHtmlChunks([string]$targetDir, [string]$htmlRel, [string]$label) {
+    $htmlPath = Join-Path $targetDir $htmlRel
+    if (-not (Test-Path -LiteralPath $htmlPath)) {
+        Write-Warning "$label : $htmlRel nao encontrado."
+        return $true
+    }
+    $html = Get-Content -LiteralPath $htmlPath -Raw
+    $matches = [regex]::Matches($html, '/_next/static/chunks/([^"?]+\.js)')
+    $missing = @()
+    foreach ($m in $matches) {
+        $chunk = $m.Groups[1].Value
+        $path = Join-Path $targetDir "_next\static\chunks\$chunk"
+        if (-not (Test-Path -LiteralPath $path)) { $missing += $chunk }
+    }
+    if ($missing.Count -gt 0) {
+        Write-Host "FALTA $label : $($missing.Count) chunk(s), ex.: $($missing[0])" -ForegroundColor Red
+        return $false
+    }
+    Write-Host "OK: $label chunks ($($matches.Count) refs em $htmlRel)."
+    return $true
+}
+
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$backup = Join-Path $TargetDir "_backup\$stamp"
+$staging = Join-Path $env:TEMP "papersign-staging-$stamp"
+New-Item -ItemType Directory -Force -Path $backup | Out-Null
+$webConfigPath = Join-Path $TargetDir "web.config"
+if (Test-Path -LiteralPath $webConfigPath) {
+    Copy-Item -LiteralPath $webConfigPath -Destination $backup -Force
+}
+
+Remove-TreeLiteral $staging
+New-Item -ItemType Directory -Force -Path $staging | Out-Null
+Expand-Archive -LiteralPath $ZipPath -DestinationPath $staging -Force
+
+if (-not (Test-Path -LiteralPath (Join-Path $staging "_next"))) {
     throw "ZIP invalido: pasta _next nao encontrada no pacote. Gere de novo com deploy\prepare-publish.ps1"
 }
 
+$stoppedPool = Stop-PapersignAppPool
+Start-Sleep -Seconds 2
+
 Write-Host "Limpando arquivos antigos do site (preservando web.config e ZIP)..."
-Get-ChildItem $TargetDir -Force | ForEach-Object {
+Get-ChildItem -LiteralPath $TargetDir -Force | ForEach-Object {
     if ($preserve -contains $_.Name) { return }
-    Remove-Item $_.FullName -Recurse -Force
+    Remove-TreeLiteral $_.FullName
 }
 
-$keepWeb = Test-Path (Join-Path $TargetDir "web.config")
-Get-ChildItem $staging -Force | ForEach-Object {
-    if ($_.Name -in @("_backup", "_staging_update", "papersignfront-dist.zip")) { return }
-    if ($_.Name -eq "web.config") { return }
-    $dest = Join-Path $TargetDir $_.Name
-    Copy-Item $_.FullName $dest -Recurse -Force
+$keepWeb = Test-Path -LiteralPath $webConfigPath
+# robocopy copia _next com (privado)/(publico) de forma mais confiavel que Copy-Item em lote
+$null = robocopy $staging $TargetDir /E /R:3 /W:2 /XF "web.config" "papersignfront-dist.zip" /NFL /NDL /NJH /NJS /nc /ns /np
+if ($LASTEXITCODE -ge 8) {
+    Start-PapersignAppPool $stoppedPool
+    throw "robocopy falhou ao copiar do staging (codigo $LASTEXITCODE). Veja se o ZIP esta completo."
 }
-Remove-Item $staging -Recurse -Force
+Remove-TreeLiteral $staging
 
 # Verificacao pos-apply
 $receitas = Join-Path $TargetDir "receitas\index.html"
-if (-not (Test-Path $receitas)) {
+if (-not (Test-Path -LiteralPath $receitas)) {
     Write-Warning "ATENCAO: receitas\index.html NAO existe em $TargetDir apos o apply."
 } else {
     Write-Host "OK: receitas\index.html presente."
 }
 
-$homeHtml = Join-Path $TargetDir "home\index.html"
-if (Test-Path $homeHtml) {
-    $html = Get-Content $homeHtml -Raw
-    $matches = [regex]::Matches($html, '/_next/static/chunks/([^"?]+\.js)')
-    $missing = @()
-    foreach ($m in $matches) {
-        $chunk = $m.Groups[1].Value
-        $path = Join-Path $TargetDir "_next\static\chunks\$chunk"
-        if (-not (Test-Path $path)) { $missing += $chunk }
+$chunkOk = $true
+$chunkOk = (Test-IndexHtmlChunks $TargetDir "home\index.html" "home") -and $chunkOk
+$chunkOk = (Test-IndexHtmlChunks $TargetDir "requisicoes\index.html" "requisicoes") -and $chunkOk
+$chunkOk = (Test-IndexHtmlChunks $TargetDir "login\index.html" "login") -and $chunkOk
+if (-not $chunkOk) {
+    Start-PapersignAppPool $stoppedPool
+    throw "Deploy incompleto: HTML novo sem todos os .js em _next (tela preta / 404). Rode iisreset /stop e aplique de novo."
+}
+
+$docusignDir = Join-Path $TargetDir "_next\static\chunks\app\(privado)\docusign"
+$docusignChunks = Get-ChildItem -LiteralPath $docusignDir -Filter "page-*.js" -ErrorAction SilentlyContinue
+$docusignOk = $false
+foreach ($f in $docusignChunks) {
+    $chunk = Get-Content -LiteralPath $f.FullName -Raw
+    if ($chunk -match 'Informe o motivo' -and $chunk -match 'excluirDocumento') {
+        $docusignOk = $true
+        Write-Host "OK: chunk WaySign $($f.Name) contem exclusao com motivo (Documentos internos)."
+        break
     }
-    if ($missing.Count -gt 0) {
-        throw "Deploy incompleto: chunks ausentes em _next: $($missing -join ', ')"
+}
+if (-not $docusignOk) {
+    Start-PapersignAppPool $stoppedPool
+    throw "Deploy incompleto: chunk docusign/page-*.js sem modal de motivo. Gere o ZIP de novo no PC de build."
+}
+
+$docHtml = Join-Path $TargetDir "docusign\index.html"
+if (Test-Path -LiteralPath $docHtml) {
+    $dh = Get-Content -LiteralPath $docHtml -Raw
+    if ($dh -match 'docusign/page-([a-f0-9]+)\.js') {
+        Write-Host "OK: docusign/index.html referencia page-$($Matches[1]).js"
     }
-    Write-Host "OK: chunks do home/index.html presentes ($($matches.Count) referencias)."
+}
+
+Start-PapersignAppPool $stoppedPool
+
+$bi = Join-Path $TargetDir "build-info.txt"
+if (Test-Path -LiteralPath $bi) {
+    Write-Host "Build aplicado: $((Get-Content -LiteralPath $bi -Raw).Trim())"
 } else {
-    Write-Warning "home\index.html nao encontrado para verificacao de chunks."
+    Write-Warning "build-info.txt ausente apos apply."
 }
-
-try {
-    Import-Module WebAdministration -ErrorAction Stop
-    foreach ($pool in @("papersign", "DefaultAppPool")) {
-        if (Get-WebAppPoolState -Name $pool -ErrorAction SilentlyContinue) {
-            Restart-WebAppPool -Name $pool
-            Write-Host "App pool reiniciado: $pool"
-            break
-        }
-    }
-} catch {
-    Write-Warning "Nao foi possivel reiniciar o app pool automaticamente. Reinicie o IIS manualmente se necessario."
-}
-
 Write-Host "Front atualizado em $TargetDir"
 if ($keepWeb) {
     Write-Host "web.config do servidor preservado. Backup: $backup"

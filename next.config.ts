@@ -5,6 +5,8 @@ const isProd = process.env.NODE_ENV === "production";
 const nextConfig: NextConfig = {
   // `output: "export"` só no build — em dev o middleware de chunks fica mais estável.
   ...(isProd ? { output: "export" as const } : {}),
+  // Hash novo a cada build (deploy\prepare-publish.ps1 define BUILD_ID) — evita chunk antigo no navegador.
+  generateBuildId: async () => process.env.BUILD_ID || "development",
   // Em build, pasta `papersign` (deploy). Em dev, `.next` no projeto.
   distDir: isProd ? "papersign" : ".next",
   trailingSlash: true,

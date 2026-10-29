@@ -205,3 +205,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* WayOne iframe: altura do iframe = viewport; scroll s� na �rea principal */
+html[data-papersign-wayone-embed="1"],
+html:has(body[data-papersign-wayone-embed="1"]) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body[data-papersign-wayone-embed="1"] {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--background);
+}
+
+body[data-papersign-wayone-embed="1"] .papersign-wayone-embed-shell {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+}
+
+body[data-papersign-wayone-embed="1"] .papersign-wayone-embed-main {
+  padding-top: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}

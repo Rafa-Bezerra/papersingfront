@@ -29,16 +29,20 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
-import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { podeCancelarDocumentoCriador, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
+import { isAdminSession, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
+import { imprimirPdfBase64, normalizeUserCode, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, buildCodigosAprovacaoFromSession } from '@/utils/usuarioAprovacaoMovimento'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import {
     adicionarAprovador,
     aprovar,
     assinar,
+    cancelarDocumento,
     createElement,
-    deleteElement,
+    excluirDocumento,
+    removerAprovador,
     Documento,
     DocumentoAprovacao,
     getAll,
@@ -82,9 +86,9 @@ function usuarioPodeAssinarDocumento(doc: Documento | undefined, userCodusuario:
     const cod = stripDiacritics(userCodusuario.toLowerCase().trim())
     const criador = stripDiacritics(String(doc.usuario_criacao ?? '').toLowerCase().trim())
     if (criador && cod === criador) return true
-    return (doc.aprovadores ?? []).some(
-        (ap) => stripDiacritics(ap.usuario.toLowerCase().trim()) === cod
-    )
+    const logados = buildCodigosAprovacaoFromSession()
+    logados.add(normalizeUserCode(userCodusuario))
+    return (doc.aprovadores ?? []).some((ap) => aprovadorEhUsuarioLogado(ap.usuario, logados))
 }
 
 export default function Page() {
@@ -94,6 +98,15 @@ export default function Page() {
     const [isLoading, setIsLoading] = useState(false)
     const [userName, setUserName] = useState("");
     const [userCodusuario, setCodusuario] = useState("");
+    const codigosAprovacao = useMemo(() => {
+        const codigos = buildCodigosAprovacaoFromSession()
+        const login = normalizeUserCode(userCodusuario)
+        if (login) codigos.add(login)
+        return codigos
+    }, [userCodusuario])
+    const [isAdminUser, setIsAdminUser] = useState(() =>
+        typeof window !== 'undefined' ? isAdminSession() : false
+    );
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -111,6 +124,8 @@ export default function Page() {
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateDocumentoMode, setUpdateDocumentoMode] = useState(false)
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
+    const [motivoExclusao, setMotivoExclusao] = useState('');
+    const [cancelDocumentoId, setCancelDocumentoId] = useState<number | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
@@ -125,6 +140,7 @@ export default function Page() {
     const [solicitanteFiltrado, setSolicitanteFiltrado] = useState<string>("")
     const [solicitantes, setSolicitantes] = useState<string[]>([])
     const [openUsuarioAprovadorSearch, setOpenUsuarioAprovadorSearch] = useState(false)
+    const [motivoCancelamento, setMotivoCancelamento] = useState('')
 
     const form = useForm<Documento>({
         defaultValues: {
@@ -159,6 +175,13 @@ export default function Page() {
         if (carregou.current) return;
         buscaUsuarios();
     }, [])
+
+    useEffect(() => {
+        setIsAdminUser(isAdminSession());
+        const onUserUpdated = () => setIsAdminUser(isAdminSession());
+        window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+        return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+    }, []);
 
     async function buscaUsuarios() {
         setIsLoading(true)
@@ -367,14 +390,37 @@ export default function Page() {
 
     async function handleExcluirDocumento() {
         if (!deleteDocumentoId) return
+        const motivo = motivoExclusao.trim()
+        if (motivo.length < 3) {
+            toast.error('Informe o motivo da exclusão (mínimo 3 caracteres).')
+            return
+        }
         try {
-            await deleteElement(deleteDocumentoId)
+            await excluirDocumento(deleteDocumentoId, motivo)
+            toast.success('Documento excluído')
+            setDeleteDocumentoId(null)
+            setMotivoExclusao('')
+            await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
-        } finally {
-            toast.success(`Documento excluído`)
-            setDeleteDocumentoId(null)
+        }
+    }
+
+    async function handleCancelarSolicitacao() {
+        if (!cancelDocumentoId) return
+        const motivo = motivoCancelamento.trim()
+        if (motivo.length < 3) {
+            toast.error('Informe o motivo do cancelamento (mínimo 3 caracteres).')
+            return
+        }
+        try {
+            await cancelarDocumento(cancelDocumentoId, motivo)
+            toast.success('Solicitação cancelada')
+            setCancelDocumentoId(null)
+            setMotivoCancelamento('')
             await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
 
@@ -413,7 +459,7 @@ export default function Page() {
     async function handleExcluirAprovador() {
         if (!deleteAprovadorId) return
         try {
-            await deleteElement(deleteAprovadorId)
+            await removerAprovador(deleteAprovadorId)
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -558,18 +604,19 @@ export default function Page() {
                 header: 'Ações',
                 cell: ({ row }) => {
                     const usuarioAprovador = row.original.aprovadores.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     );
                     const nivelUsuario = row.original.aprovadores.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     )?.ordem ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                        aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
+                    const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao)
+                        && row.original.situacao !== 'CANCELADO';
                     const qtdAnexos = row.original.quantidade_anexos ?? row.original.anexos?.length ?? 0
                     const assinouOuSemAnexos = qtdAnexos === 0
                         || row.original.usuario_assinou_anexo === 1
@@ -580,7 +627,18 @@ export default function Page() {
                         usuario_nome: row.original.usuario_nome,
                         userCodusuario,
                         userName,
-                        aprovadores: row.original.aprovadores,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
+                    });
+                    const podeCancelar = podeCancelarDocumentoCriador({
+                        usuario_criacao: row.original.usuario_criacao,
+                        usuario_nome: row.original.usuario_nome,
+                        userCodusuario,
+                        userName,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
                     });
 
                     const anexoPrincipal = resolverAnexoDocumento(row.original.anexos);
@@ -588,7 +646,7 @@ export default function Page() {
                         || row.original.usuario_assinou_anexo === 1;
 
                     return (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 max-w-[42rem]">
                             {qtdAnexos > 0 && (<Button size="sm" variant="outline" onClick={() => handleDocumentoPrincipal(row.original)}>
                                 Documento {assinouPrincipal && (
                                     <Check className="w-4 h-4 text-green-500" />
@@ -623,10 +681,23 @@ export default function Page() {
                                 </Button>
                             )}
 
+                            {podeCancelar && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setCancelDocumentoId(row.original.id)}
+                                >
+                                    Cancelar solicitação
+                                </Button>
+                            )}
+
                             {podeExcluir && (<Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => { setDeleteDocumentoId(row.original.id); }}
+                                onClick={() => {
+                                    setMotivoExclusao('')
+                                    setDeleteDocumentoId(row.original.id)
+                                }}
                             >
                                 Excluir
                             </Button>)}
@@ -635,7 +706,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userCodusuario]
+        [userName, userCodusuario, isAdminUser, codigosAprovacao]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -792,9 +863,11 @@ export default function Page() {
                                     key={"REPROVADO"}
                                     checked={situacaoFiltrada == "REPROVADO"}
                                     onCheckedChange={() => setSituacaoFiltrada("REPROVADO")}
-                                >
-                                    Reprovados
-                                </DropdownMenuCheckboxItem>
+                                >Reprovado</DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                    checked={situacaoFiltrada == "CANCELADO"}
+                                    onCheckedChange={() => setSituacaoFiltrada("CANCELADO")}
+                                >Cancelado</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem key={"Todos"} checked={situacaoFiltrada == ""} onCheckedChange={() => setSituacaoFiltrada("")}>Todos</DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -1085,20 +1158,69 @@ export default function Page() {
 
             {/* Confirmação de exclusão */}
             {deleteDocumentoId !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
+                    <div className="w-full max-w-md rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Excluir documento
                         </h3>
-                        <p className="mb-4 text-sm text-muted-foreground">
-                            Tem certeza que deseja excluir o documento #{deleteDocumentoId}?
+                        <p className="mb-3 text-sm text-muted-foreground">
+                            O documento #{deleteDocumentoId} sairá da lista. Informe o motivo (fica registrado no seu histórico).
                         </p>
+                        <Label htmlFor="motivo-exclusao-doc" className="text-sm">Motivo</Label>
+                        <textarea
+                            id="motivo-exclusao-doc"
+                            className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm cursor-text"
+                            value={motivoExclusao}
+                            onChange={(e) => setMotivoExclusao(e.target.value)}
+                            maxLength={500}
+                            placeholder="Descreva por que está excluindo este documento"
+                        />
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setDeleteDocumentoId(null)}>
-                                Cancelar
+                            <Button variant="outline" onClick={() => { setDeleteDocumentoId(null); setMotivoExclusao('') }}>
+                                Voltar
                             </Button>
-                            <Button variant="destructive" onClick={handleExcluirDocumento}>
+                            <Button
+                                variant="destructive"
+                                disabled={motivoExclusao.trim().length < 3}
+                                onClick={handleExcluirDocumento}
+                                className="disabled:cursor-not-allowed"
+                            >
                                 Excluir
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {cancelDocumentoId !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
+                    <div className="w-full max-w-md rounded-xl bg-background p-4 shadow-2xl">
+                        <h3 className="mb-2 text-base font-semibold">
+                            Cancelar solicitação
+                        </h3>
+                        <p className="mb-3 text-sm text-muted-foreground">
+                            Ninguém poderá mais aprovar ou assinar o documento #{cancelDocumentoId}, mas ele continuará visível na lista como cancelado. Informe o motivo.
+                        </p>
+                        <Label htmlFor="motivo-cancelamento-doc" className="text-sm">Motivo</Label>
+                        <textarea
+                            id="motivo-cancelamento-doc"
+                            className="mt-1 mb-4 w-full min-h-[88px] rounded-md border border-input bg-background px-3 py-2 text-sm cursor-text"
+                            value={motivoCancelamento}
+                            onChange={(e) => setMotivoCancelamento(e.target.value)}
+                            maxLength={500}
+                            placeholder="Descreva por que está cancelando esta solicitação"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => { setCancelDocumentoId(null); setMotivoCancelamento('') }}>
+                                Voltar
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                disabled={motivoCancelamento.trim().length < 3}
+                                onClick={handleCancelarSolicitacao}
+                                className="disabled:cursor-not-allowed"
+                            >
+                                Cancelar solicitação
                             </Button>
                         </div>
                     </div>
@@ -1107,7 +1229,7 @@ export default function Page() {
 
             {/* Confirmação de exclusão aprovadores */}
             {deleteAprovadorId !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cursor-default">
                     <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
                         <h3 className="mb-2 text-base font-semibold">
                             Excluir aprovador
@@ -1119,7 +1241,7 @@ export default function Page() {
                             <Button variant="outline" onClick={() => setDeleteAprovadorId(null)}>
                                 Cancelar
                             </Button>
-                            <Button variant="destructive" onClick={handleExcluirAprovador}>
+                            <Button variant="destructive" onClick={handleExcluirAprovador} className="disabled:cursor-not-allowed">
                                 Excluir
                             </Button>
                         </div>

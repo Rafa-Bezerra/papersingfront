@@ -92,12 +92,11 @@ export async function updateElement(data: DocumentoAssinar): Promise<void> {
     }
 }
   
+/** @deprecated Exclusão de documento: use documentoService.excluirDocumento com motivo (DOCINTERNO). */
 export async function deleteElement(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/${caminho}/${id}`, { method: "POST", headers: headers() });
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(`Erro ${res.status} ao atualizar ${elemento_singular}: ${msg}`);
-    }
+    throw new Error(
+        `Exclusão Docusign desativada (doc #${id}). Na WaySign, use Excluir em documento com origem Documentos internos (motivo obrigatório).`
+    );
 }
 
 export async function getAllAprovadores(id: number): Promise<DocumentoAprovacao[]> {

@@ -5,6 +5,7 @@ import * as documentoService from "@/services/documentoService";
 import * as projetosService from "@/services/projetosService";
 import { resolverAnexoDocumento } from "@/utils/documentoAnexo";
 import { normalizeUserCode } from "@/utils/functions";
+import { aprovadorEhUsuarioLogado, buildCodigosAprovacaoFromSession } from "@/utils/usuarioAprovacaoMovimento";
 import {
   clearGestorUnidadeContext,
   getGestorUnidadeContext,
@@ -161,11 +162,12 @@ function getUserCodusuario(): string {
 
 function contextoAprovadorDocumento(documento: Documento, userCodusuario?: string) {
   const login = normalizeUserCode(userCodusuario ?? getUserCodusuario());
-  const usuarioAprovador = documento.aprovadores.some(
-    (ap) => normalizeUserCode(ap.usuario) === login
-  );
+  const logados = buildCodigosAprovacaoFromSession();
+  if (login) logados.add(login);
+  const ehUsuarioLogado = (usuario: string) => aprovadorEhUsuarioLogado(usuario, logados);
+  const usuarioAprovador = documento.aprovadores.some((ap) => ehUsuarioLogado(ap.usuario));
   const nivelUsuario =
-    documento.aprovadores.find((ap) => normalizeUserCode(ap.usuario) === login)?.ordem ?? 1;
+    documento.aprovadores.find((ap) => ehUsuarioLogado(ap.usuario))?.ordem ?? 1;
   const todasInferioresAprovadas =
     nivelUsuario === 1 ||
     documento.aprovadores
@@ -173,7 +175,7 @@ function contextoAprovadorDocumento(documento: Documento, userCodusuario?: strin
       .every((ap) => (ap.aprovacao ?? "P").trim().toUpperCase() === "A");
   const usuarioDecidiu = documento.aprovadores.some(
     (ap) =>
-      normalizeUserCode(ap.usuario) === login &&
+      ehUsuarioLogado(ap.usuario) &&
       ["A", "R"].includes((ap.aprovacao ?? "P").trim().toUpperCase())
   );
   const statusLiberado = documento.situacao.trim().toUpperCase() === "EM ANDAMENTO";

@@ -21,7 +21,6 @@ import {
   podeAprovarDocumentoPendencia,
   podeAssinarDocumentoPendencia,
   recusarPendenciaAssinatura,
-  usuarioJaAssinouDocumento,
 } from "@/utils/pendenciaAssinatura";
 import { labelTipoPendencia } from "@/utils/pendenciaNavigation";
 import { cn } from "@/lib/utils";
@@ -128,26 +127,6 @@ export function PendenciaAssinaturaViewer({ item, onClose, onSigned }: Props) {
       setAnexos(lista);
       anexosRef.current = lista;
       await aplicarAnexoAtivo(lista, indiceAnexoPrincipal(lista, principal));
-
-      if (
-        usuarioJaAssinouDocumento(doc) &&
-        podeAprovarDocumentoPendencia(doc)
-      ) {
-        const toastId = toast.loading("Registrando aprovação pendente…");
-        try {
-          await concluirPendenciaAposAssinatura(doc, item.tipo);
-          toast.dismiss(toastId);
-          await finalizarDecisao("Documento aprovado e concluído na sua caixa.");
-          return;
-        } catch (e) {
-          toast.dismiss(toastId);
-          toast.message(
-            e instanceof Error
-              ? e.message
-              : "Não foi possível aprovar automaticamente. Use o botão Aprovar abaixo."
-          );
-        }
-      }
     } catch (e) {
       if (reqId !== reqRef.current) return;
       const msg = e instanceof Error ? e.message : "Erro ao carregar documento.";

@@ -10,7 +10,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { BarChart3, Bell, Boxes, Check, ChevronsUpDown, ExternalLink, Eye, FileSignature, Filter, FolderCheck, History, LayoutTemplate, Mail, Printer, SearchIcon, Settings, ShieldCheck, SquarePlus, Table2, Trash2, UserPlus, X } from 'lucide-react'
+import { BarChart3, Bell, Boxes, Check, ChevronsUpDown, ClipboardList, ExternalLink, Eye, FileSignature, Filter, FolderCheck, History, LayoutTemplate, Mail, Printer, SearchIcon, Settings, ShieldCheck, SquarePlus, Table2, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,8 +33,9 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { base64ParaImpressao, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
-import { imprimirPdfBase64, safeDateLabel, safeDateLabelAprovacao, stripDiacritics, toBase64 } from '@/utils/functions'
+import { base64ParaImpressao, podeCancelarDocumentoCriador, podeExcluirDocumentoCriador, resolverAnexoDocumento } from '@/utils/documentoAnexo'
+import { imprimirPdfBase64, normalizeUserCode, safeDateLabel, safeDateLabelAprovacao, toBase64 } from '@/utils/functions'
+import { aprovadorEhUsuarioLogado, buildCodigosAprovacaoFromSession } from '@/utils/usuarioAprovacaoMovimento'
 import { toast } from 'sonner'
 import { Loader2 } from "lucide-react";
 import {
@@ -44,6 +45,7 @@ import {
     CertificadoA1Status,
     createElement,
     deleteElement,
+    removerAprovador,
     Documento,
     DocumentoAprovacao,
     getAnexo,
@@ -89,6 +91,7 @@ import SolicitacaoAssinaturaPanel from '@/components/SolicitacaoAssinaturaPanel'
 import FornecedorParceiroPanel from '@/components/FornecedorParceiroPanel'
 import WaySignPlugSignAcoes from '@/components/WaySignPlugSignAcoes'
 import WaySignAdminPanel, { ClientesSecao } from '@/components/WaySignAdminPanel'
+import { WaySignDocumentosInternosAcoesPanel } from '@/components/WaySignDocumentosInternosAcoesPanel'
 import * as documentoService from '@/services/documentoService'
 import { listarAlertas } from '@/services/waySignService'
 import WaySignTemplatesPanel from '@/components/WaySignTemplatesPanel'
@@ -97,12 +100,21 @@ import { WaySignAlertasBotao, WaySignMensagens, WaySignPainel, WaySignRelatorio 
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getPendenciaIdFromSearchParams, isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
+import { isAdminSession, USERDATA_UPDATED_EVENT } from '@/utils/sessionUser'
 
 const TAMANHOS_PAGINA = [10, 20, 50, 100]
+/** ID na lista: mesma numeração em DOCUSIGN_* e DOCUMENTOS_INTERNOS_* pode repetir (ex.: 58). */
+function rotuloIdWaySign(row: ItemWaySign): string {
+    if (row.origem === 'PLUGSIGN') return '—'
+    if (row.origem === 'DOCINTERNO') return `D:${row.id}`
+    if (row.origem === 'INTERNO') return `I:${row.id}`
+    return String(row.id ?? '')
+}
+
 const ROTULO_ORIGEM: Record<string, string> = {
-    DOCINTERNO: 'Documentos internos',
-    // Internos = assinados dentro do PaperSign; WaySign = externos, pela PlugSign.
-    INTERNO: 'Documentos internos',
+    DOCINTERNO: 'Doc. internos (motivo/hist.)',
+    // INTERNO = fila legada DOCUSIGN_* — exclusão/cancelamento com histórico não se aplicam.
+    INTERNO: 'Interno legado (DOCUSIGN)',
     PLUGSIGN: 'WaySign',
     INTERNOS: 'Internos (PaperSign)',
     EXTERNOS: 'Externos (WaySign)',
@@ -133,7 +145,9 @@ export default function Page() {
     const [totalItens, setTotalItens] = useState(0)
     const [ultimaPagina, setUltimaPagina] = useState(1)
     const [avisoLista, setAvisoLista] = useState<string | null>(null)
-    const [isAdminUser, setIsAdminUser] = useState(false)
+    const [isAdminUser, setIsAdminUser] = useState(() =>
+        typeof window !== 'undefined' ? isAdminSession() : false
+    )
     // Unificação Documentos × WaySign: quem tem só "Documentos" entra no módulo e vê só "Documentos internos".
     // null = ainda lendo a sessão (evita buscar a lista do WaySign sem saber se pode).
     const [temWaySign, setTemWaySign] = useState<boolean | null>(null)
@@ -144,24 +158,41 @@ export default function Page() {
     // Documentos = só pendentes; Meus documentos = finalizados (concluídos, recusados ou cancelados); Solicitações = filtro livre.
     const situacaoDaAba = emMeus ? 'FINALIZADO' : aba === 'documentos' ? 'PENDENTE' : null
     // Lista única: cada linha chama a API do próprio módulo (WaySign = api/Docusign, Documentos internos = api/Documentos).
-    const origemAtual = useRef<string>('INTERNO')
-    const ehDocInterno = () => origemAtual.current === 'DOCINTERNO'
+    const origemAtual = useRef<string>('DOCINTERNO')
+    const codigoOrigem = (origem?: string | null) => (origem ?? origemAtual.current ?? '').trim().toUpperCase()
+    const ehDocInterno = () => codigoOrigem() === 'DOCINTERNO'
+    const exclusaoDocInternoModulo = (origem?: string | null) => codigoOrigem(origem) === 'DOCINTERNO'
     const servico = () => (ehDocInterno()
         ? documentoService
         : { getAnexo, assinar, aprovar, deleteElement, createElement, adicionarAprovador })
     // Só assina quem está no fluxo de aprovação (vale também para Admin); os demais só visualizam.
     // eu_destinatario vem do servidor (login ou chapa com o mesmo e-mail); o servidor confere de novo ao assinar.
+    const codigosAprovacao = useMemo(() => {
+        const codigos = buildCodigosAprovacaoFromSession()
+        const login = normalizeUserCode(userCodusuario)
+        if (login) codigos.add(login)
+        return codigos
+    }, [userCodusuario])
     const estaNoFluxo = (doc?: Documento | null) => {
         if (!doc) return false
         if ((doc as ItemWaySign).eu_destinatario) return true
-        const eu = stripDiacritics(userCodusuario.toLowerCase().trim())
-        return (doc.aprovadores ?? []).some((ap) => stripDiacritics((ap.usuario ?? '').toLowerCase().trim()) === eu)
+        return (doc.aprovadores ?? []).some((ap) => aprovadorEhUsuarioLogado(ap.usuario ?? '', codigosAprovacao))
+    }
+    // Assinatura segue a ordem da cadeia: só assina depois que todas as ordens anteriores à sua aprovaram.
+    const ordensAnterioresPendentes = (doc?: Documento | null) => {
+        const aprovadores = doc?.aprovadores ?? []
+        const minhas = aprovadores.filter((ap) => aprovadorEhUsuarioLogado(ap.usuario ?? '', codigosAprovacao))
+        if (minhas.length === 0) return []
+        const nivel = Math.min(...minhas.map((ap) => ap.ordem ?? 1))
+        return aprovadores.filter((ap) => (ap.ordem ?? 1) < nivel && ap.aprovacao !== 'A')
     }
     const marcarOrigem = (doc?: Documento | null) => {
-        origemAtual.current = (doc as ItemWaySign | undefined)?.origem ?? 'INTERNO'
+        const o = codigoOrigem((doc as ItemWaySign | undefined)?.origem)
+        origemAtual.current = o === 'DOCINTERNO' || o === 'INTERNO' ? o : 'INTERNO'
     }
     const [assinarHabilitado, setAssinarHabilitado] = useState(false)
     const [recarga, setRecarga] = useState(0)
+    const [historicoDocInternosTick, setHistoricoDocInternosTick] = useState(0)
     const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<Documento>()
     const [requisicaoAprovacoesSelecionada, setRequisicaoAprovacoesSelecionada] = useState<DocumentoAprovacao[]>([])
     const [searched, setSearched] = useState(false)
@@ -183,6 +214,10 @@ export default function Page() {
     const [isFormAprovadoresOpen, setIsFormAprovadoresOpen] = useState(false)
     const [updateDocumentoMode, setUpdateDocumentoMode] = useState(false)
     const [deleteDocumentoId, setDeleteDocumentoId] = useState<number | null>(null);
+    const [deleteDocumentoOrigem, setDeleteDocumentoOrigem] = useState<string | null>(null);
+    const [motivoExclusao, setMotivoExclusao] = useState('');
+    const [cancelDocumentoId, setCancelDocumentoId] = useState<number | null>(null);
+    const [cancelDocumentoOrigem, setCancelDocumentoOrigem] = useState<string | null>(null);
     const [deleteAprovadorId, setDeleteAprovadorId] = useState<number | null>(null);
     const [usuarios, setUsuarios] = useState<Usuario[]>([])
     const [isModalAnexosOpen, setIsModalAnexosOpen] = useState(false)
@@ -344,6 +379,13 @@ export default function Page() {
     }
 
     useEffect(() => {
+        setIsAdminUser(isAdminSession());
+        const onUserUpdated = () => setIsAdminUser(isAdminSession());
+        window.addEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+        return () => window.removeEventListener(USERDATA_UPDATED_EVENT, onUserUpdated);
+    }, []);
+
+    useEffect(() => {
         if (isPendentesFromUrl(searchParams)) {
             setSituacaoFiltrada("PENDENTE");
         }
@@ -357,8 +399,7 @@ export default function Page() {
             const user = JSON.parse(storedUser);
             setUserName(String(user.nome ?? user.NOME ?? '').toUpperCase());
             setCodusuario(String(user.codusuario ?? user.CODUSUARIO ?? '').toUpperCase());
-            setIsAdminUser(Boolean(user.admin));
-            const adminOuFinanceiro = Boolean(user.admin) || Boolean(user.financeiro);
+            const adminOuFinanceiro = isAdminSession() || Boolean(user.financeiro);
             const podeWaySign = adminOuFinanceiro || Boolean(user.docusign);
             setTemWaySign(podeWaySign);
             setTemDocumentos(adminOuFinanceiro || Boolean(user.documentos));
@@ -520,14 +561,14 @@ export default function Page() {
         }
     }
 
-    async function handleSearchClick() {
+    async function handleSearchClick(): Promise<ItemWaySign[]> {
         startTransition(() => {
             const sp = new URLSearchParams(Array.from(searchParams.entries()))
             if (query) sp.set('q', query)
             else sp.delete('q')
             router.replace(`?${sp.toString()}`)
         })
-        await handleSearch(query)
+        return await handleSearch(query)
     }
 
     async function handleAprovacoes(requisicao: Documento) {
@@ -577,7 +618,9 @@ export default function Page() {
     }
 
     async function handleInserirDocumento() {
-        origemAtual.current = temWaySign ? 'INTERNO' : 'DOCINTERNO'
+        // "Aprovação interna (em níveis)" = módulo Documentos (DOCUMENTOS_INTERNOS_* / origem DOCINTERNO).
+        // INTERNO é fila legada DOCUSIGN_* — exclusão com motivo e histórico Admin não se aplicam.
+        origemAtual.current = 'DOCINTERNO'
         form.reset({
             id: 0,
             nome: '',
@@ -591,13 +634,45 @@ export default function Page() {
     async function handleExcluirDocumento() {
         if (!deleteDocumentoId) return
         try {
-            await servico().deleteElement(deleteDocumentoId)
+            if (!exclusaoDocInternoModulo(deleteDocumentoOrigem)) {
+                toast.error(
+                    'Exclusão com motivo e histórico vale só para documentos internos (origem DOCINTERNO). ' +
+                        'Este item é do fluxo WaySign interno (DOCUSIGN).'
+                )
+                return
+            }
+            const motivo = motivoExclusao.trim()
+            if (motivo.length < 3) {
+                toast.error('Informe o motivo da exclusão (mínimo 3 caracteres).')
+                return
+            }
+            await documentoService.excluirDocumento(deleteDocumentoId, motivo)
+            toast.success('Documento excluído. Motivo registrado em Motivos doc. internos.')
+            setDeleteDocumentoId(null)
+            setDeleteDocumentoOrigem(null)
+            setMotivoExclusao('')
+            setHistoricoDocInternosTick((t) => t + 1)
+            await handleSearchClick()
         } catch (err) {
             toast.error((err as Error).message)
-        } finally {
-            toast.success(`Documento excluído`)
-            setDeleteDocumentoId(null)
+        }
+    }
+
+    async function handleCancelarSolicitacao() {
+        if (!cancelDocumentoId) return
+        if (!exclusaoDocInternoModulo(cancelDocumentoOrigem)) {
+            toast.error('Cancelamento com histórico vale só para documentos internos (origem DOCINTERNO).')
+            return
+        }
+        try {
+            await documentoService.cancelarDocumento(cancelDocumentoId)
+            toast.success('Solicitação cancelada. Registrado em Motivos doc. internos.')
+            setCancelDocumentoId(null)
+            setCancelDocumentoOrigem(null)
+            setHistoricoDocInternosTick((t) => t + 1)
             await handleSearchClick()
+        } catch (err) {
+            toast.error((err as Error).message)
         }
     }
 
@@ -612,10 +687,35 @@ export default function Page() {
                 ];
             }
             data.anexos = anexosSubmit;
-            await servico().createElement(data)
-            toast.success(`Registro enviado`)
+            if (!updateDocumentoMode) {
+                await documentoService.createElement(data)
+            } else {
+                await servico().createElement(data)
+            }
             form.reset()
-            await handleSearchClick()
+            setAnexosSubmit([])
+            const nomeSalvo = data.nome?.trim()
+            const lista = await handleSearchClick()
+            if (!updateDocumentoMode && nomeSalvo) {
+                const criado = lista
+                    .filter((d) => (d.nome ?? '').trim() === nomeSalvo)
+                    .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0]
+                const origemCriado = criado ? codigoOrigem(criado.origem) : ''
+                if (origemCriado === 'DOCINTERNO') {
+                    toast.success(
+                        `Documento #${criado!.id} cadastrado. Origem: Documentos internos — ao excluir, informe o motivo (histórico Admin).`
+                    )
+                } else {
+                    toast.warning(
+                        criado
+                            ? `Documento #${criado.id} apareceu com origem ${origemCriado || '?'}. ` +
+                                  'Só origem DOCINTERNO grava motivo no histórico. Atualize o front (build-info) e cadastre de novo.'
+                            : 'Documento salvo, mas não encontrado na lista. Confira filtros de data/aba.'
+                    )
+                }
+            } else {
+                toast.success(updateDocumentoMode ? 'Registro atualizado' : 'Registro enviado')
+            }
             setIsFormDocumentoOpen(false)
         } catch (err) {
             toast.error((err as Error).message)
@@ -636,7 +736,11 @@ export default function Page() {
     async function handleExcluirAprovador() {
         if (!deleteAprovadorId) return
         try {
-            await servico().deleteElement(deleteAprovadorId)
+            if (ehDocInterno()) {
+                await documentoService.removerAprovador(deleteAprovadorId)
+            } else {
+                await removerAprovador(deleteAprovadorId)
+            }
         } catch (err) {
             toast.error((err as Error).message)
         } finally {
@@ -800,7 +904,7 @@ export default function Page() {
 
     const colunas = useMemo<ColumnDef<ItemWaySign>[]>(
         () => [
-            { id: 'id', header: 'ID', accessorFn: (row) => (row.origem === 'PLUGSIGN' ? '—' : row.id) },
+            { id: 'id', header: 'ID', accessorFn: (row) => rotuloIdWaySign(row) },
             {
                 id: 'data',
                 header: 'Data',
@@ -844,33 +948,60 @@ export default function Page() {
                         )
                     }
                     const usuarioAprovador = row.original.aprovadores.some(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     );
                     const nivelUsuario = row.original.aprovadores.find(
-                        ap => stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim())
+                        ap => aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao)
                     )?.ordem ?? 1;
                     const todasInferioresAprovadas = nivelUsuario == 1 || (row.original.aprovadores.filter(ap => ap.ordem < (nivelUsuario)).every(ap => ap.aprovacao === 'A'));
 
                     const usuarioAprovou = row.original.aprovadores.some(ap =>
-                        stripDiacritics(ap.usuario.toLowerCase().trim()) === stripDiacritics(userCodusuario.toLowerCase().trim()) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
+                        aprovadorEhUsuarioLogado(ap.usuario, codigosAprovacao) && (ap.aprovacao === 'A' || ap.aprovacao === 'R')
                     );
 
-                    const status_liberado = ['EM ANDAMENTO'].includes(row.original.situacao);
+                    const status_liberado = ['EM ANDAMENTO', 'PENDENTE'].includes(row.original.situacao)
+                        && row.original.situacao !== 'CANCELADO';
                     const assinouOuSemAnexos = (row.original.anexos?.length ?? 0) === 0 || row.original.anexos?.some(a => a.documento_assinado === 1);
                     const podeAprovar = todasInferioresAprovadas && usuarioAprovador && !usuarioAprovou && status_liberado && assinouOuSemAnexos;
-                    const podeExcluir = podeExcluirDocumentoCriador({
+                    const origemItem = codigoOrigem((row.original as ItemWaySign).origem)
+                    /* Excluir/cancelar com motivo e histórico só em DOCUMENTOS_INTERNOS_* (DOCINTERNO).
+                       ORIGEM INTERNO = fila legada DOCUSIGN_* (sem motivo/histórico neste painel). */
+                    const ehDocInternoLista = origemItem === 'DOCINTERNO'
+                    const podeExcluir = ehDocInternoLista && podeExcluirDocumentoCriador({
                         usuario_criacao: row.original.usuario_criacao,
                         usuario_nome: row.original.usuario_nome,
                         userCodusuario,
                         userName,
-                        aprovadores: row.original.aprovadores,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
+                    });
+                    const podeCancelar = ehDocInternoLista && podeCancelarDocumentoCriador({
+                        usuario_criacao: row.original.usuario_criacao,
+                        usuario_nome: row.original.usuario_nome,
+                        userCodusuario,
+                        userName,
+                        cancelado: row.original.cancelado,
+                        situacao: row.original.situacao,
+                        isAdmin: isAdminUser,
                     });
 
                     const anexoDocumento = resolverAnexoDocumento(row.original.anexos)
+                    const anterioresPendentes = ordensAnterioresPendentes(row.original)
 
                     return (
                         <div className="flex flex-wrap gap-2">
-                            {row.original.minha_acao && !assinouOuSemAnexos && (
+                            {row.original.minha_acao && !assinouOuSemAnexos && anterioresPendentes.length > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled
+                                    title={`Aguardando: ${anterioresPendentes.map(ap => ap.usuario_nome || ap.usuario).join(', ')}`}
+                                >
+                                    Aguardando ordem anterior
+                                </Button>
+                            )}
+                            {row.original.minha_acao && !assinouOuSemAnexos && anterioresPendentes.length === 0 && (
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
@@ -930,10 +1061,30 @@ export default function Page() {
                                 </Button>
                             )}
 
+                            {podeCancelar && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        marcarOrigem(row.original)
+                                        setCancelDocumentoOrigem(origemItem)
+                                        setCancelDocumentoId(row.original.id)
+                                    }}
+                                >
+                                    Cancelar solicitação
+                                </Button>
+                            )}
+
                             {podeExcluir && (<Button
+                                type="button"
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => { marcarOrigem(row.original); setDeleteDocumentoId(row.original.id); }}
+                                onClick={() => {
+                                    marcarOrigem(row.original)
+                                    setDeleteDocumentoOrigem(origemItem)
+                                    setMotivoExclusao('')
+                                    setDeleteDocumentoId(row.original.id)
+                                }}
                             >
                                 Excluir
                             </Button>)}
@@ -942,7 +1093,7 @@ export default function Page() {
                 }
             }
         ],
-        [userName, userCodusuario, isAdminUser, assinarHabilitado]
+        [userName, userCodusuario, isAdminUser, assinarHabilitado, codigosAprovacao]
     )
 
     async function handleNotificarAprovador(usuario: string) {
@@ -1061,7 +1212,7 @@ export default function Page() {
                 setAba('solicitacoes')
             } else if (detail === 'fornecedor' || detail === 'clientes') {
                 setAba('clientes')
-            } else if (['templates', 'painel', 'relatorio', 'mensagens', 'lotes', 'admin'].includes(detail)) {
+            } else if (['templates', 'painel', 'relatorio', 'mensagens', 'lotes', 'admin', 'doc-acoes'].includes(detail)) {
                 setAba(detail)
             }
         }
@@ -1132,6 +1283,11 @@ export default function Page() {
                     )}
                     </>
                     )}
+                    {isAdminUser && (
+                        <TabsTrigger id="tour-plugsign-doc-acoes" value="doc-acoes">
+                            <ClipboardList className="w-4 h-4" /> Motivos doc. internos
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <TabsContent value="clientes" className="mt-0 space-y-4">
@@ -1168,6 +1324,12 @@ export default function Page() {
                 {isAdminUser && (
                     <TabsContent value="admin" className="mt-0">
                         <WaySignAdminPanel />
+                    </TabsContent>
+                )}
+
+                {isAdminUser && (
+                    <TabsContent value="doc-acoes" className="mt-0">
+                        <WaySignDocumentosInternosAcoesPanel refreshToken={historicoDocInternosTick} />
                     </TabsContent>
                 )}
 
@@ -1239,7 +1401,7 @@ export default function Page() {
                             WaySign
                         </a>
                     </div>
-                    <div id="tour-plugsign-doc-acoes" className="flex flex-wrap justify-end items-end gap-3">
+                    <div id="tour-plugsign-doc-toolbar" className="flex flex-wrap justify-end items-end gap-3">
                         <WaySignAlertasBotao
                             id="tour-plugsign-alertas"
                             onAbrirDocumento={(key) => {
@@ -1749,23 +1911,74 @@ export default function Page() {
                 </DialogContent>
             </Dialog>
 
-            {/* Confirmação de exclusão */}
-            {deleteDocumentoId !== null && (
+            <Dialog
+                open={deleteDocumentoId !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDeleteDocumentoId(null)
+                        setDeleteDocumentoOrigem(null)
+                        setMotivoExclusao('')
+                    }
+                }}
+            >
+                <DialogContent className="max-w-md sm:max-w-lg" showCloseButton>
+                    <DialogHeader>
+                        <DialogTitle>Excluir documento #{deleteDocumentoId ?? ''}</DialogTitle>
+                        <DialogDescription>
+                            {exclusaoDocInternoModulo(deleteDocumentoOrigem)
+                                ? 'Informe o motivo (obrigatório). O registro aparece na aba Motivos doc. internos.'
+                                : `Origem ${deleteDocumentoOrigem ?? '?'}. Só documentos com origem Documentos internos (DOCINTERNO) usam este fluxo.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {exclusaoDocInternoModulo(deleteDocumentoOrigem) && (
+                        <div className="space-y-2">
+                            <Label htmlFor="motivo-exclusao-ws">Motivo da exclusão</Label>
+                            <textarea
+                                id="motivo-exclusao-ws"
+                                autoFocus
+                                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                value={motivoExclusao}
+                                onChange={(e) => setMotivoExclusao(e.target.value)}
+                                maxLength={500}
+                                placeholder="Ex.: documento enviado por engano, substituído por nova versão…"
+                            />
+                            <p className="text-xs text-muted-foreground">Mínimo 3 caracteres.</p>
+                        </div>
+                    )}
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setDeleteDocumentoId(null)
+                                setDeleteDocumentoOrigem(null)
+                                setMotivoExclusao('')
+                            }}
+                        >
+                            Voltar
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={!exclusaoDocInternoModulo(deleteDocumentoOrigem) || motivoExclusao.trim().length < 3}
+                            onClick={() => void handleExcluirDocumento()}
+                        >
+                            Confirmar exclusão
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {cancelDocumentoId !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="w-full max-w-sm rounded-xl bg-background p-4 shadow-2xl">
-                        <h3 className="mb-2 text-base font-semibold">
-                            Excluir documento
-                        </h3>
+                        <h3 className="mb-2 text-base font-semibold">Cancelar solicitação</h3>
                         <p className="mb-4 text-sm text-muted-foreground">
-                            Tem certeza que deseja excluir o documento #{deleteDocumentoId}?
+                            Ninguém poderá mais aprovar ou assinar o documento #{cancelDocumentoId}; ele permanece visível como cancelado.
                         </p>
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setDeleteDocumentoId(null)}>
-                                Cancelar
-                            </Button>
-                            <Button variant="destructive" onClick={handleExcluirDocumento}>
-                                Excluir
-                            </Button>
+                            <Button variant="outline" onClick={() => setCancelDocumentoId(null)}>Voltar</Button>
+                            <Button variant="destructive" onClick={handleCancelarSolicitacao}>Cancelar solicitação</Button>
                         </div>
                     </div>
                 </div>
@@ -1920,11 +2133,13 @@ export default function Page() {
                     onOpenChange={(open) => { if (!open) setAnexoPdfBase64ParaAssinatura(null); setIsModalVisualizarAnexoOpen(open); }}
                     title={`Anexo ${anexoSelecionado.nome}`}
                     pdfBase64={anexoPdfBase64ParaAssinatura}
-                    canSign={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)}
+                    canSign={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
+                        && ordensAnterioresPendentes(requisicaoSelecionada).length === 0}
                     onSign={confirmarAssinaturaAnexo}
                     onPrint={handleImprimirAnexo}
                     isLoading={isLoading}
                     extraControls={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
+                        && ordensAnterioresPendentes(requisicaoSelecionada).length === 0
                         && certStatus?.plugsignAtivo ? (
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                             <Checkbox

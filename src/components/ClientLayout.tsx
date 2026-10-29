@@ -10,6 +10,7 @@ import PendenciasLoginModal from "./PendenciasLoginModal";
 import GestorUnidadeBanner from "./GestorUnidadeBanner";
 import { canAccessConfigRoute, isConfigMenuRoute } from "@/lib/configuracoes-permissoes";
 import { data } from "@/lib/data";
+import { isPapersignWayoneEmbed, WAYONE_EMBED_SESSION_EVENT } from "@/lib/wayoneThemeSync";
 import { toast } from "sonner";
 
 interface ClientLayoutProps {
@@ -64,6 +65,26 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const inactivityTimeoutRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const sessionExpiredNotifiedRef = useRef(false);
+
+  const isWayoneEmbed =
+    isPapersignWayoneEmbed() ||
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("wayoneEmbed") === "1");
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isWayoneEmbed) {
+      document.documentElement.dataset.papersignWayoneEmbed = "1";
+      document.body.dataset.papersignWayoneEmbed = "1";
+    } else {
+      delete document.documentElement.dataset.papersignWayoneEmbed;
+      delete document.body.dataset.papersignWayoneEmbed;
+    }
+    return () => {
+      delete document.documentElement.dataset.papersignWayoneEmbed;
+      delete document.body.dataset.papersignWayoneEmbed;
+    };
+  }, [isWayoneEmbed]);
 
   // Verifica se o usuário fez login antes de deixar entrar nas páginas
   useEffect(() => {
@@ -144,8 +165,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         } else {
           setIsAuthenticated(false);
           setIsAuthorized(false);
-          // Redireciona para login se não estiver autenticado
-          if (!isLoginRoute) {
+          const embed =
+            isPapersignWayoneEmbed() ||
+            new URLSearchParams(window.location.search).get("wayoneEmbed") === "1";
+          // No iframe WayOne o token vem do boot/postMessage — não mandar para /login (tela branca).
+          if (!isLoginRoute && !embed) {
             if (!sessionExpiredNotifiedRef.current) {
               sessionExpiredNotifiedRef.current = true;
               toast.info("Sua sessão expirou. Faça login novamente.");
@@ -160,7 +184,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           ? pathname.slice(0, -1)
           : pathname;
         const isLoginRoute = normalizedPath === "/login" || normalizedPath === "/login-externo";
-        if (!isLoginRoute) {
+        const embed =
+          isPapersignWayoneEmbed() ||
+          new URLSearchParams(window.location.search).get("wayoneEmbed") === "1";
+        if (!isLoginRoute && !embed) {
           router.replace("/login/");
         }
       } finally {
@@ -169,10 +196,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     };
 
     checkAuthentication();
+    window.addEventListener(WAYONE_EMBED_SESSION_EVENT, checkAuthentication);
+    return () => window.removeEventListener(WAYONE_EMBED_SESSION_EVENT, checkAuthentication);
   }, [pathname, router]);
 
   useEffect(() => {
     const handleLogout = () => {
+      if (isPapersignWayoneEmbed()) return;
       sessionStorage.removeItem("authToken");
       sessionStorage.removeItem("userData");
       setIsAuthenticated(false);
@@ -225,6 +255,17 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     return <>{children}</>;
   }
 
+  if (!isAuthenticated && isWayoneEmbed) {
+    return (
+      <div className="min-h-svh flex items-center justify-center bg-background text-muted-foreground">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-sm">Abrindo PaperSign…</p>
+        </div>
+      </div>
+    );
+  }
+
   // Só deixa entrar se estiver logado
   if (!isAuthenticated) {
     return (
@@ -260,6 +301,18 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             Ir para Home
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (isWayoneEmbed) {
+    return (
+      <div className="papersign-wayone-embed-shell flex h-full min-h-0 w-full max-h-full flex-col bg-background">
+        <main className="papersign-wayone-embed-main min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto p-2 sm:p-4 lg:p-6">
+          <div className="w-full">{children}</div>
+        </main>
+        <RafaelaTour />
+        <PendenciasLoginModal />
       </div>
     );
   }
