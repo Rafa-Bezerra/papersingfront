@@ -9,7 +9,7 @@ import RafaelaTour from "./RafaelaTour";
 import PendenciasLoginModal from "./PendenciasLoginModal";
 import GestorUnidadeBanner from "./GestorUnidadeBanner";
 import { canAccessConfigRoute, isConfigMenuRoute } from "@/lib/configuracoes-permissoes";
-import { data, FROTAS_SO_ADMIN } from "@/lib/data";
+import { data } from "@/lib/data";
 import { isPapersignWayoneEmbed, WAYONE_EMBED_SESSION_EVENT } from "@/lib/wayoneThemeSync";
 import { toast } from "sonner";
 
@@ -140,10 +140,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             }
 
             if (normalizedPath === "/contratos" && !isAdmin && !Boolean(parsedUser?.modulo_contratos)) {
-              setIsAuthorized(false);
-            }
-
-            if (normalizedPath === "/frotas" && !isAdmin && (FROTAS_SO_ADMIN || !Boolean(parsedUser?.frotas))) {
               setIsAuthorized(false);
             }
 

@@ -202,8 +202,8 @@ export default function RemoverConfigLotePanel() {
             Remover acesso em lote
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Marque quais <strong>acessos</strong> deseja retirar (itens do menu Configurações, Módulo Contratos, Frotas e,
-            se precisar, <strong>Admin</strong>). A lista mostra quem ainda tem esse acesso. Documentos, borderô e demais
+            Marque quais <strong>acessos</strong> deseja retirar (itens do menu Configurações, Módulo Contratos e, se
+            precisar, <strong>Admin</strong>). A lista mostra quem ainda tem esse acesso. Documentos, borderô e demais
             módulos do PaperSign não mudam. O Admin do seu próprio login não é removido aqui. Tudo vai para a auditoria.
           </CardDescription>
         </CardHeader>
