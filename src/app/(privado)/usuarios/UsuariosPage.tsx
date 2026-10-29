@@ -202,6 +202,7 @@ export default function PageUsuarios() {
       extrato_gestor: false,
       controle_medicao: false,
       modulo_contratos: false,
+      frotas: false,
       config_alcadas: false,
       config_usuarios: false,
       config_bordero_aprovadores: false,
@@ -358,6 +359,7 @@ export default function PageUsuarios() {
         extrato_gestor: response.extrato_gestor,
         controle_medicao: response.controle_medicao,
         modulo_contratos: response.modulo_contratos,
+        frotas: response.frotas ?? false,
         config_alcadas: response.config_alcadas ?? false,
         config_usuarios: response.config_usuarios ?? false,
         config_bordero_aprovadores: response.config_bordero_aprovadores ?? false,
@@ -411,6 +413,7 @@ export default function PageUsuarios() {
       extrato_gestor: false,
       controle_medicao: false,
       modulo_contratos: false,
+      frotas: false,
       config_alcadas: false,
       config_usuarios: false,
       config_bordero_aprovadores: false,
@@ -1095,6 +1098,22 @@ export default function PageUsuarios() {
                       <FormControl>
                         <PermissionCheckbox
                           checked={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="frotas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Frotas</FormLabel>
+                      <FormControl>
+                        <PermissionCheckbox
+                          checked={Boolean(field.value)}
                           onChange={field.onChange}
                         />
                       </FormControl>
