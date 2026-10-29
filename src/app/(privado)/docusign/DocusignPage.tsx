@@ -178,6 +178,14 @@ export default function Page() {
         if ((doc as ItemWaySign).eu_destinatario) return true
         return (doc.aprovadores ?? []).some((ap) => aprovadorEhUsuarioLogado(ap.usuario ?? '', codigosAprovacao))
     }
+    // Assinatura segue a ordem da cadeia: só assina depois que todas as ordens anteriores à sua aprovaram.
+    const ordensAnterioresPendentes = (doc?: Documento | null) => {
+        const aprovadores = doc?.aprovadores ?? []
+        const minhas = aprovadores.filter((ap) => aprovadorEhUsuarioLogado(ap.usuario ?? '', codigosAprovacao))
+        if (minhas.length === 0) return []
+        const nivel = Math.min(...minhas.map((ap) => ap.ordem ?? 1))
+        return aprovadores.filter((ap) => (ap.ordem ?? 1) < nivel && ap.aprovacao !== 'A')
+    }
     const marcarOrigem = (doc?: Documento | null) => {
         const o = codigoOrigem((doc as ItemWaySign | undefined)?.origem)
         origemAtual.current = o === 'DOCINTERNO' || o === 'INTERNO' ? o : 'INTERNO'
@@ -979,10 +987,21 @@ export default function Page() {
                     });
 
                     const anexoDocumento = resolverAnexoDocumento(row.original.anexos)
+                    const anterioresPendentes = ordensAnterioresPendentes(row.original)
 
                     return (
                         <div className="flex flex-wrap gap-2">
-                            {row.original.minha_acao && !assinouOuSemAnexos && (
+                            {row.original.minha_acao && !assinouOuSemAnexos && anterioresPendentes.length > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled
+                                    title={`Aguardando: ${anterioresPendentes.map(ap => ap.usuario_nome || ap.usuario).join(', ')}`}
+                                >
+                                    Aguardando ordem anterior
+                                </Button>
+                            )}
+                            {row.original.minha_acao && !assinouOuSemAnexos && anterioresPendentes.length === 0 && (
                                 <Button
                                     size="sm"
                                     className="bg-green-500 hover:bg-green-600 text-white"
@@ -2114,11 +2133,13 @@ export default function Page() {
                     onOpenChange={(open) => { if (!open) setAnexoPdfBase64ParaAssinatura(null); setIsModalVisualizarAnexoOpen(open); }}
                     title={`Anexo ${anexoSelecionado.nome}`}
                     pdfBase64={anexoPdfBase64ParaAssinatura}
-                    canSign={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)}
+                    canSign={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
+                        && ordensAnterioresPendentes(requisicaoSelecionada).length === 0}
                     onSign={confirmarAssinaturaAnexo}
                     onPrint={handleImprimirAnexo}
                     isLoading={isLoading}
                     extraControls={anexoSelecionado.documento_assinado == 0 && estaNoFluxo(requisicaoSelecionada)
+                        && ordensAnterioresPendentes(requisicaoSelecionada).length === 0
                         && certStatus?.plugsignAtivo ? (
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                             <Checkbox
