@@ -75,6 +75,7 @@ import PdfViewerDialog, { PdfSignData } from '@/components/PdfViewerDialog';
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { isPendentesFromUrl, usePendenciaDeepLink } from '@/utils/pendenciaDeepLink'
+import { nomeProjetoExibicao } from '@/utils/projetosModulo'
 
 
 export default function Page() {
@@ -501,7 +502,7 @@ export default function Page() {
             { accessorKey: 'id', header: 'ID' },
             { accessorKey: 'data_criacao', header: 'Data criação', accessorFn: (row) => safeDateLabel(row.data_criacao) },
             { accessorKey: 'usuario_nome', header: 'Solicitante' },
-            { accessorKey: 'nome', header: 'Descrição' },
+            { accessorKey: 'nome', header: 'Descrição', cell: ({ row }) => nomeProjetoExibicao(row.original.nome) },
             { accessorKey: 'situacao', header: 'Situação' },
             {
                 id: 'actions',
@@ -841,7 +842,7 @@ export default function Page() {
                 <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
-                            {updateDocumentoMode ? `Editar: ${requisicaoSelecionada?.nome}` : `Novo documento`}
+                            {updateDocumentoMode ? `Editar: ${nomeProjetoExibicao(requisicaoSelecionada?.nome)}` : `Novo documento`}
                         </DialogTitle>
                     </DialogHeader>
 
