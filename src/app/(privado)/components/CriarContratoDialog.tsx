@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -42,7 +43,20 @@ interface Props {
  * Dialog "Criar Contrato" compartilhado entre MovimentosPage e GeralPage — mesmos campos
  * e mesma regra de truncagem de OBSERVACAO (TCNT.OBSERVACAO no TOTVS é varchar(60)).
  */
+/** Mesmo critério do menu (AppSidebar): admin ou direito "Módulo Contratos" na sessão. */
+function podeAbrirContratos(): boolean {
+    try {
+        const raw = sessionStorage.getItem('userData')
+        if (!raw) return false
+        const user = JSON.parse(raw)
+        return Boolean(user.admin || user.modulo_contratos)
+    } catch {
+        return false
+    }
+}
+
 export default function CriarContratoDialog({ requisicao, onOpenChange, tiposContrato, onCriado }: Props) {
+    const router = useRouter()
     const [isCriandoContrato, setIsCriandoContrato] = useState(false)
 
     const formContrato = useForm<CriarContratoPayload>({
@@ -61,7 +75,19 @@ export default function CriarContratoDialog({ requisicao, onOpenChange, tiposCon
         setIsCriandoContrato(true)
         try {
             const resultado = await criarContrato(idmov, data)
-            toast.success(resultado.message || "Contrato criado com sucesso.")
+            if (podeAbrirContratos() && resultado.numeroContrato && !resultado.avisoFila) {
+                // O contrato entrou na fila de /contratos: oferece abrir lá para anexar e acompanhar o andamento.
+                toast.success(resultado.message || "Contrato criado com sucesso.", {
+                    action: {
+                        label: "Abrir em Contratos",
+                        onClick: () => router.push(`/contratos?busca=${encodeURIComponent(resultado.numeroContrato!)}`),
+                    },
+                    duration: 10000,
+                })
+            } else {
+                toast.success(resultado.message || "Contrato criado com sucesso.")
+            }
+            if (resultado.avisoFila) toast.warning(resultado.avisoFila, { duration: 10000, closeButton: true })
             onCriado(idmov, resultado)
             onOpenChange(false)
         } catch (err) {

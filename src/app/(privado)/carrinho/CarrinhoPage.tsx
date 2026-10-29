@@ -19,7 +19,10 @@ import {
 } from '@/components/ui/dialog'
 import { ChevronsUpDown, Eye, Loader2, Trash2, Check, Filter, SearchIcon } from "lucide-react";
 import PdfViewerDialog from '@/components/PdfViewerDialog'
-import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { AnexoCarrinho, Carrinho, CentroDeCusto, ContaFinanceira, createElement, updateElement, getAllCentrosDeCusto, getAllContasFinanceiras, getAllProdutos, getAnexos, getUltimasRequisicoes, getVinculos, ItemCarrinho, Produto } from '@/services/carrinhoService';
+import { getUsuariosAprovadores } from '@/services/usuariosService';
+import { Usuario } from '@/types/Usuario';
+import SelecionarUsuariosDialog from './SelecionarUsuariosDialog';
 import { getAnexoByIdmov, Requisicao_aprovacao, Requisicao_item, RequisicaoDto } from '@/services/requisicoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,6 +90,11 @@ export default function Page() {
     const [selectedAprovadoresResult, setSelectedAprovadoresResult] = useState<Requisicao_aprovacao[]>([])
     const [carrinhoDocumento, setCarrinhoDocumento] = useState<string | null>(null)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [usuarios, setUsuarios] = useState<Usuario[]>([])
+    const [liberacaoAcesso, setLiberacaoAcesso] = useState<string[]>([])
+    const [compliance, setCompliance] = useState<string[]>([])
+    const [openLiberacaoAcesso, setOpenLiberacaoAcesso] = useState(false)
+    const [openCompliance, setOpenCompliance] = useState(false)
 
     const hoje = new Date().toISOString().split('T')[0]
     const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -143,6 +151,7 @@ export default function Page() {
     useEffect(() => {
         buscaCentrosDeCusto();
         buscaUltimasRequisicoes({ dateFrom: trintaDiasAtras, dateTo: hoje });
+        getUsuariosAprovadores().then(setUsuarios).catch(() => setUsuarios([]));
     }, [])
 
     /** Busca centros de custo da API */
@@ -222,6 +231,8 @@ export default function Page() {
         carrinho.periodo_de = form.getValues("periodo_de")
         carrinho.periodo_ate = form.getValues("periodo_ate")
         carrinho.gerar_contrato = form.getValues("gerar_contrato")
+        carrinho.liberacao_acesso = liberacaoAcesso
+        carrinho.compliance = compliance
         carrinho.itens = produtosSubmit
         carrinho.anexos = anexosSubmit
         try {
@@ -300,6 +311,14 @@ export default function Page() {
         }))
         setProdutosSubmit(itens)
         try {
+            const vinculos = await getVinculos(requisicao.requisicao.idmov)
+            setLiberacaoAcesso(vinculos.liberacao_acesso ?? [])
+            setCompliance(vinculos.compliance ?? [])
+        } catch {
+            setLiberacaoAcesso([])
+            setCompliance([])
+        }
+        try {
             const anexos = await getAnexos(requisicao.requisicao.idmov)
             setAnexosSubmit(anexos)
         } catch {
@@ -314,6 +333,8 @@ export default function Page() {
         form.reset()
         setProdutosSubmit([])
         setAnexosSubmit([])
+        setLiberacaoAcesso([])
+        setCompliance([])
     }
 
     /** Converte arquivo em base64 e adiciona à lista de anexos */
@@ -549,18 +570,65 @@ export default function Page() {
                             )}
                         />
 
-                        <FormField
-                            control={form.control}
-                            name="gerar_contrato"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                                    <FormControl>
-                                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">Gerar contrato</FormLabel>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                        <div className="flex flex-wrap items-center gap-4">
+                            <FormField
+                                control={form.control}
+                                name="gerar_contrato"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                                        <FormControl>
+                                            <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Gerar contrato</FormLabel>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <Button type="button" variant="outline" size="sm" onClick={() => setOpenLiberacaoAcesso(true)}>
+                                Liberação de acesso ({liberacaoAcesso.length})
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setOpenCompliance(true)}>
+                                Compliance ({compliance.length})
+                            </Button>
+                        </div>
+                        {[
+                            { titulo: 'Liberação de acesso', lista: liberacaoAcesso, setLista: setLiberacaoAcesso },
+                            { titulo: 'Compliance', lista: compliance, setLista: setCompliance },
+                        ].filter(g => g.lista.length > 0).map(g => (
+                            <div key={g.titulo} className="grid gap-1">
+                                <span className="text-sm font-medium">{g.titulo}</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {g.lista.map(cod => (
+                                        <span key={cod} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
+                                            {usuarios.find(u => u.codusuario === cod)?.nome ?? cod}
+                                            <button
+                                                type="button"
+                                                aria-label={`Remover ${cod}`}
+                                                className="text-muted-foreground hover:text-foreground"
+                                                onClick={() => g.setLista(prev => prev.filter(c => c !== cod))}
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                        <SelecionarUsuariosDialog
+                            titulo="Liberação de acesso"
+                            open={openLiberacaoAcesso}
+                            onOpenChange={setOpenLiberacaoAcesso}
+                            usuarios={usuarios}
+                            value={liberacaoAcesso}
+                            onChange={setLiberacaoAcesso}
+                        />
+                        <SelecionarUsuariosDialog
+                            titulo="Compliance"
+                            open={openCompliance}
+                            onOpenChange={setOpenCompliance}
+                            usuarios={usuarios}
+                            value={compliance}
+                            onChange={setCompliance}
                         />
 
                     </Form>

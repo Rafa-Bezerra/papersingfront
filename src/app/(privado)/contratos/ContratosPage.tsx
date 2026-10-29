@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
+  Ban,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -14,6 +16,7 @@ import {
   PenLine,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -55,28 +58,93 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
   alterarAreaContrato,
+  alterarVigenciaContrato,
   anexarArquivoContrato,
   AREAS_CONTRATO,
   AreaContrato,
+  cancelarContrato,
   concluirContrato,
   Contrato,
   ContratoAprovacao,
+  ContratoEvento,
   ContratoIndicadores,
   DestinatarioWaySign,
   enviarContratoWaySign,
+  excluirAnexoContrato,
   labelArea,
   labelStatus,
   listarContratos,
+  listarEventosContrato,
   obterAprovacaoContrato,
   obterArquivoAnexoContrato,
   obterContrato,
   obterIndicadoresContratos,
+  reabrirContrato,
   resgatarContratoWaySign,
   SituacaoFiltro,
+  sincronizarContratoTotvs,
   TipoAnexoContrato,
 } from '@/services/contratosService';
 import { safeDateLabel, safeDateTimeLabel, toBase64, toMoney } from '@/utils/functions';
 import { corUnidadePendencia } from '@/utils/pendenciaNavigation';
+
+/** Mostra o resultado de uma ação; se o envio ao TOTVS falhou, o aviso sai logo depois do sucesso local. */
+function avisarResultado(mensagem: string, avisoTotvs?: string | null) {
+  toast.success(mensagem);
+  if (avisoTotvs) toast.warning(avisoTotvs, { duration: 10000, closeButton: true });
+}
+
+function corSyncTotvs(status?: string | null): string {
+  switch (status) {
+    case 'OK':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+    case 'ERRO':
+      return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300';
+    default:
+      return 'border-muted-foreground/30 bg-muted text-muted-foreground';
+  }
+}
+
+function labelSyncTotvs(c: Contrato): string {
+  if (!c.id_contrato_totvs) return 'TOTVS: sem vínculo';
+  switch (c.sync_totvs_status) {
+    case 'OK':
+      return c.status_totvs ? `TOTVS: sincronizado (sit. ${c.status_totvs})` : 'TOTVS: sincronizado';
+    case 'ERRO':
+      return 'TOTVS: erro na sincronização';
+    case 'PULADO':
+      return 'TOTVS: não enviado';
+    default:
+      return 'TOTVS: aguardando sincronização';
+  }
+}
+
+function labelEvento(tipo: string): string {
+  switch (tipo) {
+    case 'CRIADO':
+      return 'Criado';
+    case 'ANEXO_ADD':
+      return 'Anexo';
+    case 'ANEXO_DEL':
+      return 'Anexo excluído';
+    case 'STATUS':
+      return 'Situação';
+    case 'AREA':
+      return 'Área';
+    case 'VIGENCIA':
+      return 'Vigência';
+    case 'WAYSIGN':
+      return 'WaySign';
+    case 'TOTVS_OK':
+      return 'TOTVS';
+    case 'TOTVS_ERRO':
+      return 'TOTVS (erro)';
+    case 'TOTVS_ATUALIZADO':
+      return 'TOTVS (leitura)';
+    default:
+      return tipo;
+  }
+}
 
 const INDICADORES_VAZIOS: ContratoIndicadores = {
   aguardando_contrato: 0,
@@ -322,10 +390,12 @@ function etapasContrato(c: Contrato): EtapaLinha[] {
 }
 
 export default function ContratosPage() {
+  // ?busca=<n° do contrato> vem do aviso "Abrir em Contratos" depois de criar o contrato.
+  const buscaInicial = useSearchParams().get('busca')?.trim() ?? '';
   const [area, setArea] = useState<AreaContrato | ''>('');
   const [situacao, setSituacao] = useState<SituacaoFiltro>('pendentes');
-  const [busca, setBusca] = useState('');
-  const [buscaAplicada, setBuscaAplicada] = useState('');
+  const [busca, setBusca] = useState(buscaInicial);
+  const [buscaAplicada, setBuscaAplicada] = useState(buscaInicial);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [dataDe, setDataDe] = useState('');
   const [dataAte, setDataAte] = useState('');
@@ -350,6 +420,15 @@ export default function ContratosPage() {
   const [confirmarConclusao, setConfirmarConclusao] = useState(false);
   const [concluindo, setConcluindo] = useState(false);
   const [resgatando, setResgatando] = useState(false);
+  const [eventos, setEventos] = useState<ContratoEvento[]>([]);
+  const [anexoParaExcluir, setAnexoParaExcluir] = useState<{ id: number; nome: string } | null>(null);
+  const [excluindoAnexo, setExcluindoAnexo] = useState(false);
+  const [cancelarAberto, setCancelarAberto] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [cancelando, setCancelando] = useState(false);
+  const [reabrindo, setReabrindo] = useState(false);
+  const [salvandoVigencia, setSalvandoVigencia] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
 
   const [aprovacaoAberta, setAprovacaoAberta] = useState(false);
   const [aprovacaoTitulo, setAprovacaoTitulo] = useState('');
@@ -433,9 +512,15 @@ export default function ContratosPage() {
       setDetalhe(c);
       setVigenciaInicio(c.vigencia_inicio?.slice(0, 10) ?? '');
       setVigenciaFim(c.vigencia_fim?.slice(0, 10) ?? '');
+      try {
+        setEventos(await listarEventosContrato(id));
+      } catch {
+        setEventos([]);
+      }
     } catch (err) {
       toast.error((err as Error).message);
       setDetalhe(null);
+      setEventos([]);
     } finally {
       setCarregandoDetalhe(false);
     }
@@ -544,7 +629,7 @@ export default function ContratosPage() {
         destinatarios: dest,
         mensagem: mensagemWaySign.trim() || undefined,
       });
-      toast.success(r.message);
+      avisarResultado(r.message, r.aviso_totvs);
       setSelecionadoId(contratoDialogo.id);
       setContratoDialogo(null);
       await atualizarTudo();
@@ -577,13 +662,93 @@ export default function ContratosPage() {
         vigencia_inicio: vigenciaInicio || undefined,
         vigencia_fim: vigenciaFim || undefined,
       });
-      toast.success(r.message);
+      avisarResultado(r.message, r.aviso_totvs);
       setConfirmarConclusao(false);
       await atualizarTudo();
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
       setConcluindo(false);
+    }
+  }
+
+  async function excluirAnexo() {
+    if (!detalhe || !anexoParaExcluir) return;
+    setExcluindoAnexo(true);
+    try {
+      await excluirAnexoContrato(detalhe.id, anexoParaExcluir.id);
+      toast.success('Anexo excluído.');
+      setAnexoParaExcluir(null);
+      await atualizarTudo();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setExcluindoAnexo(false);
+    }
+  }
+
+  async function cancelar() {
+    if (!detalhe) return;
+    setCancelando(true);
+    try {
+      const r = await cancelarContrato(detalhe.id, motivoCancelamento.trim());
+      avisarResultado(r.message, r.aviso_totvs);
+      setCancelarAberto(false);
+      setMotivoCancelamento('');
+      await atualizarTudo();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setCancelando(false);
+    }
+  }
+
+  async function reabrir() {
+    if (!detalhe) return;
+    setReabrindo(true);
+    try {
+      const r = await reabrirContrato(detalhe.id);
+      avisarResultado(r.message, r.aviso_totvs);
+      await atualizarTudo();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setReabrindo(false);
+    }
+  }
+
+  async function salvarVigencia() {
+    if (!detalhe) return;
+    if (!vigenciaInicio && !vigenciaFim) {
+      toast.error('Informe o início e/ou o fim da vigência.');
+      return;
+    }
+    setSalvandoVigencia(true);
+    try {
+      const r = await alterarVigenciaContrato(detalhe.id, {
+        vigencia_inicio: vigenciaInicio || undefined,
+        vigencia_fim: vigenciaFim || undefined,
+      });
+      avisarResultado(r.message, r.aviso_totvs);
+      await atualizarTudo();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSalvandoVigencia(false);
+    }
+  }
+
+  async function reenviarTotvs() {
+    if (!detalhe) return;
+    setSincronizando(true);
+    try {
+      const r = await sincronizarContratoTotvs(detalhe.id);
+      avisarResultado(r.message, r.aviso_totvs);
+      await atualizarTudo();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSincronizando(false);
     }
   }
 
@@ -890,6 +1055,24 @@ export default function ContratosPage() {
                 )}
               </div>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', corSyncTotvs(detalhe.sync_totvs_status))}
+                  title={detalhe.sync_totvs_erro ?? (detalhe.sync_totvs_em ? `Última sincronização: ${safeDateTimeLabel(detalhe.sync_totvs_em)}` : undefined)}
+                >
+                  {labelSyncTotvs(detalhe)}
+                </span>
+                {detalhe.id_contrato_totvs ? (
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={sincronizando} onClick={() => void reenviarTotvs()}>
+                    {sincronizando ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                    Reenviar ao TOTVS
+                  </Button>
+                ) : null}
+              </div>
+              {detalhe.sync_totvs_status === 'ERRO' && detalhe.sync_totvs_erro && (
+                <p className="text-xs text-red-600 dark:text-red-400">{detalhe.sync_totvs_erro}</p>
+              )}
+
               {admin && !concluidoOuCancelado(detalhe) && (
                 <div className="flex items-center gap-2">
                   <Label className="shrink-0 text-xs text-muted-foreground">Área</Label>
@@ -936,26 +1119,38 @@ export default function ContratosPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Anexos</p>
                   {detalhe.anexos.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => void abrirAnexo(a.id, a.nome_arquivo)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
-                      title={a.nome_arquivo}
-                    >
-                      {a.tipo === 'CONTRATO_ASSINADO' ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                      ) : (
-                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <div key={a.id} className="flex items-center gap-1 rounded-md hover:bg-muted">
+                      <button
+                        type="button"
+                        onClick={() => void abrirAnexo(a.id, a.nome_arquivo)}
+                        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left text-xs"
+                        title={a.nome_arquivo}
+                      >
+                        {a.tipo === 'CONTRATO_ASSINADO' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                        ) : (
+                          <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="flex-1 truncate">{a.nome_arquivo}</span>
+                        {a.document_key_waysign && a.tipo !== 'CONTRATO_ASSINADO' && (
+                          <span className="shrink-0 text-[10px] text-blue-600 dark:text-blue-300">WaySign</span>
+                        )}
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {safeDateTimeLabel(a.data ?? undefined)}
+                        </span>
+                      </button>
+                      {!concluidoOuCancelado(detalhe) && (
+                        <button
+                          type="button"
+                          aria-label={`Excluir ${a.nome_arquivo}`}
+                          title="Excluir anexo"
+                          className="mr-1 shrink-0 rounded p-1 text-muted-foreground hover:text-red-600"
+                          onClick={() => setAnexoParaExcluir({ id: a.id, nome: a.nome_arquivo })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                      <span className="flex-1 truncate">{a.nome_arquivo}</span>
-                      {a.document_key_waysign && a.tipo !== 'CONTRATO_ASSINADO' && (
-                        <span className="shrink-0 text-[10px] text-blue-600 dark:text-blue-300">WaySign</span>
-                      )}
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {safeDateTimeLabel(a.data ?? undefined)}
-                      </span>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1003,6 +1198,17 @@ export default function ContratosPage() {
                   </div>
 
                   <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={salvandoVigencia || (!vigenciaInicio && !vigenciaFim)}
+                    onClick={() => void salvarVigencia()}
+                  >
+                    {salvandoVigencia && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                    Salvar vigência (envia ao TOTVS)
+                  </Button>
+
+                  <Button
                     className="w-full"
                     disabled={!detalhe.tem_contrato_assinado || concluindo}
                     onClick={() => setConfirmarConclusao(true)}
@@ -1013,8 +1219,46 @@ export default function ContratosPage() {
                   <p className="text-xs text-muted-foreground">
                     O botão Concluir só habilita depois que o contrato assinado é anexado.
                   </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-full text-xs text-red-600 hover:text-red-700"
+                    onClick={() => setCancelarAberto(true)}
+                  >
+                    <Ban className="mr-1.5 h-3.5 w-3.5" />
+                    Cancelar contrato
+                  </Button>
                 </>
               )}
+
+              {concluidoOuCancelado(detalhe) && (
+                <Button size="sm" variant="outline" className="w-full" disabled={reabrindo} onClick={() => void reabrir()}>
+                  {reabrindo ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="mr-2 h-3.5 w-3.5" />}
+                  Reabrir contrato
+                </Button>
+              )}
+
+              <div className="space-y-1.5 border-t pt-3">
+                <p className="text-xs font-medium text-muted-foreground">Histórico</p>
+                {eventos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum evento registrado.</p>
+                ) : (
+                  <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {eventos.map((ev) => (
+                      <li key={ev.id} className="text-xs">
+                        <p className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">{labelEvento(ev.tipo)}</span>
+                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                            {safeDateTimeLabel(ev.data ?? undefined)}
+                          </span>
+                        </p>
+                        {ev.descricao && <p className="text-muted-foreground">{ev.descricao}</p>}
+                        {ev.usuario && <p className="text-[10px] text-muted-foreground">por {ev.usuario}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </aside>
@@ -1192,6 +1436,60 @@ export default function ContratosPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={anexoParaExcluir !== null} onOpenChange={(o) => !o && setAnexoParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir anexo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {anexoParaExcluir?.nome} será removido do contrato. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindoAnexo}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={excluindoAnexo}
+              onClick={(e) => {
+                e.preventDefault();
+                void excluirAnexo();
+              }}
+            >
+              {excluindoAnexo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={cancelarAberto} onOpenChange={setCancelarAberto}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar contrato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A situação passa para Cancelado (e é enviada ao TOTVS). Informe o motivo; o contrato pode ser reaberto depois.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Motivo do cancelamento"
+            value={motivoCancelamento}
+            onChange={(e) => setMotivoCancelamento(e.target.value)}
+            maxLength={300}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelando}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelando || motivoCancelamento.trim().length < 3}
+              onClick={(e) => {
+                e.preventDefault();
+                void cancelar();
+              }}
+            >
+              {cancelando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cancelar contrato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmarConclusao} onOpenChange={setConfirmarConclusao}>
         <AlertDialogContent>
