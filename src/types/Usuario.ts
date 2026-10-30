@@ -32,7 +32,6 @@ export type Usuario = {
     extrato_gestor: boolean,
     controle_medicao: boolean,
     modulo_contratos: boolean,
-    frotas?: boolean,
     config_alcadas?: boolean,
     config_usuarios?: boolean,
     config_bordero_aprovadores?: boolean,

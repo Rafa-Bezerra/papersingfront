@@ -1,6 +1,6 @@
 import { configMenuPayloadFromUsuario, mapConfigMenuFromApi } from "@/lib/configuracoes-permissoes";
 import { API_BASE, headers } from "@/utils/constants";
-import { apiBool, readControleMedicaoFromApi, readFrotasFromApi, readModuloContratosFromApi } from "@/utils/sessionUser";
+import { apiBool, readControleMedicaoFromApi, readModuloContratosFromApi } from "@/utils/sessionUser";
 import { Usuario, CreateUsuarioResultado, CopiarUsuarioResultado, UnidadeResultado } from "@/types/Usuario";
 const caminho = "Usuarios";
 const elemento_singular = "usuário";
@@ -60,7 +60,6 @@ export async function getAll(unidadeFiltro?: string): Promise<Usuario[]> {
             extrato_gestor: apiBool(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR),
             controle_medicao: readControleMedicaoFromApi(apiData),
             modulo_contratos: readModuloContratosFromApi(apiData),
-            frotas: readFrotasFromApi(apiData),
             ...mapConfigMenuFromApi(apiData),
         } as Usuario;
     });
@@ -156,7 +155,6 @@ export async function getElementById(id: number): Promise<Usuario> {
       extrato_gestor: apiBool(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR),
       controle_medicao: readControleMedicaoFromApi(apiData),
       modulo_contratos: readModuloContratosFromApi(apiData),
-      frotas: readFrotasFromApi(apiData),
       ...mapConfigMenuFromApi(apiData as Record<string, unknown>),
     }
 
@@ -208,8 +206,6 @@ export async function updateElement(data: Usuario): Promise<void> {
         CONTROLE_MEDICAO: !!data.controle_medicao,
         controle_medicao: !!data.controle_medicao,
         modulo_contratos: !!data.modulo_contratos,
-        FROTAS: !!data.frotas,
-        frotas: !!data.frotas,
         ...configMenuPayloadFromUsuario(data),
     }
 

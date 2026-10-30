@@ -48,7 +48,6 @@ export const COLUNAS_PERMISSAO: { key: keyof Usuario; label: string }[] = [
   { key: 'extrato_gestor', label: 'Extrato gestor' },
   { key: 'controle_medicao', label: 'Controle medição' },
   { key: 'modulo_contratos', label: 'Módulo Contratos' },
-  { key: 'frotas', label: 'Frotas' },
 ]
 
 export type ChavePermissaoRelatorio = (typeof COLUNAS_PERMISSAO)[number]['key']

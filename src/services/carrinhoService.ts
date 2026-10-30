@@ -1,4 +1,4 @@
-import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho, TipoContrato } from "@/types/Carrinho";
+import { CentroDeCusto, Carrinho, ContaFinanceira, Produto, ItemCarrinho, AnexoCarrinho, TipoContrato, VinculosCarrinho } from "@/types/Carrinho";
 import { RequisicaoDto } from "@/types/Requisicao";
 import { API_BASE, headers } from "@/utils/constants";
 import { extrairMensagemErroApi } from "@/utils/functions";
@@ -75,6 +75,15 @@ export async function getAnexos(idmov: number): Promise<AnexoCarrinho[]> {
     return res.json();
 }
 
+export async function getVinculos(idmov: number): Promise<VinculosCarrinho> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/vinculos/${idmov}`, { headers: headers() });
+    if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Erro ${res.status} ao buscar vínculos: ${msg}`);
+    }
+    return res.json();
+}
+
 export async function getUltimasRequisicoes(params?: { dateFrom?: string; dateTo?: string; situacao?: string }): Promise<RequisicaoDto[]> {
     const url = new URL(`${API_BASE}/api/${caminho}/ultimasrequisicoes`);
     if (params?.dateFrom) url.searchParams.set('dateFrom', params.dateFrom);
@@ -95,4 +104,4 @@ export async function getUltimasRequisicoes(params?: { dateFrom?: string; dateTo
     return list;
 }
 
-export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto, AnexoCarrinho, TipoContrato }
+export type { CentroDeCusto, Carrinho, ItemCarrinho, ContaFinanceira, Produto, AnexoCarrinho, TipoContrato, VinculosCarrinho }

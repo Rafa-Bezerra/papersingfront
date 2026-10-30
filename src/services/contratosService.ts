@@ -62,8 +62,27 @@ export type Contrato = {
   codigo_atendimento_precontrato?: string | null;
   /** Código do contrato no TOTVS (gravado pelo "Criar Contrato"). */
   codigo_contrato?: string | null;
+  /** IDCNT no RM; ausente em contratos sem vínculo com o TOTVS. */
+  id_contrato_totvs?: number | null;
+  /** Último CODSTACNT lido do RM. */
+  status_totvs?: string | null;
+  /** Resultado da última sincronização com o RM. */
+  sync_totvs_status?: "OK" | "ERRO" | "PULADO" | null;
+  sync_totvs_erro?: string | null;
+  sync_totvs_em?: string | null;
   anexos: ContratoAnexo[];
 };
+
+export type ContratoEvento = {
+  id: number;
+  tipo: string;
+  descricao?: string | null;
+  usuario?: string | null;
+  data?: string | null;
+};
+
+/** Resposta das ações que também atualizam o RM; aviso_totvs vem preenchido quando o envio ao TOTVS falhou. */
+export type RespostaAcaoContrato = { message: string; aviso_totvs?: string | null };
 
 export type ContratoLista = {
   itens: Contrato[];
@@ -157,7 +176,7 @@ export async function enviarContratoWaySign(
     destinatarios: DestinatarioWaySign[];
     mensagem?: string;
   }
-): Promise<{ message: string; document_key: string }> {
+): Promise<{ message: string; document_key: string; aviso_totvs?: string | null }> {
   return fetchJson(
     `${BASE()}/${id}/enviar-waysign`,
     { method: "POST", body: JSON.stringify(dados) },
@@ -178,7 +197,7 @@ export async function resgatarContratoWaySign(id: number): Promise<ContratoAnexo
 export async function concluirContrato(
   id: number,
   vigencia?: { vigencia_inicio?: string; vigencia_fim?: string }
-): Promise<{ message: string }> {
+): Promise<RespostaAcaoContrato> {
   return fetchJson(
     `${BASE()}/${id}/concluir`,
     { method: "POST", body: JSON.stringify(vigencia ?? {}) },
@@ -191,5 +210,45 @@ export async function alterarAreaContrato(id: number, area: AreaContrato): Promi
     `${BASE()}/${id}/area`,
     { method: "POST", body: JSON.stringify({ area }) },
     "Erro ao alterar a área"
+  );
+}
+
+export async function listarEventosContrato(id: number): Promise<ContratoEvento[]> {
+  return fetchJson<ContratoEvento[]>(`${BASE()}/${id}/eventos`, undefined, "Erro ao carregar o histórico");
+}
+
+export async function excluirAnexoContrato(id: number, anexoId: number): Promise<{ message: string }> {
+  return fetchJson(`${BASE()}/${id}/anexos/${anexoId}`, { method: "DELETE" }, "Erro ao excluir o anexo");
+}
+
+export async function cancelarContrato(id: number, motivo: string): Promise<RespostaAcaoContrato> {
+  return fetchJson(
+    `${BASE()}/${id}/cancelar`,
+    { method: "POST", body: JSON.stringify({ motivo }) },
+    "Erro ao cancelar o contrato"
+  );
+}
+
+export async function reabrirContrato(id: number): Promise<RespostaAcaoContrato> {
+  return fetchJson(`${BASE()}/${id}/reabrir`, { method: "POST" }, "Erro ao reabrir o contrato");
+}
+
+export async function alterarVigenciaContrato(
+  id: number,
+  vigencia: { vigencia_inicio?: string; vigencia_fim?: string }
+): Promise<RespostaAcaoContrato> {
+  return fetchJson(
+    `${BASE()}/${id}/vigencia`,
+    { method: "POST", body: JSON.stringify(vigencia) },
+    "Erro ao alterar a vigência"
+  );
+}
+
+export async function sincronizarContratoTotvs(id: number): Promise<RespostaAcaoContrato & { contrato?: Contrato }> {
+  return fetchJson(
+    `${BASE()}/${id}/sincronizar-totvs`,
+    { method: "POST" },
+    "Erro ao sincronizar com o TOTVS",
+    120_000
   );
 }

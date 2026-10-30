@@ -56,6 +56,7 @@ import {
 import { Assinar, assinar } from '@/services/assinaturaService'
 import { getAllTiposContrato, TipoContrato } from '@/services/carrinhoService'
 import CriarContratoDialog from './CriarContratoDialog'
+import VinculosMovimentoDialog from './VinculosMovimentoDialog'
 import { toast } from 'sonner'
 import { AvisoApi, mostrarErro } from '@/utils/avisoApi'
 import { Loader2 } from "lucide-react";
@@ -108,6 +109,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
     const [isModalItensOpen, setIsModalItensOpen] = useState(false)
     const [isModalAprovacoesOpen, setIsModalAprovacoesOpen] = useState(false)
     const [isModalDocumentosOpen, setIsModalDocumentosOpen] = useState(false)
+    const [vinculosIdmov, setVinculosIdmov] = useState<number | null>(null)
     const [situacaoFiltrada, setSituacaoFiltrada] = useState<string>("Em Andamento")
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
     type RawDados = Awaited<ReturnType<typeof getAllRequisicoes>>
@@ -753,6 +755,9 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleAprovacoes(row.original)}>
                                 Aprovações
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setVinculosIdmov(requisicao.idmov)}>
+                                Vínculos
                             </Button>
 
                             {podeAprovar && requisicao.documento_assinado == 1 && (
@@ -1410,6 +1415,11 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
                     </Form>
                 </DialogContent>
             </Dialog>)}
+
+            <VinculosMovimentoDialog
+                idmov={vinculosIdmov}
+                onOpenChange={(open) => { if (!open) setVinculosIdmov(null) }}
+            />
 
             <CriarContratoDialog
                 requisicao={contratoRequisicao}

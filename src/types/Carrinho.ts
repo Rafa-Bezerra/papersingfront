@@ -20,8 +20,15 @@ export type Carrinho = {
     origem?: string;
     destino?: string;
     gerar_contrato?: boolean;
+    liberacao_acesso?: string[];
+    compliance?: string[];
     itens: ItemCarrinho[];
     anexos: AnexoCarrinho[];
+};
+
+export type VinculosCarrinho = {
+    liberacao_acesso: string[];
+    compliance: string[];
 };
 
 export type CentroDeCusto = {

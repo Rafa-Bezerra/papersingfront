@@ -45,6 +45,9 @@ export type CriarContratoResult = {
     message?: string;
     erro?: string;
     numeroContrato?: string;
+    avisoControle?: string | null;
+    /** Preenchido quando o contrato foi criado no TOTVS mas não entrou na fila de /contratos. */
+    avisoFila?: string | null;
 };
 
 /** Cria manualmente o contrato no TOTVS para uma solicitação já totalmente aprovada. */
