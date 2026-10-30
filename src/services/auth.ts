@@ -1,6 +1,6 @@
 import { API_BASE, apiFetch, headers } from "@/utils/constants";
 import { mapConfigMenuFromApi } from "@/lib/configuracoes-permissoes";
-import { readControleMedicaoFromApi, readModuloContratosFromApi } from "@/utils/sessionUser";
+import { readControleMedicaoFromApi, readFrotasFromApi, readModuloContratosFromApi } from "@/utils/sessionUser";
 
 
 export interface LoginPayload {
@@ -46,6 +46,7 @@ export interface LoginResponse {
   extrato_gestor: boolean;
   controle_medicao: boolean;
   modulo_contratos: boolean;
+  frotas: boolean;
   relatorio_mensal: boolean;
   config_alcadas: boolean;
   config_usuarios: boolean;
@@ -137,6 +138,7 @@ function normalizeLoginResponse(apiData: Record<string, unknown>): LoginResponse
     extrato_gestor: Boolean(apiData.extrato_gestor ?? apiData.EXTRATO_GESTOR ?? false),
     controle_medicao: readControleMedicaoFromApi(apiData),
     modulo_contratos: readModuloContratosFromApi(apiData),
+    frotas: readFrotasFromApi(apiData),
     relatorio_mensal: Boolean(
       apiData.relatorio_mensal ?? apiData.RELATORIO_MENSAL ?? apiData.admin ?? apiData.ADMIN
     ),
