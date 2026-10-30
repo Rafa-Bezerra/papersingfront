@@ -383,19 +383,53 @@ export function imprimirPdfBase64(base64String: string) {
   }
 
   const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray], { type: "application/pdf" });
 
-  const url = URL.createObjectURL(blob);
+  void ajustarPaginasAoA4(byteArray).then((bytes) => {
+    const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
 
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = url;
+    const url = URL.createObjectURL(blob);
 
-  document.body.appendChild(iframe);
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = url;
 
-  iframe.onload = () => {
-    iframe.contentWindow?.print();
-  };
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      iframe.contentWindow?.print();
+    };
+  });
+}
+
+/** Só para impressão: páginas maiores que A4 (ex.: assinados com faixa de QR) são reduzidas para caber na folha. */
+async function ajustarPaginasAoA4(bytes: Uint8Array): Promise<Uint8Array> {
+  const A4_MENOR = 595.28;
+  const A4_MAIOR = 841.89;
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+    if (pdf.isEncrypted) return bytes;
+    let alterou = false;
+    for (const page of pdf.getPages()) {
+      const { x, y, width, height } = page.getCropBox();
+      const [aw, ah] = width > height ? [A4_MAIOR, A4_MENOR] : [A4_MENOR, A4_MAIOR];
+      const s = Math.min(aw / width, ah / height);
+      if (s >= 0.995) continue;
+      page.scaleContent(s, s);
+      page.scaleAnnotations(s, s);
+      const nx = s * x - (aw - s * width) / 2;
+      const ny = s * y - (ah - s * height) / 2;
+      page.setMediaBox(nx, ny, aw, ah);
+      page.setCropBox(nx, ny, aw, ah);
+      page.setBleedBox(nx, ny, aw, ah);
+      page.setTrimBox(nx, ny, aw, ah);
+      page.setArtBox(nx, ny, aw, ah);
+      alterou = true;
+    }
+    return alterou ? await pdf.save() : bytes;
+  } catch {
+    return bytes;
+  }
 }
 
 export function normalizeUserCode(value?: string | null) {
