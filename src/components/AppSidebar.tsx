@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from '@/components/ui/sidebar'
-import { NavSection } from '@/lib/data'
+import { FROTAS_SO_ADMIN, NavSection } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import {
   Home,
@@ -31,6 +31,7 @@ import {
   Inbox,
   Ruler,
   FileSignature,
+  Car,
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -78,6 +79,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
   const [userExtratoGestor, setUserExtratoGestor] = useState(false)
   const [userControleMedicao, setUserControleMedicao] = useState(false)
   const [userModuloContratos, setUserModuloContratos] = useState(false)
+  const [userFrotas, setUserFrotas] = useState(false)
   const [configSession, setConfigSession] = useState<ConfigMenuSession>({ admin: false })
   const [configOpen, setConfigOpen] = useState(false)
   // const [userAdministrativo, setUserAdministrativo] = useState(false)
@@ -116,6 +118,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
       setUserExtratoGestor(Boolean(user.extrato_gestor));
       setUserControleMedicao(Boolean(user.controle_medicao));
       setUserModuloContratos(Boolean(user.modulo_contratos));
+      setUserFrotas(Boolean(user.frotas));
       setConfigSession({
         admin: Boolean(user.admin),
         unidade: String(user.unidade ?? ''),
@@ -171,6 +174,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
     'Extrato gestor': <ClipboardList className="w-5 h-5" />,
     'Controle medição': <Ruler className="w-5 h-5" />,
     'Contratos': <FileSignature className="w-5 h-5" />,
+    'Frotas': <Car className="w-5 h-5" />,
     'Pagamentos CI': <FileText className="w-5 h-5" />,
     'Borderô': <FileText className="w-5 h-5" />,
     'Carrinho': <ShoppingCart className="w-5 h-5" />,
@@ -301,6 +305,8 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                       if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
                       if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
                       if (item.url === "/contratos" && !userModuloContratos && !userAdmin) return null;
+                      // Frotas: só admin ou quem tem a flag (financeiro não herda).
+                      if (item.url === "/frotas" && !userAdmin && (FROTAS_SO_ADMIN || !userFrotas)) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações
                       // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
                       if (!userAdmin && !userFinanceiro) {

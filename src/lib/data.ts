@@ -9,6 +9,9 @@ export interface NavSection {
   items: NavItem[];
 }
 
+/** Implantação: só Admin vê o Frotas (a permissão Frotas ainda não libera). Igual a GusuarioFrotas.SoAdminNaImplantacao na API. */
+export const FROTAS_SO_ADMIN = true;
+
 export const data = {
   navMain: [
     {
@@ -28,6 +31,7 @@ export const data = {
         { title: "Extrato gestor", url: "/extrato-gestor" },
         { title: "Controle medição", url: "/controle-medicao" },
         { title: "Contratos", url: "/contratos" },
+        { title: "Frotas", url: "/frotas" },
         { title: "Pagamentos CI", url: "/comunicados" },
         { title: "Borderô", url: "/bordero" },
         { title: "Carrinho", url: "/carrinho" },
