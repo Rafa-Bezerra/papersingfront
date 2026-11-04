@@ -50,6 +50,7 @@ import {
   SUGESTOES_RQ106,
   TIPOS_FROTA,
 } from '@/services/frotasService';
+import { graficoPdfLista } from './graficosFrotas';
 import {
   BotaoPdf,
   BotoesAnexo,
@@ -300,12 +301,18 @@ export default function SinistrosPage() {
   function montarPdf(): RelatorioFrotaPdf {
     const daCausa = (c: string) => semCausa.filter((s) => s.causa === c);
     const simNao = { SIM: 'sim', NAO: 'não', TERCEIROS: 'seguro de terceiros', SEM: 'não informado' } as Record<string, string>;
+    const causaItens = CAUSAS_SINISTRO.map((c) => ({
+      valor: c.valor,
+      rotulo: c.rotulo,
+      total: soma(daCausa(c.valor)),
+    })).filter((x) => x.total > 0);
     return {
       titulo: 'Sinistros',
       subtitulo: 'Gestão de frotas',
       unidade,
       periodo: textoPeriodo(de, ate),
       arquivo: `sinistros-${unidade}-${de || 'inicio'}-a-${ate || isoHoje()}`,
+      graficos: [graficoPdfLista('Custo por causa', causaItens, (x) => x.valor, (x) => x.rotulo, (x) => x.total, brl)],
       kpis: [
         { rotulo: 'Total', valor: brl(soma(semCausa)), detalhe: `${semCausa.length} sinistro(s)` },
         ...CAUSAS_SINISTRO.map((c) => ({ rotulo: c.rotulo, valor: brl(soma(daCausa(c.valor))), detalhe: `${daCausa(c.valor).length} sinistro(s)` })),

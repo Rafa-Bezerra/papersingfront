@@ -3,7 +3,8 @@
 # Limpa o site antes de copiar (evita _next antigo + HTML novo = chunk 404).
 param(
     [string]$ZipPath = "C:\inetpub\wwwroot\papersign\papersignfront-dist.zip",
-    [string]$TargetDir = "C:\inetpub\wwwroot\papersign"
+    [string]$TargetDir = "C:\inetpub\wwwroot\papersign",
+    [switch]$SemFrotas
 )
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $ZipPath)) { throw "ZIP nao encontrado: $ZipPath" }
@@ -100,6 +101,30 @@ Remove-TreeLiteral $staging
 New-Item -ItemType Directory -Force -Path $staging | Out-Null
 Expand-Archive -LiteralPath $ZipPath -DestinationPath $staging -Force
 
+$flagSemFrotas = Join-Path $staging "deploy-sem-frotas.flag"
+if (Test-Path -LiteralPath $flagSemFrotas) {
+    $flagVal = (Get-Content -LiteralPath $flagSemFrotas -Raw).Trim()
+    if ($flagVal -eq "1") { $SemFrotas = $true }
+}
+
+$frotasBackup = $null
+if ($SemFrotas) {
+    $frotasBackup = Join-Path $env:TEMP "papersign-frotas-backup-$stamp"
+    New-Item -ItemType Directory -Force -Path $frotasBackup | Out-Null
+    $frotasSite = Join-Path $TargetDir "frotas"
+    if (Test-Path -LiteralPath $frotasSite) {
+        Copy-Item -LiteralPath $frotasSite -Destination (Join-Path $frotasBackup "frotas") -Recurse -Force
+        Write-Host "SemFrotas: backup de frotas\ do site."
+    }
+    $frotasChunksSite = Join-Path $TargetDir "_next\static\chunks\app\(privado)\frotas"
+    if (Test-Path -LiteralPath $frotasChunksSite) {
+        $destChunks = Join-Path $frotasBackup "chunks-frotas"
+        New-Item -ItemType Directory -Force -Path $destChunks | Out-Null
+        Copy-Item -LiteralPath $frotasChunksSite -Destination (Join-Path $destChunks "frotas") -Recurse -Force
+        Write-Host "SemFrotas: backup dos chunks Frotas."
+    }
+}
+
 if (-not (Test-Path -LiteralPath (Join-Path $staging "_next"))) {
     throw "ZIP invalido: pasta _next nao encontrada no pacote. Gere de novo com deploy\prepare-publish.ps1"
 }
@@ -120,6 +145,25 @@ if ($LASTEXITCODE -ge 8) {
     Start-PapersignAppPool $stoppedPool
     throw "robocopy falhou ao copiar do staging (codigo $LASTEXITCODE). Veja se o ZIP esta completo."
 }
+
+if ($SemFrotas -and $frotasBackup) {
+    $bakFrotas = Join-Path $frotasBackup "frotas"
+    if (Test-Path -LiteralPath $bakFrotas) {
+        $destF = Join-Path $TargetDir "frotas"
+        New-Item -ItemType Directory -Force -Path $destF | Out-Null
+        $null = robocopy $bakFrotas $destF /E /R:2 /W:1 /NFL /NDL /NJH /NJS /nc /ns /np
+        Write-Host "SemFrotas: pasta frotas\ restaurada no site."
+    }
+    $bakChunks = Join-Path $frotasBackup "chunks-frotas\frotas"
+    if (Test-Path -LiteralPath $bakChunks) {
+        $destChunks = Join-Path $TargetDir "_next\static\chunks\app\(privado)\frotas"
+        New-Item -ItemType Directory -Force -Path (Split-Path $destChunks) | Out-Null
+        $null = robocopy $bakChunks $destChunks /E /R:2 /W:1 /NFL /NDL /NJH /NJS /nc /ns /np
+        Write-Host "SemFrotas: chunks Frotas restaurados."
+    }
+    Remove-TreeLiteral $frotasBackup
+}
+
 Remove-TreeLiteral $staging
 
 # Verificacao pos-apply
@@ -134,6 +178,11 @@ $chunkOk = $true
 $chunkOk = (Test-IndexHtmlChunks $TargetDir "home\index.html" "home") -and $chunkOk
 $chunkOk = (Test-IndexHtmlChunks $TargetDir "requisicoes\index.html" "requisicoes") -and $chunkOk
 $chunkOk = (Test-IndexHtmlChunks $TargetDir "login\index.html" "login") -and $chunkOk
+if (-not $SemFrotas) {
+    $chunkOk = (Test-IndexHtmlChunks $TargetDir "frotas\index.html" "frotas") -and $chunkOk
+} else {
+    Write-Host "SemFrotas: verificacao de chunks frotas ignorada."
+}
 if (-not $chunkOk) {
     Start-PapersignAppPool $stoppedPool
     throw "Deploy incompleto: HTML novo sem todos os .js em _next (tela preta / 404). Rode iisreset /stop e aplique de novo."

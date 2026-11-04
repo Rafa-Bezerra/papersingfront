@@ -82,4 +82,41 @@ export async function incluirAprovadorEmLote(data: AlcadaLoteAprovador): Promise
     return res.json();
 }
 
+export type AlcadaPorUsuarioLinha = {
+    id: number
+    id_alcada: number
+    centro_custo: string
+    centro_custo_nome: string
+    usuario: string
+    cargo: string
+    nivel: number
+    valor_inicial: number
+    valor_final: number
+    unidade: string
+    substituto?: string | null
+    usuario_original?: string | null
+    qtd_no_nivel: number
+    situacao: string
+    visivel_na_lista: boolean
+}
+
+export type AlcadaPorUsuarioResposta = {
+    usuario: string
+    unidade: string
+    linhas: AlcadaPorUsuarioLinha[]
+    resumo: {
+        total_linhas: number
+        total_centros_distintos: number
+        por_nivel: { nivel: number; quantidade: number }[]
+    }
+}
+
+export async function getAlcadasPorUsuario(usuario: string, unidade?: string): Promise<AlcadaPorUsuarioResposta> {
+    const qs = new URLSearchParams({ usuario: usuario.trim() })
+    if (unidade?.trim()) qs.set('unidade', unidade.trim())
+    const res = await fetch(`${API_BASE}/api/${caminho}/por-usuario?${qs.toString()}`, { headers: headers() })
+    if (!res.ok) throw await erroDaResposta(res, 'consultar alçadas por usuário')
+    return res.json()
+}
+
 export type { Alcada }

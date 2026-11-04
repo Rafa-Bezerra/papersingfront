@@ -3,10 +3,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
-  ChevronsUpDown,
   CircleDot,
   Coins,
+  FileText,
+  ListChecks,
   Loader2,
+  MapPin,
   PaintBucket,
   Pencil,
   Plus,
@@ -23,7 +25,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { DataTable } from '@/components/ui/data-table';
 import {
   Dialog,
@@ -35,15 +36,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   anexoManutencao,
-  buscarFornecedoresRm,
   CLASSIFICACOES_MANUTENCAO,
   excluirManutencao,
-  FornecedorRm,
   FrotaManutencao,
   FrotaPlaca,
   listarManutencoes,
@@ -59,7 +58,7 @@ import {
   COR_PDF,
   DialogExclusao,
   FiltroPeriodo,
-  inicioDoAno,
+  inicioHistoricoManutencao,
   isoHoje,
   RelatorioFrotaPdf,
   SeletorUnidade,
@@ -71,7 +70,19 @@ import {
   valorParaApi,
   valorParaCampo,
 } from './comum';
+import { graficoPdfLista } from './graficosFrotas';
 import { dataBr } from './VeiculoDialog';
+import ComparativosManutencao from './manutencao/ComparativosManutencao';
+import LotacaoPlacas from './manutencao/LotacaoPlacas';
+import NotasManutencao from './manutencao/NotasManutencao';
+import {
+  formatarDocumento,
+  numeroBr,
+  qtd,
+  rotuloClassificacao,
+  rotuloServico,
+  SeletorFornecedorRm,
+} from './manutencao/comumManutencao';
 
 const MAX_MB = 10;
 
@@ -89,25 +100,78 @@ const ESTILO_CLASSIFICACAO: Record<string, { icone: LucideIcon; tom: TomIndicado
   BORRACHARIA: { icone: CircleDot, tom: 'cinza' },
 };
 
-function rotuloClassificacao(c: string) {
-  return CLASSIFICACOES_MANUTENCAO.find((x) => x.valor === c)?.rotulo ?? c;
-}
+/** Quadros do topo: as 4 classificações de sempre; as demais somam no total. */
+const CARTOES_CLASSIFICACAO = CLASSIFICACOES_MANUTENCAO.filter((c) => c.valor in ESTILO_CLASSIFICACAO);
 
-function rotuloServico(s?: string | null) {
-  return s ? (SERVICOS_MANUTENCAO.find((x) => x.valor === s)?.rotulo ?? s) : '';
-}
+type SubAba = 'notas' | 'lancamentos' | 'comparativos' | 'lotacao';
 
-const qtd = (m: FrotaManutencao) => (m.quantidade && m.quantidade > 0 ? m.quantidade : 1);
-const numeroBr = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-
+/** Aba Manutenção: notas fiscais (substitui a planilha), lançamentos por placa, comparativos e lotação das placas. */
 export default function ManutencaoPage() {
   const sel = useUnidadeFrotas();
-  const { unidade } = sel;
+  const [subaba, setSubaba] = useState<SubAba>('notas');
+  // Cada sub-aba só monta na primeira vez que é aberta; ao salvar uma nota, os lançamentos/comparativos recarregam.
+  const [abertas, setAbertas] = useState<Set<SubAba>>(() => new Set(['notas']));
+  const [versao, setVersao] = useState(0);
+  const mudou = useCallback(() => setVersao((v) => v + 1), []);
+
+  function trocar(v: string) {
+    const a = v as SubAba;
+    setSubaba(a);
+    setAbertas((s) => (s.has(a) ? s : new Set(s).add(a)));
+  }
+
+  const conteudo = (valor: SubAba, pagina: React.ReactNode) => (
+    <TabsContent value={valor} forceMount className="data-[state=inactive]:hidden">
+      {abertas.has(valor) ? pagina : null}
+    </TabsContent>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Wrench className="h-6 w-6" /> Manutenção
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Notas e pedidos da frota, serviços por placa e comparativos por tipo de serviço, fornecedor e região. O fornecedor
+            vem sempre do cadastro do RM.
+          </p>
+        </div>
+        <SeletorUnidade {...sel} />
+      </div>
+      <Tabs value={subaba} onValueChange={trocar} className="space-y-4">
+        <TabsList className="flex h-auto max-w-full flex-wrap gap-1">
+          <TabsTrigger value="notas" className="gap-1.5 text-xs sm:text-sm">
+            <FileText className="h-4 w-4 shrink-0" /> Notas e pedidos
+          </TabsTrigger>
+          <TabsTrigger value="lancamentos" className="gap-1.5 text-xs sm:text-sm">
+            <ListChecks className="h-4 w-4 shrink-0" /> Lançamentos por placa
+          </TabsTrigger>
+          <TabsTrigger value="comparativos" className="gap-1.5 text-xs sm:text-sm">
+            <Scale className="h-4 w-4 shrink-0" /> Comparativos
+          </TabsTrigger>
+          <TabsTrigger value="lotacao" className="gap-1.5 text-xs sm:text-sm">
+            <MapPin className="h-4 w-4 shrink-0" /> Lotação das placas
+          </TabsTrigger>
+        </TabsList>
+        {conteudo('notas', <NotasManutencao unidade={sel.unidade} onMudou={mudou} />)}
+        {conteudo('lancamentos', <LancamentosManutencao unidade={sel.unidade} versao={versao} />)}
+        {conteudo('comparativos', (
+          <ComparativosManutencao unidade={sel.unidade} podeTrocarUnidade={sel.podeTrocarUnidade} versao={versao} />
+        ))}
+        {conteudo('lotacao', <LotacaoPlacas unidade={sel.unidade} onMudou={mudou} />)}
+      </Tabs>
+    </div>
+  );
+}
+
+function LancamentosManutencao({ unidade, versao }: { unidade: string; versao: number }) {
   const placas = usePlacasFrota(unidade);
 
   const [itens, setItens] = useState<FrotaManutencao[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [de, setDe] = useState(inicioDoAno());
+  const [de, setDe] = useState(inicioHistoricoManutencao());
   const [ate, setAte] = useState(isoHoje());
   const [placa, setPlaca] = useState('');
   const [classificacao, setClassificacao] = useState('TODAS');
@@ -134,9 +198,9 @@ export default function ManutencaoPage() {
 
   useEffect(() => {
     void carregar();
-  }, [carregar]);
+  }, [carregar, versao]);
 
-  // Filtros de placa e busca valem para os quadros; a classificação filtra só a tabela.
+  // Placa e busca valem para os quadros; classificação filtra tabela e o total em destaque.
   const semClassificacao = useMemo(() => {
     const p = normalizarPlaca(placa);
     const b = busca.trim().toLowerCase();
@@ -151,7 +215,10 @@ export default function ManutencaoPage() {
     [semClassificacao, classificacao]
   );
   const total = linhas.reduce((s, m) => s + m.valor, 0);
+  const totalQuadros = semClassificacao.reduce((s, m) => s + m.valor, 0);
+  const periodoLabel = textoPeriodo(de, ate);
   const filtrosAtivos = !!placa || !!busca || classificacao !== 'TODAS';
+  const valorIndicador = (v: number) => (carregando ? '…' : brl(v));
 
   const colunas: ColumnDef<FrotaManutencao>[] = useMemo(
     () => [
@@ -159,7 +226,12 @@ export default function ManutencaoPage() {
       {
         id: 'placa',
         header: 'Placa',
-        cell: ({ row }) => <span className="font-mono font-medium">{row.original.placa}</span>,
+        cell: ({ row }) => (
+          <div className="leading-tight">
+            <p className="font-mono font-medium">{row.original.placa}</p>
+            {row.original.regiao && <p className="text-xs text-muted-foreground">{row.original.regiao}</p>}
+          </div>
+        ),
       },
       {
         id: 'classificacao',
@@ -192,9 +264,9 @@ export default function ManutencaoPage() {
         cell: ({ row }) => (
           <div className="leading-tight">
             <p>{row.original.fornecedor}</p>
-            {row.original.fornecedor_cnpj && (
-              <p className="text-xs text-muted-foreground">{row.original.fornecedor_cnpj}</p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {[row.original.numero_nf && `NF ${row.original.numero_nf}`, row.original.fornecedor_cnpj].filter(Boolean).join(' · ')}
+            </p>
           </div>
         ),
       },
@@ -237,18 +309,22 @@ export default function ManutencaoPage() {
       {
         id: 'acoes',
         header: '',
-        cell: ({ row }) => (
+        cell: ({ row }) => {
+          const daNota = row.original.id_nota != null;
+          const dica = daNota ? `Item da NF ${row.original.numero_nf ?? ''}: altere pela sub-aba Notas e pedidos` : '';
+          return (
           <div className="flex justify-end">
-            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" title="Alterar"
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" title={dica || 'Alterar'} disabled={daNota}
               onClick={() => setEditando(row.original)}>
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" title="Excluir"
-              onClick={() => setExcluindo(row.original)}>
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" title={dica || 'Excluir'}
+              disabled={daNota} onClick={() => setExcluindo(row.original)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-        ),
+          );
+        },
       },
     ],
     [total]
@@ -256,15 +332,37 @@ export default function ManutencaoPage() {
 
   function montarPdf(): RelatorioFrotaPdf {
     const doTipo = (c: string) => semClassificacao.filter((m) => m.classificacao === c);
+    const classItens = CARTOES_CLASSIFICACAO.map((c) => ({
+      valor: c.valor,
+      rotulo: c.rotulo,
+      total: doTipo(c.valor).reduce((s, m) => s + m.valor, 0),
+    })).filter((x) => x.total > 0);
+    const porServ = new Map<string, number>();
+    for (const m of semClassificacao) {
+      const s = m.servico && m.servico !== 'OUTRO' ? m.servico : 'SEM_TIPO';
+      porServ.set(s, (porServ.get(s) ?? 0) + m.valor);
+    }
+    const servItens = [...porServ.entries()].map(([servico, total]) => ({ servico, total }));
     return {
       titulo: 'Manutenções',
       subtitulo: 'Gestão de frotas',
       unidade,
       periodo: textoPeriodo(de, ate),
       arquivo: `manutencoes-${unidade}-${de || 'inicio'}-a-${ate || isoHoje()}`,
+      graficos: [
+        graficoPdfLista('Gasto por classificação', classItens, (x) => x.valor, (x) => x.rotulo, (x) => x.total, brl),
+        graficoPdfLista(
+          'Gasto por tipo de serviço',
+          servItens,
+          (x) => x.servico,
+          (x) => (x.servico === 'SEM_TIPO' ? 'Sem tipo' : rotuloServico(x.servico)),
+          (x) => x.total,
+          brl
+        ),
+      ],
       kpis: [
         { rotulo: 'Total no período', valor: brl(semClassificacao.reduce((s, m) => s + m.valor, 0)), detalhe: `${semClassificacao.length} serviço(s)` },
-        ...CLASSIFICACOES_MANUTENCAO.map((c) => ({
+        ...CARTOES_CLASSIFICACAO.map((c) => ({
           rotulo: c.rotulo,
           valor: brl(doTipo(c.valor).reduce((s, m) => s + m.valor, 0)),
           detalhe: `${doTipo(c.valor).length} serviço(s)`,
@@ -300,35 +398,16 @@ export default function ManutencaoPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Wrench className="h-6 w-6" /> Manutenção
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Serviços feitos nos veículos: data, classificação, fornecedor e valor gasto. Fica só no PaperSign.
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm max-w-3xl">
+          Um serviço por placa. Os itens das notas aparecem aqui e só mudam pela nota; use “Lançamento avulso” para um serviço
+          sem nota.
+        </p>
         <div className="flex items-end gap-3">
-          <SeletorUnidade {...sel} />
           <BotaoPdf disabled={!unidade || carregando} montar={montarPdf} />
-          <Button type="button" onClick={() => setEditando('novo')} disabled={!unidade}>
-            <Plus className="h-4 w-4 mr-2" /> Nova manutenção
+          <Button type="button" variant="outline" onClick={() => setEditando('novo')} disabled={!unidade}>
+            <Plus className="h-4 w-4 mr-2" /> Lançamento avulso
           </Button>
         </div>
-      </div>
-
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-        <CartaoIndicador icone={Coins} tom="verde" destaque rotulo="Total no período" ativo={classificacao === 'TODAS'}
-          onClick={() => setClassificacao('TODAS')} valor={brl(semClassificacao.reduce((s, m) => s + m.valor, 0))}
-          detalhe={`${semClassificacao.length} serviço(s)`} />
-        {CLASSIFICACOES_MANUTENCAO.map((c) => {
-          const doTipo = semClassificacao.filter((m) => m.classificacao === c.valor);
-          return (
-            <CartaoIndicador key={c.valor} {...ESTILO_CLASSIFICACAO[c.valor]} rotulo={c.rotulo} ativo={classificacao === c.valor}
-              onClick={() => setClassificacao(classificacao === c.valor ? 'TODAS' : c.valor)}
-              valor={brl(doTipo.reduce((s, m) => s + m.valor, 0))} detalhe={`${doTipo.length} serviço(s)`} />
-          );
-        })}
       </div>
 
       <Card>
@@ -384,12 +463,31 @@ export default function ManutencaoPage() {
                 <X className="h-4 w-4 mr-1" /> Limpar filtros
               </Button>
             )}
-            <Button type="button" variant="ghost" title="Recarregar" disabled={!unidade} onClick={() => void carregar()}>
-              <RefreshCw className="h-4 w-4" />
+            <Button type="button" variant="ghost" title="Recarregar" disabled={!unidade || carregando} onClick={() => void carregar()}>
+              <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Período: {periodoLabel}. Ao mudar as datas, a lista e os números abaixo recarregam automaticamente.
+          </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+            <CartaoIndicador icone={Coins} tom="verde" destaque rotulo="Total no período" ativo={classificacao === 'TODAS'}
+              onClick={() => setClassificacao('TODAS')}
+              valor={valorIndicador(classificacao === 'TODAS' ? totalQuadros : total)}
+              detalhe={carregando ? 'Carregando…' : `${classificacao === 'TODAS' ? semClassificacao.length : linhas.length} serviço(s)`} />
+            {CARTOES_CLASSIFICACAO.map((c) => {
+              const doTipo = semClassificacao.filter((m) => m.classificacao === c.valor);
+              return (
+                <CartaoIndicador key={c.valor} {...ESTILO_CLASSIFICACAO[c.valor]} rotulo={c.rotulo} ativo={classificacao === c.valor}
+                  onClick={() => setClassificacao(classificacao === c.valor ? 'TODAS' : c.valor)}
+                  valor={valorIndicador(doTipo.reduce((s, m) => s + m.valor, 0))}
+                  detalhe={carregando ? 'Carregando…' : `${doTipo.length} serviço(s)`} />
+              );
+            })}
+          </div>
+          <div className="overflow-x-auto rounded-md border">
           <DataTable
             columns={colunas}
             data={linhas}
@@ -397,10 +495,9 @@ export default function ManutencaoPage() {
             hideSearch
             emptyMessage={filtrosAtivos ? 'Nenhuma manutenção com esses filtros.' : 'Nenhuma manutenção no período.'}
           />
+          </div>
         </CardContent>
       </Card>
-
-      <ComparativoFornecedores unidade={unidade} periodo={textoPeriodo(de, ate)} itens={semClassificacao} carregando={carregando} />
 
       <FormManutencao
         unidade={unidade}
@@ -438,215 +535,6 @@ export default function ManutencaoPage() {
   );
 }
 
-type LinhaComparativo = {
-  chave: string;
-  fornecedor: string;
-  cnpj: string;
-  servicos: number;
-  quantidade: number;
-  total: number;
-  menor: number;
-  maior: number;
-  ultimaData: string;
-  ultimoUnitario: number;
-  medio: number;
-};
-
-/** Um fornecedor por linha (CNPJ, ou o nome quando não há CNPJ), do mais barato por unidade ao mais caro. */
-function compararFornecedores(itens: FrotaManutencao[]): LinhaComparativo[] {
-  const mapa = new Map<string, LinhaComparativo>();
-  for (const m of itens) {
-    const chave = m.fornecedor_cnpj || m.fornecedor.trim().toUpperCase();
-    const unitario = m.valor / qtd(m);
-    const l = mapa.get(chave) ?? {
-      chave, fornecedor: m.fornecedor, cnpj: m.fornecedor_cnpj ?? '', servicos: 0, quantidade: 0, total: 0,
-      menor: unitario, maior: unitario, ultimaData: '', ultimoUnitario: unitario, medio: 0,
-    };
-    l.servicos += 1;
-    l.quantidade += qtd(m);
-    l.total += m.valor;
-    l.menor = Math.min(l.menor, unitario);
-    l.maior = Math.max(l.maior, unitario);
-    if (m.data_manutencao >= l.ultimaData) {
-      l.ultimaData = m.data_manutencao;
-      l.ultimoUnitario = unitario;
-    }
-    mapa.set(chave, l);
-  }
-  return [...mapa.values()].map((l) => ({ ...l, medio: l.total / l.quantidade })).sort((a, b) => a.medio - b.medio);
-}
-
-const acimaDoMaisBarato = (l: LinhaComparativo, maisBarato: LinhaComparativo) =>
-  maisBarato.medio > 0 ? ((l.medio - maisBarato.medio) / maisBarato.medio) * 100 : 0;
-
-function ComparativoFornecedores({ unidade, periodo, itens, carregando }: {
-  unidade: string;
-  periodo: string;
-  itens: FrotaManutencao[];
-  carregando: boolean;
-}) {
-  const [escolhido, setEscolhido] = useState('');
-
-  const porServico = useMemo(() => {
-    const grupos = new Map<string, FrotaManutencao[]>();
-    for (const m of itens) {
-      if (!m.servico || m.servico === 'OUTRO') continue;
-      grupos.set(m.servico, [...(grupos.get(m.servico) ?? []), m]);
-    }
-    return SERVICOS_MANUTENCAO.filter((s) => grupos.has(s.valor)).map((s) => {
-      const linhas = compararFornecedores(grupos.get(s.valor)!);
-      return { ...s, lancamentos: grupos.get(s.valor)!.length, linhas };
-    });
-  }, [itens]);
-  const semTipo = itens.filter((m) => !m.servico);
-
-  const padrao = [...porServico].sort((a, b) => b.linhas.length - a.linhas.length || b.lancamentos - a.lancamentos)[0];
-  const atual = porServico.find((s) => s.valor === escolhido) ?? padrao;
-  const maisBarato = atual?.linhas[0];
-
-  function montarPdf(): RelatorioFrotaPdf {
-    return {
-      titulo: 'Comparativo de fornecedores',
-      subtitulo: 'Manutenção · mesmo tipo de serviço',
-      unidade,
-      periodo,
-      arquivo: `comparativo-fornecedores-${unidade}-${periodo}`,
-      kpis: [
-        { rotulo: 'Tipos de serviço', valor: String(porServico.length), detalhe: 'com lançamento no período' },
-        { rotulo: 'Comparáveis', valor: String(porServico.filter((s) => s.linhas.length > 1).length), detalhe: 'com 2 ou mais fornecedores' },
-        { rotulo: 'Sem tipo', valor: String(semTipo.length), detalhe: 'lançamentos fora do comparativo' },
-      ],
-      secoes: porServico.map((s) => ({
-        titulo: s.rotulo,
-        nota: `${s.lancamentos} lançamento(s) · ${s.linhas.length} fornecedor(es) · preço por unidade = valor ÷ quantidade`,
-        colunas: [
-          { titulo: 'Fornecedor', largura: 54 }, { titulo: 'Serv.', largura: 14, alinhar: 'right' },
-          { titulo: 'Qtd.', largura: 14, alinhar: 'right' }, { titulo: 'Médio/un.', largura: 24, alinhar: 'right' },
-          { titulo: 'Menor', largura: 22, alinhar: 'right' }, { titulo: 'Maior', largura: 22, alinhar: 'right' },
-          { titulo: 'Total', largura: 24, alinhar: 'right' }, { titulo: 'Dif.', largura: 16, alinhar: 'right' },
-        ],
-        linhas: s.linhas.map((l, i) => [
-          { texto: l.fornecedor, sub: l.cnpj || undefined, negrito: i === 0 },
-          { texto: String(l.servicos) },
-          { texto: numeroBr(l.quantidade) },
-          { texto: brl(l.medio), negrito: true, cor: i === 0 && s.linhas.length > 1 ? COR_PDF.ok : undefined },
-          { texto: brl(l.menor) },
-          { texto: brl(l.maior) },
-          { texto: brl(l.total) },
-          i === 0
-            ? { texto: s.linhas.length > 1 ? 'menor' : '—', cor: COR_PDF.ok }
-            : { texto: `+${acimaDoMaisBarato(l, s.linhas[0]).toFixed(0)}%`, cor: COR_PDF.alerta },
-        ]),
-      })),
-    };
-  }
-
-  return (
-    <Card>
-      <CardHeader className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Scale className="h-4 w-4" /> Comparativo de fornecedores por tipo de serviço
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Preço por unidade (valor ÷ quantidade) de cada fornecedor no mesmo serviço, com o período e os filtros acima.
-            </p>
-          </div>
-          <BotaoPdf rotulo="PDF do comparativo" disabled={!unidade || carregando || porServico.length === 0} montar={montarPdf} />
-        </div>
-        {porServico.length > 0 && (
-          <div className="space-y-1">
-            <Label>Tipo de serviço</Label>
-            <Select value={atual?.valor ?? ''} onValueChange={setEscolhido}>
-              <SelectTrigger className="w-72">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {porServico.map((s) => (
-                  <SelectItem key={s.valor} value={s.valor}>
-                    {s.rotulo} · {s.linhas.length} fornecedor(es)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!atual || !maisBarato ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma manutenção com tipo de serviço no período. As novas já pedem o tipo; as antigas entram aqui quando forem
-            alteradas e o tipo for escolhido.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-muted-foreground">
-                <tr>
-                  <th className="p-2 text-left font-medium">Fornecedor</th>
-                  <th className="p-2 text-right font-medium">Serviços</th>
-                  <th className="p-2 text-right font-medium">Qtd.</th>
-                  <th className="p-2 text-right font-medium">Preço médio/un.</th>
-                  <th className="p-2 text-right font-medium">Menor</th>
-                  <th className="p-2 text-right font-medium">Maior</th>
-                  <th className="p-2 text-right font-medium">Último</th>
-                  <th className="p-2 text-right font-medium">Total gasto</th>
-                  <th className="p-2 text-right font-medium">Diferença</th>
-                </tr>
-              </thead>
-              <tbody>
-                {atual.linhas.map((l, i) => (
-                  <tr key={l.chave} className="border-t">
-                    <td className="p-2">
-                      <p className="font-medium">{l.fornecedor}</p>
-                      {l.cnpj && <p className="text-xs text-muted-foreground">{formatarDocumento(l.cnpj)}</p>}
-                    </td>
-                    <td className="p-2 text-right">{l.servicos}</td>
-                    <td className="p-2 text-right">{numeroBr(l.quantidade)}</td>
-                    <td className="p-2 text-right font-semibold">{brl(l.medio)}</td>
-                    <td className="p-2 text-right">{brl(l.menor)}</td>
-                    <td className="p-2 text-right">{brl(l.maior)}</td>
-                    <td className="p-2 text-right">
-                      <p>{brl(l.ultimoUnitario)}</p>
-                      <p className="text-xs text-muted-foreground">{dataBr(l.ultimaData)}</p>
-                    </td>
-                    <td className="p-2 text-right">{brl(l.total)}</td>
-                    <td className="p-2 text-right">
-                      {i === 0 ? (
-                        atual.linhas.length > 1 ? (
-                          <Badge variant="outline" className="border-emerald-500 text-emerald-700 dark:text-emerald-400">
-                            Mais barato
-                          </Badge>
-                        ) : (
-                          '—'
-                        )
-                      ) : (
-                        <span className="font-medium text-amber-700 dark:text-amber-400">
-                          +{acimaDoMaisBarato(l, maisBarato).toFixed(0)}% ({brl(l.medio - maisBarato.medio)}/un.)
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {atual && atual.linhas.length === 1 && (
-          <p className="text-xs text-muted-foreground">Só um fornecedor fez este serviço no período; amplie o período para comparar.</p>
-        )}
-        {semTipo.length > 0 && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            {semTipo.length} lançamento(s) sem tipo de serviço ({brl(semTipo.reduce((s, m) => s + m.valor, 0))}) ficam fora do
-            comparativo. Use o lápis na tabela e escolha o tipo.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 const FORM_VAZIO = {
   placa: '',
   data_manutencao: '',
@@ -660,94 +548,6 @@ const FORM_VAZIO = {
   quantidade: '1',
   motivo: '',
 };
-
-function formatarDocumento(v?: string | null) {
-  const d = (v ?? '').replace(/\D/g, '');
-  if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-  return d;
-}
-
-/** Busca o fornecedor no FCFO do RM da unidade; o nome e o CNPJ gravados vêm do cadastro escolhido. */
-function SeletorFornecedorRm({ unidade, nome, disabled, onEscolher }: {
-  unidade: string;
-  nome: string;
-  disabled?: boolean;
-  onEscolher: (f: { nome: string; cnpj: string }) => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const [busca, setBusca] = useState('');
-  const [itens, setItens] = useState<FornecedorRm[]>([]);
-  const [buscando, setBuscando] = useState(false);
-  const termo = busca.trim();
-
-  useEffect(() => {
-    if (!aberto || termo.length < 2) {
-      setItens([]);
-      return;
-    }
-    let cancelado = false;
-    const espera = setTimeout(() => {
-      setBuscando(true);
-      buscarFornecedoresRm(unidade, termo)
-        .then((r) => !cancelado && setItens(r))
-        .catch((e) => !cancelado && toast.error(e instanceof Error ? e.message : 'Falha ao buscar fornecedores no RM.'))
-        .finally(() => !cancelado && setBuscando(false));
-    }, 300);
-    return () => {
-      cancelado = true;
-      clearTimeout(espera);
-    };
-  }, [aberto, termo, unidade]);
-
-  const nomeExibido = (f: FornecedorRm) => f.nome_fantasia?.trim() || f.nome;
-
-  return (
-    <Popover modal open={aberto} onOpenChange={setAberto}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={disabled}>
-          <span className={`truncate ${nome ? '' : 'text-muted-foreground'}`}>{nome || 'Buscar fornecedor no RM'}</span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-(--radix-popover-trigger-width) min-w-80 pointer-events-auto z-[9999]" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder="Nome, código ou CNPJ" value={busca} onValueChange={setBusca} />
-          <CommandList>
-            {buscando && itens.length === 0 ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <CommandEmpty>
-                {termo.length < 2 ? 'Digite pelo menos 2 letras.' : 'Nenhum fornecedor ativo encontrado no RM.'}
-              </CommandEmpty>
-            )}
-            <CommandGroup>
-              {itens.map((f) => (
-                <CommandItem
-                  key={f.codcfo}
-                  value={f.codcfo}
-                  onSelect={() => {
-                    onEscolher({ nome: nomeExibido(f), cnpj: f.cnpj });
-                    setAberto(false);
-                  }}
-                >
-                  <div className="min-w-0 leading-tight">
-                    <p className="truncate">{nomeExibido(f)}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[f.codcfo, nomeExibido(f) !== f.nome && f.nome, formatarDocumento(f.cnpj), f.cidade].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 function FormManutencao({ unidade, placas, registro, onFechar, onSalvo }: {
   unidade: string;

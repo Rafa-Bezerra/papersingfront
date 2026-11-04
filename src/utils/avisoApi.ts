@@ -11,8 +11,17 @@ export async function erroDaResposta(res: Response, contexto: string): Promise<E
     if (res.status === 400 || res.status === 409) {
         let msg = texto
         try {
-            const json = JSON.parse(texto)
-            if (json && typeof json === 'object') msg = json.message || json.erro || json.title || texto
+            const json = JSON.parse(texto) as Record<string, unknown>
+            if (json && typeof json === 'object') {
+                const errs = json.errors as Record<string, string[] | undefined> | undefined
+                const detalhe = errs && Object.values(errs).flat().filter(Boolean)[0]
+                msg =
+                    (typeof json.message === 'string' && json.message) ||
+                    (typeof json.erro === 'string' && json.erro) ||
+                    detalhe ||
+                    (typeof json.title === 'string' && json.title) ||
+                    texto
+            }
         } catch { /* texto simples */ }
         if (msg) return new AvisoApi(msg)
     }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { ColumnDef } from '@tanstack/react-table'
-import { CircleDollarSign, Loader2, Play, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CircleDollarSign, Loader2, Play, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,15 +23,65 @@ import {
   getPendentes,
   getUnidadesReceitas,
   getHistoricoReceitas,
+  getConferenciaReceitas,
+  getResumoPorPracaReceitas,
+  labelProblemaConferencia,
   processarLote,
   uploadPlanilha,
+  type ReceitasConferenciaProblema,
+  type ReceitasConferenciaResultado,
   type ReceitasLoteResultado,
+  type ReceitasResumoPracaDiaItem,
   type ReceitasPendentesGrupo,
   type ReceitasPendentesResumo,
   type ReceitasUnidadeInfo,
   type ReceitasUnidadesResponse,
   type ReceitasHistoricoItem,
 } from '@/services/receitasService'
+
+function isoDateLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function periodoConferenciaPadrao(): { ini: string; fim: string } {
+  const hoje = new Date()
+  const ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  return { ini: isoDateLocal(ini), fim: isoDateLocal(hoje) }
+}
+
+function resumoProblemasConferencia(problemas: ReceitasConferenciaProblema[]) {
+  const pracas = new Set(problemas.map((p) => p.praca))
+  const dias = new Set(problemas.map((p) => String(p.dia).slice(0, 10)))
+  const porTipo = {
+    diaNaoRecebido: problemas.filter((p) => p.problema === 'DIA_NAO_RECEBIDO').length,
+    diaIncompleto: problemas.filter((p) => p.problema === 'DIA_INCOMPLETO').length,
+    linhaDuplicada: problemas.filter((p) => p.problema === 'LINHA_DUPLICADA').length,
+    semDePara: problemas.filter((p) => p.problema === 'SEM_DEPARA').length,
+  }
+  const criticos = problemas.filter(
+    (p) => p.problema === 'DIA_NAO_RECEBIDO' || p.problema === 'DIA_INCOMPLETO'
+  )
+  const vistos = new Set<string>()
+  const destaques: ReceitasConferenciaProblema[] = []
+  for (const p of criticos) {
+    const chave = `${p.praca}|${String(p.dia).slice(0, 10)}|${p.problema}`
+    if (vistos.has(chave)) continue
+    vistos.add(chave)
+    destaques.push(p)
+    if (destaques.length >= 8) break
+  }
+  return {
+    qtdPracas: pracas.size,
+    qtdDias: dias.size,
+    total: problemas.length,
+    porTipo,
+    destaques,
+    restantes: Math.max(0, criticos.length - destaques.length),
+  }
+}
 
 function formatDataCurta(v: string | null | undefined): string {
   if (!v) return '—'
@@ -255,12 +305,40 @@ function PainelUnidade({
   const [lote, setLote] = useState<ReceitasLoteResultado | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [confirmProblemasOpen, setConfirmProblemasOpen] = useState(false)
+  const conferenciaIntegrador =
+    unidade.conferenciaCompletude ??
+    (unidade.codigo === '112' || unidade.codigo === '306')
+  const padraoPeriodo = periodoConferenciaPadrao()
+  const [dataIniConferencia, setDataIniConferencia] = useState(padraoPeriodo.ini)
+  const [dataFimConferencia, setDataFimConferencia] = useState(padraoPeriodo.fim)
+  const [conferencia, setConferencia] = useState<ReceitasConferenciaResultado | null>(null)
+  const [resumoPraca, setResumoPraca] = useState<ReceitasResumoPracaDiaItem[]>([])
+  const [conferenciaModalOpen, setConferenciaModalOpen] = useState(false)
+  const [abaConferencia, setAbaConferencia] = useState<'problemas' | 'totais'>('problemas')
+
+  async function carregarConferencia() {
+    if (!conferenciaIntegrador) return
+    try {
+      const [conf, resumo] = await Promise.all([
+        getConferenciaReceitas(unidade.codigo, dataIniConferencia, dataFimConferencia),
+        getResumoPorPracaReceitas(unidade.codigo, dataIniConferencia, dataFimConferencia),
+      ])
+      setConferencia(conf)
+      setResumoPraca(resumo.linhas ?? [])
+    } catch (e) {
+      toast.error((e as Error).message)
+      setConferencia(null)
+      setResumoPraca([])
+    }
+  }
 
   async function carregar() {
     setLoading(true)
     try {
       const res = await getPendentes(unidade.codigo)
       setData(res)
+      if (conferenciaIntegrador) await carregarConferencia()
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -292,13 +370,21 @@ function PainelUnidade({
     }
   }
 
+  const optsConferenciaLote = conferenciaIntegrador
+    ? { dataIniConferencia, dataFimConferencia }
+    : undefined
+
   async function simularLote() {
     setProcessando(true)
     try {
-      const r = await processarLote(unidade.codigo, false)
+      const r = await processarLote(unidade.codigo, false, optsConferenciaLote)
       setLote(r)
+      if (r.conferencia) setConferencia(r.conferencia)
       setDialogOpen(true)
-      if (!r.validacaoOk) toast.error('Validação do lote falhou. Veja o detalhe.')
+      if (r.conferenciaBloqueou) toast.error('Lote bloqueado por problemas na conferência de completude.')
+      else if (!r.validacaoOk) toast.error('Validação do lote falhou. Veja o detalhe.')
+      else if ((r.conferencia?.resumo?.qtdProblemas ?? 0) > 0)
+        toast.warning('Há dias ou praças incompletos — confira antes de gravar.')
       else toast.message('Conferência OK — revise os números e confirme para gravar.')
     } catch (e) {
       toast.error((e as Error).message)
@@ -308,10 +394,17 @@ function PainelUnidade({
   }
 
   async function confirmarLote() {
+    const qtdProb = lote?.conferencia?.resumo?.qtdProblemas ?? conferencia?.resumo?.qtdProblemas ?? 0
+    if (conferenciaIntegrador && qtdProb > 0 && !confirmProblemasOpen) {
+      setConfirmProblemasOpen(true)
+      return
+    }
+    setConfirmProblemasOpen(false)
     setProcessando(true)
     try {
-      const r = await processarLote(unidade.codigo, true)
+      const r = await processarLote(unidade.codigo, true, optsConferenciaLote)
       setLote(r)
+      if (r.conferencia) setConferencia(r.conferencia)
       if (r.commitEfetuado) {
         toast.success('Lote gravado com sucesso.')
         setDialogOpen(false)
@@ -376,6 +469,131 @@ function PainelUnidade({
           </div>
         </div>
       )}
+
+      {conferenciaIntegrador && (
+        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <label className="grid gap-1">
+            <span className="text-xs text-muted-foreground">Conferência — de</span>
+            <input
+              type="date"
+              className="h-9 rounded-md border px-2"
+              value={dataIniConferencia}
+              onChange={(e) => setDataIniConferencia(e.target.value)}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-muted-foreground">até</span>
+            <input
+              type="date"
+              className="h-9 rounded-md border px-2"
+              value={dataFimConferencia}
+              onChange={(e) => setDataFimConferencia(e.target.value)}
+            />
+          </label>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => void carregarConferencia()}
+          >
+            Atualizar conferência
+          </Button>
+        </div>
+      )}
+
+      {conferenciaIntegrador && (conferencia?.resumo?.qtdProblemas ?? 0) > 0 && (() => {
+        const r = resumoProblemasConferencia(conferencia!.problemas)
+        return (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/45 bg-amber-500/[0.08] px-4 py-3 shadow-sm dark:border-amber-400/35 dark:bg-amber-950/50"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/15 dark:bg-amber-400/10">
+                    <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="font-semibold leading-tight text-amber-950 dark:text-amber-50">
+                      Carga incompleta no integrador
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Período {formatDataCurta(dataIniConferencia)} a {formatDataCurta(dataFimConferencia)}
+                      · {r.qtdPracas} praça(s) · {r.qtdDias} dia(s) com problema
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  A Tecsidel pode não ter enviado todos os dias ou tipos de arrecadação (8 por praça/dia).
+                  O valor processado pode divergir do{' '}
+                  <span className="font-medium">Relatório de Arrecadação 2030</span>.
+                </p>
+
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  {r.porTipo.diaNaoRecebido > 0 && (
+                    <span className="rounded-md border border-amber-500/30 bg-background/60 px-2 py-0.5 tabular-nums">
+                      {r.porTipo.diaNaoRecebido} dia(s) sem carga
+                    </span>
+                  )}
+                  {r.porTipo.diaIncompleto > 0 && (
+                    <span className="rounded-md border border-amber-500/30 bg-background/60 px-2 py-0.5 tabular-nums">
+                      {r.porTipo.diaIncompleto} dia(s) incompletos
+                    </span>
+                  )}
+                  {r.porTipo.linhaDuplicada > 0 && (
+                    <span className="rounded-md border border-amber-500/30 bg-background/60 px-2 py-0.5 tabular-nums">
+                      {r.porTipo.linhaDuplicada} duplicidade(s)
+                    </span>
+                  )}
+                  {r.porTipo.semDePara > 0 && (
+                    <span className="rounded-md border border-amber-500/30 bg-background/60 px-2 py-0.5 tabular-nums">
+                      {r.porTipo.semDePara} sem de-para RM
+                    </span>
+                  )}
+                </div>
+
+                {r.destaques.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {r.destaques.map((p) => (
+                      <span
+                        key={`${p.praca}-${p.dia}-${p.problema}`}
+                        className="inline-flex items-center gap-1 rounded-md bg-background/70 px-2 py-1 text-xs font-medium ring-1 ring-amber-500/25"
+                      >
+                        <span className="text-amber-800 dark:text-amber-200">{p.praca}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="tabular-nums">{formatDataCurta(p.dia)}</span>
+                        <span className="text-muted-foreground font-normal">
+                          — {labelProblemaConferencia(p.problema)}
+                        </span>
+                      </span>
+                    ))}
+                    {r.restantes > 0 && (
+                      <button
+                        type="button"
+                        className="text-xs text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"
+                        onClick={() => setConferenciaModalOpen(true)}
+                      >
+                        + {r.restantes} outro(s)
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0 border-amber-500/30 bg-background/80 hover:bg-background"
+                onClick={() => setConferenciaModalOpen(true)}
+              >
+                Ver detalhes ({r.total})
+              </Button>
+            </div>
+          </div>
+        )
+      })()}
 
       <div id="tour-receitas-acoes" className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={carregar} disabled={loading || uploading || processando || cancelando}>
@@ -498,6 +716,12 @@ function PainelUnidade({
                   ))}
                 </div>
               )}
+              {(lote.conferencia?.resumo?.qtdProblemas ?? 0) > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                  Conferência: {lote.conferencia!.resumo.qtdProblemas} problema(s) no período{' '}
+                  {formatDataCurta(dataIniConferencia)} – {formatDataCurta(dataFimConferencia)}.
+                </div>
+              )}
             </div>
           )}
 
@@ -507,9 +731,167 @@ function PainelUnidade({
             </Button>
             <Button
               onClick={confirmarLote}
-              disabled={processando || !lote?.validacaoOk}
+              disabled={processando || !lote?.validacaoOk || lote?.conferenciaBloqueou}
             >
               {processando ? 'Gravando…' : 'Confirmar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={conferenciaModalOpen} onOpenChange={setConferenciaModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Conferência de completude — {unidade.label}</DialogTitle>
+            <DialogDescription>
+              Período {formatDataCurta(dataIniConferencia)} a {formatDataCurta(dataFimConferencia)}.
+              Compare os totais com o Relatório de Arrecadação 2030 (8 tipos por praça/dia).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={abaConferencia === 'problemas' ? 'default' : 'outline'}
+              onClick={() => setAbaConferencia('problemas')}
+            >
+              Problemas ({conferencia?.problemas?.length ?? 0})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={abaConferencia === 'totais' ? 'default' : 'outline'}
+              onClick={() => setAbaConferencia('totais')}
+            >
+              Total por praça e dia
+            </Button>
+          </div>
+
+          {abaConferencia === 'problemas' ? (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="px-2 py-2">Praça</th>
+                    <th className="px-2 py-2">Dia</th>
+                    <th className="px-2 py-2">Problema</th>
+                    <th className="px-2 py-2">Tipos recebidos</th>
+                    <th className="px-2 py-2 text-right">Linhas</th>
+                    <th className="px-2 py-2 text-right">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(conferencia?.problemas?.length ?? 0) === 0 ? (
+                    <tr className="border-t">
+                      <td colSpan={6} className="px-2 py-3 text-muted-foreground">
+                        Nenhum problema no período.
+                      </td>
+                    </tr>
+                  ) : (
+                    conferencia!.problemas.map((p, i) => (
+                      <tr key={`${p.praca}-${p.dia}-${p.problema}-${i}`} className="border-t">
+                        <td className="px-2 py-1.5 font-medium">{p.praca}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">{formatDataCurta(p.dia)}</td>
+                        <td className="px-2 py-1.5">
+                          {labelProblemaConferencia(p.problema)}
+                          {p.tipoArrecadacao ? ` (${p.tipoArrecadacao})` : ''}
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">{p.tiposRecebidos || '—'}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{p.linhas}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{formatMoney(p.valor)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="px-2 py-2">Praça</th>
+                    <th className="px-2 py-2">Dia</th>
+                    <th className="px-2 py-2 text-right">10</th>
+                    <th className="px-2 py-2 text-right">13</th>
+                    <th className="px-2 py-2 text-right">8</th>
+                    <th className="px-2 py-2 text-right">2</th>
+                    <th className="px-2 py-2 text-right">6</th>
+                    <th className="px-2 py-2 text-right">7</th>
+                    <th className="px-2 py-2 text-right">14</th>
+                    <th className="px-2 py-2 text-right">15</th>
+                    <th className="px-2 py-2 text-right font-semibold">TOTAL</th>
+                    <th className="px-2 py-2 text-right">Tipos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumoPraca.length === 0 ? (
+                    <tr className="border-t">
+                      <td colSpan={12} className="px-2 py-3 text-muted-foreground">
+                        Sem linhas no período.
+                      </td>
+                    </tr>
+                  ) : (
+                    resumoPraca.map((r) => (
+                      <tr key={`${r.praca}-${r.dia}`} className="border-t">
+                        <td className="px-2 py-1 font-medium">{r.praca}</td>
+                        <td className="px-2 py-1 whitespace-nowrap">{formatDataCurta(r.dia)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo10)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo13)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo8)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo2)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo6)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo7)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo14)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatMoney(r.tipo15)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums font-semibold">
+                          {formatMoney(r.total)}
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums">{r.qtdTiposDistintos}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {conferencia?.resumo && (
+            <p className="text-xs text-muted-foreground">
+              Período: {formatMoney(conferencia.resumo.totalPeriodo)} · Pendente:{' '}
+              {formatMoney(conferencia.resumo.totalPendente)} · Integrado:{' '}
+              {formatMoney(conferencia.resumo.totalIntegrado)}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmProblemasOpen} onOpenChange={setConfirmProblemasOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Conferência incompleta</DialogTitle>
+            <DialogDescription>
+              Ainda há praças ou dias faltando no integrador. Gravar o lote assim pode divergir do
+              Relatório 2030.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-48 overflow-y-auto text-sm list-disc pl-5 space-y-1">
+            {(lote?.conferencia?.problemas ?? conferencia?.problemas ?? [])
+              .filter((p) => p.problema === 'DIA_NAO_RECEBIDO' || p.problema === 'DIA_INCOMPLETO')
+              .slice(0, 20)
+              .map((p, i) => (
+                <li key={`${p.praca}-${p.dia}-${i}`}>
+                  {p.praca} · {formatDataCurta(p.dia)} · {labelProblemaConferencia(p.problema)}
+                </li>
+              ))}
+          </ul>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmProblemasOpen(false)}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmarLote()}>
+              Gravar mesmo assim
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,9 @@
 #Requires -Version 5.1
 # Gera ZIP do export estatico Next.js (pasta papersign/) para o IIS.
 # Sempre grava a API de producao no JS; ignora NEXT_PUBLIC_API_URL do .env.local.
+param(
+    [switch]$SemFrotas
+)
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
@@ -66,11 +69,42 @@ foreach ($f in $docusignChunks) {
 }
 if (-not $docusignOk) { throw "Build sem fix DOCINTERNO: chunk docusign/page-*.js sem modal de motivo (Informe o motivo + excluirDocumento)." }
 
+if (-not $SemFrotas) {
+    $frotasChunks = Get-ChildItem -Path (Join-Path $dist "_next\static\chunks\app\(privado)\frotas") -Filter "page-*.js" -ErrorAction SilentlyContinue
+    $frotasOk = $false
+    foreach ($f in $frotasChunks) {
+        $chunk = Get-Content $f.FullName -Raw
+        if ($chunk -match 'Notas e pedidos' -and $chunk -match 'Comparativos') { $frotasOk = $true; break }
+    }
+    if (-not $frotasOk) { throw "Build Frotas incompleto: chunk frotas/page-*.js sem sub-abas Manutencao (Notas e pedidos + Comparativos)." }
+
+    $frotasHtml = Join-Path $dist "frotas\index.html"
+    if (-not (Test-Path $frotasHtml)) { throw "Export incompleto: falta frotas\index.html" }
+    $fh = Get-Content $frotasHtml -Raw
+    $missingFrotas = @()
+    foreach ($m in [regex]::Matches($fh, '/_next/static/chunks/([^"?]+\.js)')) {
+        $chunk = $m.Groups[1].Value
+        $path = Join-Path $dist "_next\static\chunks\$chunk"
+        if (-not (Test-Path -LiteralPath $path)) { $missingFrotas += $chunk }
+    }
+    if ($missingFrotas.Count -gt 0) {
+        throw "Export Frotas inconsistente: HTML referencia chunk ausente ($($missingFrotas[0]))."
+    }
+} else {
+    Write-Host "SemFrotas: removendo rotas/chunks Frotas do pacote (servidor mantem pasta frotas no apply)."
+    $frotasDir = Join-Path $dist "frotas"
+    if (Test-Path $frotasDir) { Remove-Item $frotasDir -Recurse -Force }
+    $frotasChunksDir = Join-Path $dist "_next\static\chunks\app\(privado)\frotas"
+    if (Test-Path -LiteralPath $frotasChunksDir) { Remove-Item -LiteralPath $frotasChunksDir -Recurse -Force }
+}
+
 Copy-Item (Join-Path $PSScriptRoot "aplicar-front.ps1") $dist -Force
+Set-Content -Path (Join-Path $dist "deploy-sem-frotas.flag") -Value ($(if ($SemFrotas) { "1" } else { "0" }))
 Compress-Archive -Path (Join-Path $dist "*") -DestinationPath $zip -CompressionLevel Optimal
 
 $sizeMb = [math]::Round((Get-Item $zip).Length / 1MB, 2)
-Write-Host "ZIP pronto: $zip ($sizeMb MB)"
+Write-Host "ZIP pronto: $zip ($sizeMb MB) $(if ($SemFrotas) { '(sem Frotas no pacote)' } else { '(com Frotas)' })"
+Write-Host "Deploy sem Frotas: prepare-publish.ps1 -SemFrotas e aplicar-front.ps1 -SemFrotas no servidor."
 Write-Host "Contem receitas/: $(Test-Path (Join-Path $dist 'receitas\index.html'))"
 Write-Host "Copie para: C:\inetpub\wwwroot\papersign\papersignfront-dist.zip"
 Write-Host "Apos apply, confira: https://papersign.grupowaybrasil.com.br:5063/build-info.txt"

@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { BarChart3, Car, CarFront, ReceiptText, ShieldAlert, Users, Wrench } from 'lucide-react';
+import { BarChart3, Car, CarFront, ReceiptText, ShieldAlert, ShoppingCart, Users, Wrench } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -11,10 +11,11 @@ import DashboardPage from './DashboardPage';
 import FrotasPage from './FrotasPage';
 import GestaoFrotasPage from './GestaoFrotasPage';
 import ManutencaoPage from './ManutencaoPage';
+import PedidosCompraPage from './PedidosCompraPage';
 import MultasPage from './MultasPage';
 import SinistrosPage from './SinistrosPage';
 
-const ABAS = ['cadastro', 'gestao', 'condutores', 'manutencao', 'multas', 'sinistros', 'dashboard'] as const;
+const ABAS = ['cadastro', 'gestao', 'condutores', 'manutencao', 'pedidos', 'multas', 'sinistros', 'dashboard'] as const;
 type Aba = (typeof ABAS)[number];
 
 /** Módulo Frotas no modelo do WaySign: abas na mesma tela (?aba=gestao, ?aba=manutencao, ?aba=multas). */
@@ -57,6 +58,9 @@ export default function FrotasModulo() {
           <TabsTrigger value="manutencao">
             <Wrench className="w-4 h-4" /> Manutenção
           </TabsTrigger>
+          <TabsTrigger value="pedidos">
+            <ShoppingCart className="w-4 h-4" /> Pedidos de compra
+          </TabsTrigger>
           <TabsTrigger value="multas">
             <ReceiptText className="w-4 h-4" /> Multas
           </TabsTrigger>
@@ -71,6 +75,7 @@ export default function FrotasModulo() {
         {conteudo('gestao', <GestaoFrotasPage />)}
         {conteudo('condutores', <CondutoresPage />)}
         {conteudo('manutencao', <ManutencaoPage />)}
+        {conteudo('pedidos', <PedidosCompraPage />)}
         {conteudo('multas', <MultasPage />)}
         {conteudo('sinistros', <SinistrosPage />)}
         {conteudo('dashboard', <DashboardPage />)}

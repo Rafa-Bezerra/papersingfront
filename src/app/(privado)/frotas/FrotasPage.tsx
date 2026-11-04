@@ -43,15 +43,19 @@ import {
   normalizarPlaca,
   placaValida,
   unidadeDaSessao,
-  UNIDADES_FROTAS,
+  unidadeInicialFrotas,
+  UNIDADES_FROTAS_RM,
 } from '@/services/frotasService';
 
 import { BotaoPdf, CartaoIndicador, COR_PDF, RelatorioFrotaPdf, textoFiltros } from './comum';
+import { graficoPdf, graficoPdfLista, montarFatiasGrafico } from './graficosFrotas';
 
 const NOVO = '__novo__';
 // Limites das colunas do RM: OFMODELO.MODELO varchar(30), OFSUBMODELO.DESCRICAO varchar(25).
 const MAX_MODELO = 30;
 const MAX_SUBMODELO = 25;
+
+type FiltroSituacaoPlaca = 'todas' | 'ativas' | 'inativas';
 
 type LinhaPlaca = { placa: string; frota?: string; valida: boolean };
 
@@ -122,6 +126,7 @@ export default function FrotasPage() {
   const [placasRm, setPlacasRm] = useState<FrotaPlaca[]>([]);
   const [carregandoPlacas, setCarregandoPlacas] = useState(false);
   const [busca, setBusca] = useState('');
+  const [filtroSituacao, setFiltroSituacao] = useState<FiltroSituacaoPlaca>('todas');
 
   const [placaNova, setPlacaNova] = useState('');
   const [frotaNova, setFrotaNova] = useState('');
@@ -148,10 +153,8 @@ export default function FrotasPage() {
 
   useEffect(() => {
     const propria = unidadeDaSessao();
-    const naLista = (UNIDADES_FROTAS as readonly string[]).includes(propria);
-    // Só a WAY CSC atende todas as unidades; as demais (inclusive Admin) veem só a própria.
     setPodeTrocarUnidade(propria === 'WAY CSC');
-    setUnidade(naLista ? propria : '');
+    setUnidade(unidadeInicialFrotas());
   }, []);
 
   const carregarModelos = useCallback(async (u: string) => {
@@ -197,10 +200,17 @@ export default function FrotasPage() {
     setResultados([]);
     setSimulacao(null);
     setFiltroHistorico('');
+    setFiltroSituacao('todas');
     void carregarModelos(unidade);
     void carregarPlacas(unidade);
     void carregarHistorico(unidade);
   }, [unidade, carregarModelos, carregarPlacas, carregarHistorico]);
+
+  const placasExibidas = useMemo(() => {
+    if (filtroSituacao === 'ativas') return placasRm.filter((p) => p.ativo);
+    if (filtroSituacao === 'inativas') return placasRm.filter((p) => !p.ativo);
+    return placasRm;
+  }, [placasRm, filtroSituacao]);
 
   const modeloEdicao = modelos.find((m) => String(m.codmodelo) === edicao?.codmodelo);
 
@@ -501,12 +511,35 @@ export default function FrotasPage() {
 
   function montarPdf(): RelatorioFrotaPdf {
     const ativas = placasRm.filter((p) => p.ativo).length;
+    const inativas = placasRm.length - ativas;
+    const porFrota = new Map<string, number>();
+    for (const p of placasRm) {
+      const f = p.frota?.trim() || 'Não informada';
+      porFrota.set(f, (porFrota.get(f) ?? 0) + 1);
+    }
+    const frotaItens = [...porFrota.entries()].map(([nome, qtd]) => ({ nome, qtd }));
     return {
       titulo: 'Placas cadastradas no RM',
       subtitulo: 'Gestão de frotas · cadastro no RM',
       unidade,
       periodo: 'situação atual',
       arquivo: `placas-rm-${unidade}-${new Date().toISOString().slice(0, 10)}`,
+      graficos: [
+        graficoPdf(
+          'Ativas x inativas',
+          montarFatiasGrafico(
+            [
+              { chave: 'A', rotulo: 'Ativas', total: ativas },
+              { chave: 'I', rotulo: 'Inativas', total: inativas },
+            ],
+            (x) => x.chave,
+            (x) => x.rotulo,
+            (x) => x.total,
+            (v) => String(v)
+          )
+        ),
+        graficoPdfLista('Placas por frota', frotaItens, (x) => x.nome, (x) => x.nome, (x) => x.qtd, (v) => String(v)),
+      ],
       kpis: [
         { rotulo: 'Placas listadas', valor: String(placasRm.length), detalhe: busca.trim() ? `busca: ${busca.trim()}` : 'todas da unidade' },
         { rotulo: 'Ativas', valor: String(ativas), detalhe: 'no RM' },
@@ -573,7 +606,7 @@ export default function FrotasPage() {
                   <SelectValue placeholder="Unidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {UNIDADES_FROTAS.map((u) => (
+                  {UNIDADES_FROTAS_RM.map((u) => (
                     <SelectItem key={u} value={u}>
                       {u}
                     </SelectItem>
@@ -589,14 +622,41 @@ export default function FrotasPage() {
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <CartaoIndicador icone={CarFront} tom="azul" destaque rotulo="Placas no RM" valor={carregandoPlacas ? '…' : placasRm.length}
-          detalhe={busca.trim() ? `busca: ${busca.trim()}` : 'todas da unidade'} />
-        <CartaoIndicador icone={CircleCheck} tom="verde" rotulo="Ativas" valor={carregandoPlacas ? '…' : placasRm.filter((p) => p.ativo).length}
-          detalhe="podem receber lançamentos" />
-        <CartaoIndicador icone={Ban} tom="cinza" rotulo="Inativas" valor={carregandoPlacas ? '…' : placasRm.filter((p) => !p.ativo).length}
-          detalhe="desativadas no RM" />
-        <CartaoIndicador icone={Layers} tom="roxo" rotulo="Modelos" valor={carregandoPlacas ? '…' : new Set(placasRm.map((p) => p.modelo)).size}
-          detalhe="diferentes na lista" />
+        <CartaoIndicador
+          icone={CarFront}
+          tom="azul"
+          destaque={filtroSituacao === 'todas'}
+          rotulo="Placas no RM"
+          valor={carregandoPlacas ? '…' : placasRm.length}
+          detalhe={busca.trim() ? `busca: ${busca.trim()}` : 'todas da unidade · clique para listar'}
+          ativo={filtroSituacao === 'todas'}
+          onClick={() => setFiltroSituacao('todas')}
+        />
+        <CartaoIndicador
+          icone={CircleCheck}
+          tom="verde"
+          rotulo="Ativas"
+          valor={carregandoPlacas ? '…' : placasRm.filter((p) => p.ativo).length}
+          detalhe="podem receber lançamentos · clique para filtrar"
+          ativo={filtroSituacao === 'ativas'}
+          onClick={() => setFiltroSituacao('ativas')}
+        />
+        <CartaoIndicador
+          icone={Ban}
+          tom="cinza"
+          rotulo="Inativas"
+          valor={carregandoPlacas ? '…' : placasRm.filter((p) => !p.ativo).length}
+          detalhe="desativadas no RM · clique para filtrar"
+          ativo={filtroSituacao === 'inativas'}
+          onClick={() => setFiltroSituacao('inativas')}
+        />
+        <CartaoIndicador
+          icone={Layers}
+          tom="roxo"
+          rotulo="Modelos"
+          valor={carregandoPlacas ? '…' : new Set(placasRm.map((p) => p.modelo)).size}
+          detalhe="diferentes na lista"
+        />
       </div>
 
       <Card>
@@ -816,7 +876,11 @@ export default function FrotasPage() {
 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base">Placas cadastradas no RM ({unidade})</CardTitle>
+          <CardTitle className="text-base">
+            Placas cadastradas no RM ({unidade})
+            {filtroSituacao === 'ativas' && ' · somente ativas'}
+            {filtroSituacao === 'inativas' && ' · somente inativas'}
+          </CardTitle>
           <div className="flex gap-2">
             <Input
               placeholder="Buscar placa, frota ou modelo"
@@ -836,6 +900,7 @@ export default function FrotasPage() {
               title="Recarregar"
               onClick={() => {
                 setBusca('');
+                setFiltroSituacao('todas');
                 void carregarPlacas(unidade);
               }}
             >
@@ -846,10 +911,16 @@ export default function FrotasPage() {
         <CardContent>
           <DataTable
             columns={colunas}
-            data={placasRm}
+            data={placasExibidas}
             loading={carregandoPlacas}
             hideSearch
-            emptyMessage="Nenhuma placa encontrada."
+            emptyMessage={
+              filtroSituacao === 'ativas'
+                ? 'Nenhuma placa ativa nesta lista.'
+                : filtroSituacao === 'inativas'
+                  ? 'Nenhuma placa inativa nesta lista.'
+                  : 'Nenhuma placa encontrada.'
+            }
           />
         </CardContent>
       </Card>

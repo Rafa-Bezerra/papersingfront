@@ -46,7 +46,7 @@ export type PdfDashboardFrotaInput = Base & {
   ordemVeiculos: string
 }
 
-export type PdfDetalheFrotaInput = Base & { titulo: string; subtitulo: string; secoes: SecaoPdf[] }
+export type PdfDetalheFrotaInput = Base & { titulo: string; subtitulo: string; secoes: SecaoPdf[]; graficos?: GraficoPdf[] }
 
 const PAGE_W = 210
 const MARGIN = 10
@@ -131,8 +131,7 @@ function pizza(doc: jsPDF, cx: number, cy: number, r: number, fatias: GraficoPdf
   doc.circle(cx, cy, r * 0.55, 'F')
 }
 
-function graficos(doc: jsPDF, y: number, lista: GraficoPdf[]): number {
-  if (!lista.length) return y
+function graficosLinha(doc: jsPDF, y: number, lista: GraficoPdf[]): number {
   const gap = 4
   const w = (CONTENT_W - gap * (lista.length - 1)) / lista.length
   const r = 15
@@ -177,6 +176,15 @@ function graficos(doc: jsPDF, y: number, lista: GraficoPdf[]): number {
     }
   })
   return y + h + 8
+}
+
+function graficos(doc: jsPDF, y: number, lista: GraficoPdf[]): number {
+  if (!lista.length) return y
+  const porLinha = 3
+  for (let i = 0; i < lista.length; i += porLinha) {
+    y = graficosLinha(doc, y, lista.slice(i, i + porLinha))
+  }
+  return y
 }
 
 function cabecalhoTabela(doc: jsPDF, y: number, colunas: ColunaPdf[]): number {
@@ -320,6 +328,7 @@ export function gerarPdfDashboardFrota(input: PdfDashboardFrotaInput): jsPDF {
 export function gerarPdfDetalheFrota(input: PdfDetalheFrotaInput): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
   let y = cabecalho(doc, input.titulo, input.subtitulo, input)
+  if (input.graficos?.length) y = graficos(doc, y, input.graficos)
   for (const s of input.secoes) y = tabela(doc, y, s)
   drawFooters(doc, `${input.titulo} · ${input.unidade}`)
   return doc

@@ -80,6 +80,7 @@ import {
   useUnidadeFrotas,
   usePlacasFrota,
 } from './comum';
+import { graficoPdfLista } from './graficosFrotas';
 import { dataBr } from './VeiculoDialog';
 
 const MAX_MB = 10;
@@ -469,12 +470,19 @@ export default function CondutoresPage() {
 
   function montarPdf(): RelatorioFrotaPdf {
     const rotuloCnh = { TODAS: '', VENCIDA: 'vencida', VENCE_30: 'vence em até 30 dias', EM_DIA: 'em dia', SEM_VALIDADE: 'sem validade' };
+    const cnhItens = [
+      { chave: 'VENCIDA', rotulo: 'CNH vencida', qtd: contagem.VENCIDA },
+      { chave: 'VENCE_30', rotulo: 'Vence em 30 dias', qtd: contagem.VENCE_30 },
+      { chave: 'EM_DIA', rotulo: 'CNH em dia', qtd: contagem.EM_DIA },
+      { chave: 'SEM', rotulo: 'Sem validade', qtd: contagem.SEM_VALIDADE },
+    ].filter((x) => x.qtd > 0);
     return {
       titulo: 'Condutores e viagens',
       subtitulo: 'Gestão de frotas',
       unidade,
       periodo: `viagens de ${textoPeriodo(de, ate)}`,
       arquivo: `condutores-${unidade}-${isoHoje()}`,
+      graficos: [graficoPdfLista('Condutores ativos por CNH', cnhItens, (x) => x.chave, (x) => x.rotulo, (x) => x.qtd, (v) => String(v))],
       kpis: [
         { rotulo: 'Condutores ativos', valor: String(ativos.length), detalhe: `${condutores.length - ativos.length} inativo(s)` },
         { rotulo: 'CNH vencida', valor: String(contagem.VENCIDA), detalhe: 'condutores ativos' },
@@ -875,12 +883,18 @@ function MultasDoCondutor({ unidade, condutor, onFechar }: {
   const rotuloDesconto = (m: FrotaMulta) => SITUACOES_DESCONTO.find((s) => s.valor === situacaoDesconto(m))?.rotulo ?? '';
 
   function montarPdf(): RelatorioFrotaPdf {
+    const sitItens = SITUACOES_MULTA.map((s) => ({
+      valor: s.valor,
+      rotulo: s.rotulo,
+      total: multas.filter((m) => m.situacao === s.valor).reduce((t, m) => t + m.valor, 0),
+    })).filter((x) => x.total > 0);
     return {
       titulo: `Multas de ${condutor?.nome ?? ''}`,
       subtitulo: 'Gestão de frotas · condutor',
       unidade,
       periodo: 'todas as multas',
       arquivo: `multas-${condutor?.nome ?? 'condutor'}`,
+      graficos: [graficoPdfLista('Valor por situação', sitItens, (x) => x.valor, (x) => x.rotulo, (x) => x.total, brl)],
       kpis: [
         { rotulo: 'Multas', valor: String(multas.length), detalhe: 'vinculadas ou com o mesmo nome' },
         { rotulo: 'Total', valor: brl(total), detalhe: 'todas as situações' },

@@ -9,7 +9,8 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, X } from 'lucide-react'
+import { ChevronsUpDown, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, UserSearch, X } from 'lucide-react'
+import AlcadasPorUsuario from './AlcadasPorUsuario'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -88,9 +89,12 @@ export default function Page() {
         ? 'substituicao'
         : tabParam === 'transferencia'
           ? 'transferencia'
-          : 'alcadas'
+          : tabParam === 'por-usuario'
+            ? 'por-usuario'
+            : 'centros'
     )
     const [ehCsc, setEhCsc] = useState(false)
+    const [ehAdmin, setEhAdmin] = useState(false)
     const [unidadeLogada, setUnidadeLogada] = useState('')
 
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -173,12 +177,13 @@ export default function Page() {
                 const u = JSON.parse(raw)
                 unidade = String(u.unidade ?? u.UNIDADE ?? '').trim()
                 csc = unidade.toUpperCase() === 'WAY CSC'
+                setEhAdmin(Boolean(u.admin))
             }
         } catch { /* ignore */ }
         setEhCsc(csc)
         setUnidadeLogada(unidade)
         if (!csc && (aba === 'substituicao' || aba === 'transferencia')) {
-            setAba('alcadas')
+            setAba('centros')
             const params = new URLSearchParams(searchParams.toString())
             params.delete('tab')
             const qs = params.toString()
@@ -590,11 +595,21 @@ export default function Page() {
         [handleEditarAprovador, usuarios]
     )
 
+    function irParaCentroDeCusto(centroCusto: string) {
+        setAba('centros')
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('tab')
+        const qs = params.toString()
+        router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
+        setQuery(centroCusto)
+        void handleSearch(centroCusto)
+    }
+
     function trocarAba(value: string) {
         if ((value === 'substituicao' || value === 'transferencia') && !ehCsc) return
         setAba(value)
         const params = new URLSearchParams(searchParams.toString())
-        if (value === 'substituicao' || value === 'transferencia') params.set('tab', value)
+        if (value === 'substituicao' || value === 'transferencia' || value === 'por-usuario') params.set('tab', value)
         else params.delete('tab')
         const qs = params.toString()
         router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
@@ -604,8 +619,11 @@ export default function Page() {
         <div className="p-6">
             <Tabs value={aba} onValueChange={trocarAba} className="space-y-4">
                 <TabsList className="flex-wrap h-auto w-fit">
-                    <TabsTrigger value="alcadas">
-                        <Users className="w-4 h-4" /> Alçadas
+                    <TabsTrigger value="centros">
+                        <Users className="w-4 h-4" /> Centros de custo
+                    </TabsTrigger>
+                    <TabsTrigger value="por-usuario">
+                        <UserSearch className="w-4 h-4" /> Por usuário
                     </TabsTrigger>
                     {ehCsc && (
                         <TabsTrigger value="substituicao">
@@ -619,7 +637,7 @@ export default function Page() {
                     )}
                 </TabsList>
 
-                <TabsContent value="alcadas" className="mt-0 space-y-4">
+                <TabsContent value="centros" className="mt-0 space-y-4">
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
@@ -685,6 +703,14 @@ export default function Page() {
                     Nenhum registro encontrado.
                 </p>
             )}
+                </TabsContent>
+
+                <TabsContent value="por-usuario" className="mt-0">
+                    <AlcadasPorUsuario
+                        unidadeLogada={unidadeLogada}
+                        podeTrocarUnidade={ehCsc || ehAdmin}
+                        onAbrirCentro={irParaCentroDeCusto}
+                    />
                 </TabsContent>
 
                 {ehCsc && (

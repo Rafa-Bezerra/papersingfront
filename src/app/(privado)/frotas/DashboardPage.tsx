@@ -27,6 +27,7 @@ import {
   anexoMulta,
   anexoSinistro,
   CAUSAS_SINISTRO,
+  CLASSIFICACOES_DESPESA,
   CLASSIFICACOES_MANUTENCAO,
   FrotaCondutor,
   FrotaManutencao,
@@ -44,6 +45,7 @@ import {
 } from '@/services/frotasService';
 import type { CelulaPdf, ColunaPdf, CorPdf, KpiPdf, RankingCondutor, RankingVeiculo, SecaoPdf } from '@/lib/frotasDashboardPdf';
 
+import { graficoPdfLista } from './graficosFrotas';
 import {
   BotaoEnviarAnexo,
   BotaoPdf,
@@ -306,6 +308,20 @@ function DetalheVeiculo({ veiculo, manutencoes, sinistros, multas, unidade, peri
     unidade,
     periodo,
     kpis,
+    graficos: [
+      graficoPdfLista(
+        'Gasto no período',
+        [
+          { chave: 'ma', rotulo: 'Manutenções', total: somaMa },
+          { chave: 'si', rotulo: 'Sinistros', total: somaSi },
+          { chave: 'mu', rotulo: 'Multas', total: somaMu },
+        ].filter((x) => x.total > 0),
+        (x) => x.chave,
+        (x) => x.rotulo,
+        (x) => x.total,
+        brl
+      ),
+    ],
     secoes: secoes(),
     arquivo: `historico-veiculo-${veiculo.placa}`,
   });
@@ -442,12 +458,18 @@ function DetalheCondutor({ condutor, multas, unidade, periodo, onAnexo, onFechar
       { titulo: 'Pontos', largura: 14, alinhar: 'right' }, { titulo: 'Situação', largura: 24 }, { titulo: 'Desconto', largura: 26 },
       { titulo: 'Valor', largura: 24, alinhar: 'right' },
     ];
+    const sitItens = SITUACOES_MULTA.map((s) => ({
+      valor: s.valor,
+      rotulo: s.rotulo,
+      total: validas.filter((m) => m.situacao === s.valor).reduce((t, m) => t + m.valor, 0),
+    })).filter((x) => x.total > 0);
     return {
       titulo: `Multas de ${condutor!.nome}`,
       subtitulo: condutor!.cadastrado ? 'Gestão de frotas · condutor cadastrado' : 'Gestão de frotas · nome informado na multa (sem cadastro)',
       unidade,
       periodo,
       kpis,
+      graficos: [graficoPdfLista('Valor por situação', sitItens, (x) => x.valor, (x) => x.rotulo, (x) => x.total, brl)],
       arquivo: `multas-${condutor!.nome}`,
       secoes: [{
         titulo: 'Multas', nota: `${validas.length} multa(s) · ${brl(soma(() => true))} (canceladas aparecem, mas não somam)`, colunas,
@@ -562,7 +584,8 @@ export default function DashboardPage() {
       return [];
     };
     setMultas(valor(mu, 'Multas'));
-    setManutencoes(valor(ma, 'Manutenções'));
+    // Abastecimento, locação, telemetria etc. entram nas notas, mas não são manutenção.
+    setManutencoes(valor(ma, 'Manutenções').filter((m) => !CLASSIFICACOES_DESPESA.has(m.classificacao)));
     setSinistros(valor(si, 'Sinistros'));
     setCondutores(valor(co, 'Condutores'));
     falhas.forEach((f) => toast.error(f));

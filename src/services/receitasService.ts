@@ -5,6 +5,8 @@ export type ReceitasUnidadeInfo = {
   label: string;
   permiteUpload: boolean;
   pendenteExigeIdlanNull: boolean;
+  /** Conferência praça×dia (integrador → 2030): WAY 112 e 306 quando habilitado na API. */
+  conferenciaCompletude?: boolean;
   emStandby: boolean;
   podeConsultar: boolean;
   podeUpload: boolean;
@@ -70,6 +72,55 @@ export type ReceitasUploadResultado = {
   avisos: string[];
 };
 
+export type ReceitasConferenciaProblema = {
+  praca: string;
+  dia: string;
+  tiposRecebidos: string;
+  linhas: number;
+  valor: number;
+  problema: string;
+  tipoArrecadacao?: string | null;
+};
+
+export type ReceitasConferenciaResumo = {
+  totalPeriodo: number;
+  totalPendente: number;
+  totalIntegrado: number;
+  qtdProblemas: number;
+};
+
+export type ReceitasConferenciaResultado = {
+  codigo: string;
+  label: string;
+  dataIni: string;
+  dataFim: string;
+  resumo: ReceitasConferenciaResumo;
+  problemas: ReceitasConferenciaProblema[];
+};
+
+export type ReceitasResumoPracaDiaItem = {
+  praca: string;
+  dia: string;
+  tipo10: number;
+  tipo13: number;
+  tipo8: number;
+  tipo2: number;
+  tipo6: number;
+  tipo7: number;
+  tipo14: number;
+  tipo15: number;
+  total: number;
+  qtdTiposDistintos: number;
+};
+
+export type ReceitasResumoPracaDiaResultado = {
+  codigo: string;
+  label: string;
+  dataIni: string;
+  dataFim: string;
+  linhas: ReceitasResumoPracaDiaItem[];
+};
+
 export type ReceitasLoteResultado = {
   codigo: string;
   label: string;
@@ -91,6 +142,8 @@ export type ReceitasLoteResultado = {
   idlanDuplicados: number;
   aindaPendentes: number;
   valorAindaPendente: number;
+  conferencia?: ReceitasConferenciaResultado | null;
+  conferenciaBloqueou?: boolean;
 };
 
 async function readError(res: Response): Promise<string> {
@@ -173,14 +226,67 @@ export async function cancelarPendentes(codigo: string): Promise<{
   return res.json();
 }
 
-export async function processarLote(codigo: string, confirmar: boolean): Promise<ReceitasLoteResultado> {
+export async function getConferenciaReceitas(
+  codigo: string,
+  dataIni: string,
+  dataFim: string
+): Promise<ReceitasConferenciaResultado> {
+  const q = new URLSearchParams({
+    codigo,
+    dataIni,
+    dataFim,
+  });
+  const res = await fetch(`${API_BASE}/api/Receitas/conferencia?${q}`, { headers: headers() });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function getResumoPorPracaReceitas(
+  codigo: string,
+  dataIni: string,
+  dataFim: string
+): Promise<ReceitasResumoPracaDiaResultado> {
+  const q = new URLSearchParams({
+    codigo,
+    dataIni,
+    dataFim,
+  });
+  const res = await fetch(`${API_BASE}/api/Receitas/resumo-por-praca?${q}`, { headers: headers() });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function processarLote(
+  codigo: string,
+  confirmar: boolean,
+  opts?: { dataIniConferencia?: string; dataFimConferencia?: string }
+): Promise<ReceitasLoteResultado> {
   const res = await fetch(`${API_BASE}/api/Receitas/${encodeURIComponent(codigo)}/processar`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ confirmar }),
+    body: JSON.stringify({
+      confirmar,
+      dataIniConferencia: opts?.dataIniConferencia,
+      dataFimConferencia: opts?.dataFimConferencia,
+    }),
   });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
+}
+
+export function labelProblemaConferencia(codigo: string): string {
+  switch (codigo) {
+    case "DIA_NAO_RECEBIDO":
+      return "Dia não recebido";
+    case "DIA_INCOMPLETO":
+      return "Dia incompleto";
+    case "LINHA_DUPLICADA":
+      return "Linha duplicada";
+    case "SEM_DEPARA":
+      return "Sem de-para (ZMDREFERENCIA)";
+    default:
+      return codigo;
+  }
 }
 
 export function formatMoney(v: number | null | undefined): string {

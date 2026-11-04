@@ -16,17 +16,22 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { CorPdf, KpiPdf, SecaoPdf } from '@/lib/frotasDashboardPdf';
-import { FrotaPlaca, listarPlacas, unidadeDaSessao, UNIDADES_FROTAS } from '@/services/frotasService';
+import type { CorPdf, GraficoPdf, KpiPdf, SecaoPdf } from '@/lib/frotasDashboardPdf';
+import {
+  FrotaPlaca,
+  listarPlacas,
+  unidadeDaSessao,
+  unidadeInicialFrotas,
+  UNIDADES_FROTAS_RM,
+} from '@/services/frotasService';
 
 /** Unidade da tela: a da sessão; só a WAY CSC pode trocar (mesma regra da API). */
 export function useUnidadeFrotas() {
   const [unidade, setUnidade] = useState('');
   const [podeTrocarUnidade, setPodeTrocarUnidade] = useState(false);
   useEffect(() => {
-    const propria = unidadeDaSessao();
-    setPodeTrocarUnidade(propria === 'WAY CSC');
-    setUnidade((UNIDADES_FROTAS as readonly string[]).includes(propria) ? propria : '');
+    setPodeTrocarUnidade(unidadeDaSessao() === 'WAY CSC');
+    setUnidade(unidadeInicialFrotas());
   }, []);
   return { unidade, setUnidade, podeTrocarUnidade };
 }
@@ -69,6 +74,8 @@ export type RelatorioFrotaPdf = {
   unidade: string;
   periodo: string;
   kpis: KpiPdf[];
+  /** Pizzas no mesmo layout do Dashboard de frotas (opcional). */
+  graficos?: GraficoPdf[];
   secoes: SecaoPdf[];
   arquivo: string;
 };
@@ -175,7 +182,7 @@ export function SeletorUnidade({ unidade, setUnidade, podeTrocarUnidade }: Retur
             <SelectValue placeholder="Unidade" />
           </SelectTrigger>
           <SelectContent>
-            {UNIDADES_FROTAS.map((u) => (
+            {UNIDADES_FROTAS_RM.map((u) => (
               <SelectItem key={u} value={u}>
                 {u}
               </SelectItem>
@@ -197,6 +204,11 @@ export function isoHoje(deslocDias = 0) {
 
 export function inicioDoAno() {
   return `${new Date().getFullYear()}-01-01`;
+}
+
+/** Período inicial nas abas de manutenção (planilha histórica de NFs, a partir de 2023). */
+export function inicioHistoricoManutencao() {
+  return '2023-01-01';
 }
 
 export function brl(v: number) {

@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from '@/components/ui/sidebar'
-import { FROTAS_SO_ADMIN, NavSection } from '@/lib/data'
+import { FROTAS_FORA_DO_DEPLOY, FROTAS_SO_ADMIN, NavSection } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import {
   Home,
@@ -305,6 +305,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                       if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
                       if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
                       if (item.url === "/contratos" && !userModuloContratos && !userAdmin) return null;
+                      if (item.url === "/frotas" && FROTAS_FORA_DO_DEPLOY) return null;
                       // Frotas: só admin ou quem tem a flag (financeiro não herda).
                       if (item.url === "/frotas" && !userAdmin && (FROTAS_SO_ADMIN || !userFrotas)) return null;
                       // Financeiro tem acesso a todas as rotinas, exceto as configurações

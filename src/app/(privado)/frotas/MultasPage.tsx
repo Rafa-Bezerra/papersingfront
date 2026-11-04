@@ -3,17 +3,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
+  Ban,
   CircleCheck,
   CircleHelp,
-  CircleX,
   Clock,
+  Gavel,
   Loader2,
   Pencil,
   Plus,
   ReceiptText,
   RefreshCw,
   Route,
-  Scale,
   Trash2,
   UserCheck,
   X,
@@ -56,6 +56,7 @@ import {
   SUGESTOES_RQ131,
   TIPOS_FROTA,
 } from '@/services/frotasService';
+import { graficoPdfLista } from './graficosFrotas';
 import {
   BotaoPdf,
   BotoesAnexo,
@@ -86,16 +87,16 @@ const MAX_MB = 10;
 const ESTILO_SITUACAO: Record<string, { icone: LucideIcon; tom: TomIndicador }> = {
   A_PAGAR: { icone: Clock, tom: 'ambar' },
   PAGA: { icone: CircleCheck, tom: 'verde' },
-  RECORRIDA: { icone: Scale, tom: 'roxo' },
-  CANCELADA: { icone: CircleX, tom: 'cinza' },
+  RECORRIDA: { icone: Gavel, tom: 'roxo' },
+  CANCELADA: { icone: Ban, tom: 'vermelho' },
   NAO_INFORMADA: { icone: CircleHelp, tom: 'cinza' },
 };
 
 const COR_SITUACAO: Record<string, string> = {
   A_PAGAR: 'border-amber-500 text-amber-700 dark:text-amber-400',
   PAGA: 'border-emerald-500 text-emerald-700 dark:text-emerald-400',
-  RECORRIDA: 'border-sky-500 text-sky-700 dark:text-sky-400',
-  CANCELADA: 'border-slate-400 text-slate-600 dark:text-slate-300',
+  RECORRIDA: 'border-violet-500 text-violet-700 dark:text-violet-400',
+  CANCELADA: 'border-red-400 text-red-700 dark:text-red-400',
   NAO_INFORMADA: 'border-dashed border-slate-400 text-muted-foreground',
 };
 
@@ -367,12 +368,27 @@ export default function MultasPage() {
   function montarPdf(): RelatorioFrotaPdf {
     const doTipo = (s: string) => semSituacao.filter((m) => m.situacao === s);
     const rotuloOpcao = (lista: readonly { valor: string; rotulo: string }[], v: string) => lista.find((x) => x.valor === v)?.rotulo ?? v;
+    const sitItens = SITUACOES_MULTA.map((s) => ({
+      valor: s.valor,
+      rotulo: s.rotulo,
+      total: doTipo(s.valor).reduce((t, m) => t + m.valor, 0),
+    })).filter((x) => x.total > 0);
+    const porCond = new Map<string, number>();
+    for (const m of semSituacao) {
+      const c = m.condutor?.trim() || 'Sem condutor';
+      porCond.set(c, (porCond.get(c) ?? 0) + m.valor);
+    }
+    const condItens = [...porCond.entries()].map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total);
     return {
       titulo: 'Multas',
       subtitulo: 'Gestão de frotas',
       unidade,
       periodo: textoPeriodo(de, ate),
       arquivo: `multas-${unidade}-${de || 'inicio'}-a-${ate || isoHoje()}`,
+      graficos: [
+        graficoPdfLista('Valor por situação', sitItens, (x) => x.valor, (x) => x.rotulo, (x) => x.total, brl),
+        graficoPdfLista('Valor por condutor', condItens, (x) => x.nome, (x) => x.nome, (x) => x.total, brl),
+      ],
       kpis: [
         { rotulo: 'Total no período', valor: brl(semSituacao.reduce((s, m) => s + m.valor, 0)), detalhe: `${semSituacao.length} multa(s)` },
         ...SITUACOES_MULTA.map((s) => ({
@@ -465,6 +481,8 @@ export default function MultasPage() {
                   {s.valor === 'A_PAGAR' && vencidas > 0 && (
                     <span className="text-destructive font-medium"> · {vencidas} vencida(s)</span>
                   )}
+                  {s.valor === 'RECORRIDA' && ' · em recurso administrativo'}
+                  {s.valor === 'CANCELADA' && ' · anulada, não entra nos totais'}
                 </>
               }
             />

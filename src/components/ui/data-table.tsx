@@ -52,6 +52,8 @@ interface DataTableProps<TData> {
   searchClassName?: string;
   /** Linhas por página (padrão: 10). */
   pageSize?: number;
+  /** Clique na linha (ex.: abrir detalhe). */
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData>({
@@ -69,6 +71,7 @@ export function DataTable<TData>({
   tableClassName,
   searchClassName,
   pageSize = 10,
+  onRowClick,
 }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -159,6 +162,8 @@ export function DataTable<TData>({
               <TableRow
                 key={row.id}
                 data-pendencia-id={getRowDataId?.(row.original) ?? undefined}
+                className={onRowClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
               >
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as DataTableColumnMeta | undefined;
