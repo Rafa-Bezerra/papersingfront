@@ -2,12 +2,21 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, Download, Loader2, UserSearch, X } from 'lucide-react'
+import { ChevronsUpDown, Download, ListChecks, Loader2, Trash2, UserSearch, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { DataTable } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,8 +31,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PopoverPortal } from '@radix-ui/react-popover'
 import {
+  AlcadaLoteRemoverModo,
   AlcadaPorUsuarioLinha,
   getAlcadasPorUsuario,
+  removerAprovadorEmLote,
 } from '@/services/alcadasService'
 import { getUsuariosAprovadores, Usuario } from '@/services/usuariosService'
 import { downloadBlobFile } from '@/lib/downloadFile'
@@ -33,6 +44,7 @@ import { mostrarErro } from '@/utils/avisoApi'
 type Props = {
   unidadeLogada: string
   podeTrocarUnidade: boolean
+  podeEditar?: boolean
   onAbrirCentro?: (centroCusto: string) => void
 }
 
@@ -47,7 +59,7 @@ function escapeCsv(c: string) {
   return c
 }
 
-export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, onAbrirCentro }: Props) {
+export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, podeEditar = false, onAbrirCentro }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [usuario, setUsuario] = useState('')
   const [unidadeConsulta, setUnidadeConsulta] = useState(unidadeLogada)
@@ -55,6 +67,11 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
   const [filtro, setFiltro] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [dados, setDados] = useState<Awaited<ReturnType<typeof getAlcadasPorUsuario>> | null>(null)
+  const [marcados, setMarcados] = useState<Set<number>>(new Set())
+  const [dialogRemover, setDialogRemover] = useState(false)
+  const [modoRemocao, setModoRemocao] = useState<AlcadaLoteRemoverModo>('usuario')
+  const [motivoRemocao, setMotivoRemocao] = useState('')
+  const [removendo, setRemovendo] = useState(false)
   const carregouUsuarios = useRef(false)
 
   useEffect(() => {
@@ -83,6 +100,7 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
     }
     setCarregando(true)
     setDados(null)
+    setMarcados(new Set())
     try {
       const unidade = podeTrocarUnidade && unidadeConsulta.trim() ? unidadeConsulta.trim() : undefined
       setDados(await getAlcadasPorUsuario(login, unidade))
@@ -103,8 +121,121 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
     })
   }, [dados, filtro])
 
+  function alternarMarcado(id: number) {
+    setMarcados((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function marcarFiltrados() {
+    setMarcados(new Set(linhasFiltradas.map((l) => l.id)))
+  }
+
+  function desmarcarFiltrados() {
+    setMarcados((prev) => {
+      const next = new Set(prev)
+      for (const l of linhasFiltradas) next.delete(l.id)
+      return next
+    })
+  }
+
+  function linhasParaMarcados(ids: Set<number>) {
+    return (dados?.linhas ?? []).filter((l) => ids.has(l.id))
+  }
+
+  function abrirRemover(modo: AlcadaLoteRemoverModo, ids?: Set<number>) {
+    setModoRemocao(modo)
+    if (ids) setMarcados(new Set(ids))
+    else if (marcados.size === 0) setMarcados(new Set(linhasFiltradas.map((l) => l.id)))
+    setDialogRemover(true)
+  }
+
+  function abrirRemoverTodasListadas(modo: AlcadaLoteRemoverModo) {
+    abrirRemover(modo, new Set(linhasFiltradas.map((l) => l.id)))
+  }
+
+  const linhasMarcadas = useMemo(() => linhasParaMarcados(marcados), [dados, marcados])
+
+  const resumoRemocao = useMemo(() => {
+    const linhas = linhasMarcadas
+    const centros = new Set(linhas.map((l) => l.id_alcada))
+    if (modoRemocao === 'usuario') {
+      return { linhas: linhas.length, centros: centros.size, aprovadores: linhas.length }
+    }
+    const porNivel = new Map<string, number>()
+    for (const l of linhas) {
+      const k = `${l.id_alcada}:${l.nivel}`
+      if (!porNivel.has(k)) porNivel.set(k, l.qtd_no_nivel)
+    }
+    if (modoRemocao === 'todos_nivel') {
+      const aprovadores = [...porNivel.values()].reduce((a, b) => a + b, 0)
+      return { linhas: linhas.length, centros: centros.size, aprovadores, paresNivel: porNivel.size }
+    }
+    return { linhas: linhas.length, centros: centros.size, aprovadores: null as number | null }
+  }, [linhasMarcadas, modoRemocao])
+
+  const todosFiltradosMarcados =
+    linhasFiltradas.length > 0 && linhasFiltradas.every((l) => marcados.has(l.id))
+
+  async function confirmarRemocao() {
+    if (!dados || marcados.size === 0) return
+    setRemovendo(true)
+    try {
+      const unidade =
+        podeTrocarUnidade && unidadeConsulta.trim() ? unidadeConsulta.trim() : dados.unidade
+      const r = await removerAprovadorEmLote({
+        modo: modoRemocao,
+        usuario: dados.usuario,
+        unidade,
+        ids_aprovador: [...marcados],
+        motivo: motivoRemocao.trim() || undefined,
+      })
+      const msgModo =
+        r.modo === 'todos_centro'
+          ? `Removidos ${r.removidos} aprovador(es) em ${r.centros_referencia} centro(s) de custo (todos os níveis).`
+          : r.modo === 'todos_nivel'
+            ? `Removidos ${r.removidos} aprovador(es) do nível da linha em ${r.centros_referencia} centro(s).`
+            : `${dados.usuario} removido de ${r.removidos} alçada(s).`
+      toast.success(`${msgModo} Registro no histórico (auditoria).`)
+      setDialogRemover(false)
+      setMotivoRemocao('')
+      setMarcados(new Set())
+      await consultar()
+    } catch (e) {
+      mostrarErro(e)
+    } finally {
+      setRemovendo(false)
+    }
+  }
+
   const colunas = useMemo<ColumnDef<AlcadaPorUsuarioLinha>[]>(
     () => [
+      ...(podeEditar
+        ? [
+            {
+              id: 'marcar',
+              header: () => (
+                <Checkbox
+                  checked={todosFiltradosMarcados}
+                  onCheckedChange={(v) => (v === true ? marcarFiltrados() : desmarcarFiltrados())}
+                  aria-label="Marcar ou desmarcar todas as linhas visíveis"
+                />
+              ),
+              cell: ({ row }: { row: { original: AlcadaPorUsuarioLinha } }) => (
+                <Checkbox
+                  checked={marcados.has(row.original.id)}
+                  onCheckedChange={() => alternarMarcado(row.original.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Selecionar ${row.original.centro_custo}`}
+                />
+              ),
+              enableSorting: false,
+            } satisfies ColumnDef<AlcadaPorUsuarioLinha>,
+          ]
+        : []),
       { accessorKey: 'centro_custo', header: 'Conta (centro de custo)' },
       { accessorKey: 'centro_custo_nome', header: 'Nome do centro de custo' },
       { accessorKey: 'nivel', header: 'Ordem (nível)' },
@@ -137,7 +268,7 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
           ),
       },
     ],
-    []
+    [podeEditar, marcados, todosFiltradosMarcados, filtro]
   )
 
   async function exportarCsv() {
@@ -190,9 +321,9 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
         <CardHeader>
           <CardTitle className="text-lg">Alçadas por usuário</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Somente leitura: todas as alçadas em que o usuário aparece como aprovador na unidade (inclui logins com o
-            mesmo e-mail no GUSUARIO). &quot;Visível na lista&quot; usa a tabela de filtro da unidade (ex. USUARIOCCUSTO_EXPLICIT
-            na WAY 306), como a guia Centros de custo.
+            Consulte o usuário e use <strong>remover como aprovador em lote</strong> — vários centros de custo de uma
+            vez, sem abrir cada alçada na guia Centros de custo. A remoção fica no histórico (AUDIT_LOG). Inclui logins
+            com o mesmo e-mail no GUSUARIO.
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end">
@@ -281,6 +412,57 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
             </Card>
           </div>
 
+          {podeEditar && dados.linhas.length > 0 && (
+            <Card className="border-destructive/25 bg-destructive/[0.04]">
+              <CardContent className="flex flex-col gap-3 pt-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <ListChecks className="h-4 w-4" /> Remoção em lote (por usuário consultado)
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-3xl">
+                    Use o filtro para limitar os CCs. Você pode retirar <strong>só {dados.usuario}</strong> ou{' '}
+                    <strong>todos os aprovadores</strong> daqueles centros (nível da linha ou todos os níveis do CC).
+                    {filtro.trim()
+                      ? ` Visíveis agora: ${linhasFiltradas.length} linha(s) de ${dados.linhas.length}.`
+                      : ` ${dados.linhas.length} linha(s) na consulta.`}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    disabled={linhasFiltradas.length === 0}
+                    onClick={() => abrirRemoverTodasListadas('usuario')}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Só {dados.usuario} — todas listadas ({linhasFiltradas.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="shrink-0"
+                    disabled={linhasFiltradas.length === 0}
+                    onClick={() => abrirRemoverTodasListadas('todos_nivel')}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Todos do nível da linha — CCs listados ({linhasFiltradas.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="shrink-0 bg-destructive/90"
+                    disabled={linhasFiltradas.length === 0}
+                    onClick={() => abrirRemoverTodasListadas('todos_centro')}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Todos os níveis do CC — centros listados
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent className="flex flex-col gap-3 pt-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -305,20 +487,75 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
                 <Button type="button" variant="outline" size="sm" onClick={() => void exportarCsv()} disabled={!linhasFiltradas.length}>
                   <Download className="mr-2 h-4 w-4" /> Exportar CSV
                 </Button>
+                {podeEditar && linhasFiltradas.length > 0 && (
+                  <>
+                    <Button type="button" variant="outline" size="sm" onClick={marcarFiltrados}>
+                      Marcar filtrados ({linhasFiltradas.length})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={marcados.size === 0}
+                      onClick={() => setMarcados(new Set())}
+                    >
+                      Limpar marcação
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={marcados.size === 0}
+                      onClick={() => abrirRemover('usuario')}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remover selecionadas ({marcados.size})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={marcados.size === 0}
+                      onClick={() => abrirRemover('todos_nivel')}
+                    >
+                      Todos do nível (sel.)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={marcados.size === 0}
+                      onClick={() => abrirRemover('todos_centro')}
+                    >
+                      Todos do CC (sel.)
+                    </Button>
+                  </>
+                )}
               </div>
               <DataTable
                 columns={colunas}
                 data={linhasFiltradas}
                 loading={carregando}
                 hideSearch
-                onRowClick={onAbrirCentro ? (linha) => onAbrirCentro(linha.centro_custo) : undefined}
+                onRowClick={
+                  podeEditar
+                    ? (linha) => alternarMarcado(linha.id)
+                    : onAbrirCentro
+                      ? (linha) => onAbrirCentro(linha.centro_custo)
+                      : undefined
+                }
               />
               {dados.resumo.total_linhas === 0 && (
                 <p className="text-center text-sm text-muted-foreground">
                   Este usuário não está em nenhuma alçada nesta unidade.
                 </p>
               )}
-              {onAbrirCentro && linhasFiltradas.length > 0 && (
+              {podeEditar && linhasFiltradas.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Clique na linha ou use o checkbox para incluir no lote de remoção.
+                </p>
+              )}
+              {!podeEditar && onAbrirCentro && linhasFiltradas.length > 0 && (
                 <p className="text-xs text-muted-foreground">Clique na linha para localizar o centro na guia Centros de custo.</p>
               )}
             </CardContent>
@@ -329,6 +566,88 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, on
       {!dados && !carregando && (
         <p className="text-center text-sm text-muted-foreground">Selecione um usuário e clique em Consultar.</p>
       )}
+
+      <Dialog open={dialogRemover} onOpenChange={setDialogRemover}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirmar remoção em lote</DialogTitle>
+            <DialogDescription asChild>
+              {dados && (
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>
+                    Unidade <strong className="text-foreground">{dados.unidade}</strong> ·{' '}
+                    <strong className="text-foreground">{resumoRemocao.centros}</strong> centro(s) de custo ·{' '}
+                    <strong className="text-foreground">{marcados.size}</strong> linha(s) de referência
+                  </p>
+                  {modoRemocao === 'usuario' && (
+                    <p>
+                      Remove <strong className="text-foreground">{dados.usuario}</strong> apenas —{' '}
+                      <strong className="text-foreground">{resumoRemocao.aprovadores}</strong> registro(s) de aprovador.
+                    </p>
+                  )}
+                  {modoRemocao === 'todos_nivel' && (
+                    <p>
+                      Remove <strong className="text-foreground">todos os aprovadores do mesmo nível</strong> (ordem da
+                      linha) em cada CC marcado — inclui colegas além de {dados.usuario}. Estimativa:{' '}
+                      <strong className="text-foreground">{resumoRemocao.aprovadores ?? '—'}</strong> registro(s).
+                    </p>
+                  )}
+                  {modoRemocao === 'todos_centro' && (
+                    <p className="text-destructive/90">
+                      Remove <strong>todos os aprovadores de todos os níveis</strong> nos centros de custo das linhas
+                      marcadas. Operação ampla — confira o filtro antes de confirmar.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant={modoRemocao === 'usuario' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setModoRemocao('usuario')}
+                    >
+                      Só o usuário
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={modoRemocao === 'todos_nivel' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setModoRemocao('todos_nivel')}
+                    >
+                      Todos do nível
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={modoRemocao === 'todos_centro' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setModoRemocao('todos_centro')}
+                    >
+                      Todos do CC
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="motivo-remocao-alcada">Motivo (opcional, recomendado)</Label>
+            <Input
+              id="motivo-remocao-alcada"
+              value={motivoRemocao}
+              onChange={(e) => setMotivoRemocao(e.target.value)}
+              placeholder="Ex.: desligamento, troca de função…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogRemover(false)} disabled={removendo}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmarRemocao()} disabled={removendo}>
+              {removendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirmar remoção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

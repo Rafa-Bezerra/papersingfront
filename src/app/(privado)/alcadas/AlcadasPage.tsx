@@ -9,8 +9,9 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, UserSearch, X } from 'lucide-react'
+import { ChevronsUpDown, History, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, UserSearch, X } from 'lucide-react'
 import AlcadasPorUsuario from './AlcadasPorUsuario'
+import AlcadasHistorico from './AlcadasHistorico'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -91,10 +92,13 @@ export default function Page() {
           ? 'transferencia'
           : tabParam === 'por-usuario'
             ? 'por-usuario'
-            : 'centros'
+            : tabParam === 'historico'
+              ? 'historico'
+              : 'centros'
     )
     const [ehCsc, setEhCsc] = useState(false)
     const [ehAdmin, setEhAdmin] = useState(false)
+    const [podeEditarAlcadas, setPodeEditarAlcadas] = useState(false)
     const [unidadeLogada, setUnidadeLogada] = useState('')
 
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -171,18 +175,28 @@ export default function Page() {
     useEffect(() => {
         let csc = false
         let unidade = ''
+        let admin = false
         try {
             const raw = sessionStorage.getItem('userData')
             if (raw) {
                 const u = JSON.parse(raw)
                 unidade = String(u.unidade ?? u.UNIDADE ?? '').trim()
                 csc = unidade.toUpperCase() === 'WAY CSC'
-                setEhAdmin(Boolean(u.admin))
+                admin = Boolean(u.admin)
+                setEhAdmin(admin)
+                setPodeEditarAlcadas(admin || Boolean(u.config_alcadas))
             }
         } catch { /* ignore */ }
         setEhCsc(csc)
         setUnidadeLogada(unidade)
         if (!csc && (aba === 'substituicao' || aba === 'transferencia')) {
+            setAba('centros')
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('tab')
+            const qs = params.toString()
+            router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
+        }
+        if (!admin && aba === 'historico') {
             setAba('centros')
             const params = new URLSearchParams(searchParams.toString())
             params.delete('tab')
@@ -607,9 +621,11 @@ export default function Page() {
 
     function trocarAba(value: string) {
         if ((value === 'substituicao' || value === 'transferencia') && !ehCsc) return
+        if (value === 'historico' && !ehAdmin) return
         setAba(value)
         const params = new URLSearchParams(searchParams.toString())
-        if (value === 'substituicao' || value === 'transferencia' || value === 'por-usuario') params.set('tab', value)
+        if (value === 'substituicao' || value === 'transferencia' || value === 'por-usuario' || value === 'historico')
+            params.set('tab', value)
         else params.delete('tab')
         const qs = params.toString()
         router.replace(qs ? `/alcadas?${qs}` : '/alcadas', { scroll: false })
@@ -633,6 +649,11 @@ export default function Page() {
                     {ehCsc && (
                         <TabsTrigger value="transferencia">
                             <ArrowRightLeft className="w-4 h-4" /> Transferência definitiva
+                        </TabsTrigger>
+                    )}
+                    {ehAdmin && (
+                        <TabsTrigger value="historico">
+                            <History className="w-4 h-4" /> Histórico
                         </TabsTrigger>
                     )}
                 </TabsList>
@@ -709,6 +730,7 @@ export default function Page() {
                     <AlcadasPorUsuario
                         unidadeLogada={unidadeLogada}
                         podeTrocarUnidade={ehCsc || ehAdmin}
+                        podeEditar={podeEditarAlcadas}
                         onAbrirCentro={irParaCentroDeCusto}
                     />
                 </TabsContent>
@@ -721,6 +743,11 @@ export default function Page() {
                 {ehCsc && (
                     <TabsContent value="transferencia" className="mt-0">
                         <TransferenciaAlcadasPanel />
+                    </TabsContent>
+                )}
+                {ehAdmin && (
+                    <TabsContent value="historico" className="mt-0">
+                        <AlcadasHistorico unidadeLogada={unidadeLogada} podeFiltrarUnidade={ehCsc || ehAdmin} />
                     </TabsContent>
                 )}
             </Tabs>
