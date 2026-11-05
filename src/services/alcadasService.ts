@@ -167,8 +167,25 @@ export async function getAlcadasHistorico(params: {
     if (params.de) qs.set('de', params.de)
     if (params.ate) qs.set('ate', params.ate)
     if (params.top) qs.set('top', String(params.top))
-    const res = await fetch(`${API_BASE}/api/${caminho}/historico?${qs.toString()}`, { headers: headers() })
-    if (!res.ok) throw await erroDaResposta(res, 'consultar histórico de alçadas')
+    const urls = [
+        `${API_BASE}/api/${caminho}/historico?${qs.toString()}`,
+        `${API_BASE}/api/HistoricoUsuario/alcadas?${qs.toString()}`,
+    ]
+    let res: Response | null = null
+    let lastMsg = ''
+    for (const url of urls) {
+        res = await fetch(url, { headers: headers() })
+        if (res.ok) break
+        lastMsg = await res.text()
+        if (res.status !== 404) break
+    }
+    if (!res?.ok) {
+        const hint =
+            res?.status === 404
+                ? ' Endpoint não encontrado — faça deploy da API (papersingapi-update.zip) ou reinicie o dotnet run local.'
+                : ''
+        throw new Error((lastMsg?.trim() || `Erro ${res?.status ?? 0} ao consultar histórico de alçadas`) + hint)
+    }
     const data = (await res.json()) as Record<string, unknown>
     const raw = (data.eventos ?? data.Eventos ?? []) as Record<string, unknown>[]
     return {
