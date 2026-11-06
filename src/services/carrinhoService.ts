@@ -50,11 +50,17 @@ export async function getAllProdutos(data: string): Promise<Produto[]> {
     return list;
 }
 
-export async function createElement(data: Carrinho): Promise<void> {
+export async function createElement(data: Carrinho): Promise<{ aviso?: string; idmov?: number }> {
     const res = await fetch(`${API_BASE}/api/${caminho}/enviarsoap`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
     if (!res.ok) {
         const body = await res.text();
         throw new Error(extrairMensagemErroApi(body, `Erro ${res.status} ao enviar o carrinho.`));
+    }
+    try {
+        const json = (await res.json()) as { aviso?: string; idmov?: number };
+        return { aviso: json.aviso, idmov: json.idmov };
+    } catch {
+        return {};
     }
 }
 

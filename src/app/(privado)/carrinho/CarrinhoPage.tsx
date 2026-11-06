@@ -238,10 +238,15 @@ export default function Page() {
         try {
             if (editar != null) {
                 await updateElement(editar, carrinho)
+                toast.success('Carrinho enviado com sucesso!')
             } else {
-                await createElement(carrinho)
+                const r = await createElement(carrinho)
+                if (r.aviso) {
+                    toast.warning(r.aviso, { duration: 15_000, closeButton: true })
+                } else {
+                    toast.success('Carrinho enviado com sucesso!')
+                }
             }
-            toast.success('Carrinho enviado com sucesso!')
             window.location.reload()
         } catch (err) {
             // Falha de envio: toast mais longo + botão de fechar para o usuário conseguir ler
@@ -722,9 +727,9 @@ export default function Page() {
                                                         <CommandList>
                                                             <CommandEmpty>Nenhum encontrado</CommandEmpty>
                                                             <CommandGroup>
-                                                                {contasFinanceiras.map(x => (
+                                                                {contasFinanceiras.map((x, idx) => (
                                                                     <CommandItem
-                                                                        key={x.codconta}
+                                                                        key={`${x.codconta}|${x.contabil}|${idx}`}
                                                                         value={`${x.codconta} - ${x.contabil}`}
                                                                         onSelect={() => {
                                                                             field.onChange(x.codconta)
