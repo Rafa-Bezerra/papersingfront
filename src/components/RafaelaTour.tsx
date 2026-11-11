@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { API_BASE, headers, apiFetch } from '@/utils/constants'
+import { canAccessConfigRoute, type ConfigMenuSession } from '@/lib/configuracoes-permissoes'
 import { marcarTourRaphaelaAberto } from '@/utils/pendenciaNavigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
@@ -74,6 +75,34 @@ function usuarioPodePagamentosCi(): boolean {
 function usuarioPodeFinanceiroRm(): boolean {
   const u = lerUserData()
   return Boolean(u?.financeiro_totvs)
+}
+
+function sessaoConfigMenu(): ConfigMenuSession | null {
+  const u = lerUserData()
+  if (!u) return null
+  return u as ConfigMenuSession
+}
+
+/** Mesma regra de rota: /alcadas → admin ou Config: Alçadas. */
+function usuarioPodeAlcadas(): boolean {
+  const u = sessaoConfigMenu()
+  if (!u) return false
+  return canAccessConfigRoute('/alcadas', u)
+}
+
+/** Mesma regra de rota: /centros-custos → admin ou permissão CCUSTO. */
+function usuarioPodeCentrosCustos(): boolean {
+  const u = sessaoConfigMenu()
+  if (!u) return false
+  return canAccessConfigRoute('/centros-custos', u)
+}
+
+function usuarioDeveVerTourAlcadasCc(): boolean {
+  return usuarioPodeAlcadas() || usuarioPodeCentrosCustos()
+}
+
+function usuarioEhAdmin(): boolean {
+  return Boolean(lerUserData()?.admin)
 }
 
 function passoEhReceitas(passo: TourPasso): boolean {
@@ -173,6 +202,38 @@ function passoEhPendencias(passo: TourPasso): boolean {
   return false
 }
 
+function passoEhAlcadas(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  const rota = (passo.rota || '').trim().toLowerCase()
+  if (sel.includes('tour-alcadas') || sel.includes('tour-menu-alcadas')) return true
+  if (rota.includes('/alcadas')) return true
+  return false
+}
+
+function passoEhCentrosCustos(passo: TourPasso): boolean {
+  const sel = (passo.seletorCss || '').trim().toLowerCase()
+  const rota = (passo.rota || '').trim().toLowerCase()
+  if (sel.includes('tour-cc') || sel.includes('tour-menu-centros-custos')) return true
+  if (rota.includes('/centros-custos')) return true
+  return false
+}
+
+function passoEhHistoricoAlcadas(passo: TourPasso): boolean {
+  return (passo.seletorCss || '').trim().toLowerCase() === '#tour-alcadas-historico'
+}
+
+function passoEhHistoricoCentrosCustos(passo: TourPasso): boolean {
+  return (passo.seletorCss || '').trim().toLowerCase() === '#tour-cc-historico'
+}
+
+/** Tour publicado só com novidades de Alçadas e Centros de custo (versão 3.8). */
+function tourEhAlcadasCentrosCusto(tour: TourPendente | null): boolean {
+  if (tour?.versao === '3.8') return true
+  return Boolean(
+    tour?.passos?.some((p) => passoEhAlcadas(p) || passoEhCentrosCustos(p))
+  )
+}
+
 const NOME_MODULO_ASSINATURA = 'WaySign'
 
 /** Nome do módulo no menu/tour (WaySign). Mantém PlugSign só como provedor externo de assinatura. */
@@ -218,12 +279,17 @@ function filtrarPassosPorPermissao(passos: TourPasso[]): TourPasso[] {
   const podeReceitas = usuarioPodeReceitas()
   const podeCi = usuarioPodePagamentosCi()
   const podeFinRm = usuarioPodeFinanceiroRm()
+  const podeAlcadas = usuarioPodeAlcadas()
+  const podeCc = usuarioPodeCentrosCustos()
   const temAlgumModulo = true
 
   return passos.filter((p) => {
     if (!p.seletorCss || !p.seletorCss.trim()) return false
 
     if (passoEhGlpi(p)) return true
+    if (passoEhHistoricoAlcadas(p) || passoEhHistoricoCentrosCustos(p)) return false
+    if (passoEhAlcadas(p)) return podeAlcadas
+    if (passoEhCentrosCustos(p)) return podeCc
     if (passoEhPendencias(p)) return true
     if (passoEhMenuGeral(p)) return temAlgumModulo
     if (passoEhReceitas(p)) return podeReceitas
@@ -284,6 +350,31 @@ function mensagemFimDocumentosNoWaySign(): string {
   if (usuarioPodePlugSign()) {
     texto +=
       '\n• Solicitações e Clientes e parceiros: envio para assinatura pela PlugSign, como antes.'
+  }
+  return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
+}
+
+function mensagemIntroAlcadasCentrosCusto(): string {
+  const mods: string[] = []
+  if (usuarioPodeAlcadas()) mods.push('Alçadas')
+  if (usuarioPodeCentrosCustos()) mods.push('Centros de custo')
+  if (mods.length === 0) {
+    return (
+      'Olá, sou a Raphaela!\n\n' +
+      'No seu perfil esses módulos não estão liberados (precisa ser admin ou ter Config: Alçadas e/ou Centros de custos).\n\n' +
+      'Você pode voltar ou avançar a qualquer momento.'
+    )
+  }
+  const cc = `Vou mostrar o que mudou em ${mods.join(' e ')}: comparação com inclusão em lote e consulta sempre na sua unidade.`
+  return `Olá, sou a Raphaela!\n\n${cc}\n\nVocê pode voltar ou avançar a qualquer momento.`
+}
+
+function mensagemFimAlcadasCentrosCusto(): string {
+  let texto =
+    'Pronto! Recapitulando:\n\n• Comparação (Alçadas e CC × usuários): marcar centros, exportar planilha, e em Centros de custo incluir ou remover colaborador em lote nos CCs marcados.\n• Unidade: cada base enxerga só a própria unidade — a consulta usa sempre a unidade em que você está logado.'
+  if (!usuarioDeveVerTourAlcadasCc()) {
+    texto =
+      'No seu perfil, Alçadas e Centros de custo dependem de permissão de configuração (admin, Config: Alçadas ou Centros de custos). Se precisar, abra chamado no GLPI.'
   }
   return `${texto}\n\nSe precisar de ajuda, use o ícone de Suporte (GLPI) ou fale com a equipe de TI.\n\nBom trabalho!`
 }
@@ -466,6 +557,64 @@ function fecharSolicitarSeAberto(): void {
 }
 
 /** Abre a aba correta do PlugSign (como o Novo da CI abre o formulário). */
+const ABAS_ALCADAS: Record<string, string> = {
+  '#tour-alcadas-comparacao': 'comparacao',
+  '#tour-alcadas-historico': 'historico',
+}
+
+const ABAS_CENTROS_CUSTOS: Record<string, string> = {
+  '#tour-cc-comparacao': 'comparacao',
+  '#tour-cc-historico': 'historico',
+}
+
+async function ativarAbaAlcadasSePreciso(seletor: string): Promise<void> {
+  const valor = ABAS_ALCADAS[seletor]
+  if (!valor) return
+  const tab =
+    document.querySelector(`button[value="${valor}"]`) ??
+    Array.from(document.querySelectorAll('#tour-alcadas-abas button')).find((b) =>
+      b.textContent?.toLowerCase().includes(valor === 'comparacao' ? 'comparação' : 'histórico')
+    )
+  if (tab instanceof HTMLElement) {
+    clicarAbaRadix(tab)
+    await new Promise((r) => setTimeout(r, 400))
+  }
+  await esperarSeletor(seletor, 4000)
+}
+
+/** Alçadas e CC costumam ficar só em Configurações — abre o bloco antes de destacar o link. */
+async function abrirMenuConfigSePreciso(seletor: string): Promise<void> {
+  if (seletor !== '#tour-menu-alcadas' && seletor !== '#tour-menu-centros-custos') return
+  if (document.querySelector(seletor)) return
+
+  const configBtn = Array.from(document.querySelectorAll('button[aria-expanded]')).find((b) =>
+    (b.textContent ?? '').includes('Configurações')
+  )
+  if (configBtn instanceof HTMLElement && configBtn.getAttribute('aria-expanded') === 'false') {
+    configBtn.click()
+    await new Promise((r) => setTimeout(r, 350))
+  }
+  await esperarSeletor(seletor, 2500)
+}
+
+async function ativarAbaCentrosCustosSePreciso(seletor: string): Promise<void> {
+  const valor = ABAS_CENTROS_CUSTOS[seletor]
+  if (!valor) return
+  const tab =
+    document.querySelector(`button[value="${valor}"]`) ??
+    Array.from(document.querySelectorAll('#tour-cc-abas button')).find((b) => {
+      const t = b.textContent?.toLowerCase() ?? ''
+      if (valor === 'comparacao') return t.includes('comparação usuários')
+      if (valor === 'historico') return t.includes('histórico')
+      return false
+    })
+  if (tab instanceof HTMLElement) {
+    clicarAbaRadix(tab)
+    await new Promise((r) => setTimeout(r, 400))
+  }
+  await esperarSeletor(seletor, 4000)
+}
+
 async function ativarAbaPlugSignSePreciso(seletor: string): Promise<void> {
   const valorAba = abaPlugSignPorSeletor(seletor)
   if (!valorAba) return
@@ -525,6 +674,16 @@ function limparPopoversDriverExtras(): void {
   }
 }
 
+/** Remove overlay e popovers do Driver.js (evita tela final + passo ao mesmo tempo). */
+function limparDriverCompleto(): void {
+  document.querySelectorAll('.driver-popover').forEach((el) => el.remove())
+  document.querySelectorAll('.driver-overlay').forEach((el) => el.remove())
+  document.getElementById('driver-highlighted-element-stage')?.remove()
+  document.getElementById('driver-page-overlay')?.remove()
+  document.body.classList.remove('driver-active')
+  document.documentElement.classList.remove('driver-active')
+}
+
 async function prepararPasso(
   passo: TourPasso,
   routerPush: (href: string) => void
@@ -544,6 +703,9 @@ async function prepararPasso(
 
   await ativarAbaReceitasSePreciso(seletor)
   await ativarFormCiSePreciso(seletor)
+  await abrirMenuConfigSePreciso(seletor)
+  await ativarAbaAlcadasSePreciso(seletor)
+  await ativarAbaCentrosCustosSePreciso(seletor)
   await ativarAbaPlugSignSePreciso(seletor)
 
   let el = await esperarSeletor(seletor)
@@ -585,6 +747,7 @@ export default function RafaelaTour() {
   const navLockRef = useRef(false)
   const introTimerRef = useRef<number | null>(null)
   const tourIniciadoRef = useRef(false)
+  const encerrarTourGuiadoRef = useRef(false)
 
   const marcarVisualizado = useCallback(async (versao: string) => {
     try {
@@ -600,8 +763,14 @@ export default function RafaelaTour() {
 
   const fecharTudo = useCallback(
     async (marcar: boolean) => {
-      driverRef.current?.destroy()
+      encerrarTourGuiadoRef.current = true
+      try {
+        driverRef.current?.destroy()
+      } catch {
+        /* silencioso */
+      }
       driverRef.current = null
+      limparDriverCompleto()
       setAberto(false)
       setFase('idle')
       setAnimApontar(false)
@@ -615,6 +784,7 @@ export default function RafaelaTour() {
 
   /** Encerra os destaques e vai para a tela final (Entendido / ver de novo). */
   const irParaFinal = useCallback(() => {
+    encerrarTourGuiadoRef.current = true
     finalizandoRef.current = true
     try {
       driverRef.current?.destroy()
@@ -622,6 +792,7 @@ export default function RafaelaTour() {
       /* silencioso */
     }
     driverRef.current = null
+    limparDriverCompleto()
     setAnimApontar(false)
     // Fecha formulário da CI se o tour tiver aberto no meio do passo a passo.
     try {
@@ -677,6 +848,13 @@ export default function RafaelaTour() {
             const guias = document.querySelector('#tour-plugsign-guias')
             if (guias) return guias
           }
+          if (sel === '#tour-menu-alcadas' || sel === '#tour-menu-centros-custos') {
+            return (
+              (document.querySelector('#tour-sidebar') as Element) ||
+              (document.querySelector('#tour-receitas-abas') as Element) ||
+              document.body
+            )
+          }
           return (
             (document.querySelector('#tour-receitas-abas') as Element) ||
             document.body
@@ -718,6 +896,7 @@ export default function RafaelaTour() {
       },
       onHighlighted: () => {
         limparPopoversDriverExtras()
+        if (tourEhAlcadasCentrosCusto(tour)) return
         try {
           d.refresh()
         } catch {
@@ -725,19 +904,27 @@ export default function RafaelaTour() {
         }
       },
       onDestroyStarted: () => {
+        // Troca de rota/aba no meio do passo — ignorar destroy fantasma do Driver.
+        if (navLockRef.current) return
         if (finalizandoRef.current) {
           d.destroy()
+          limparDriverCompleto()
           return
         }
+        finalizandoRef.current = true
         d.destroy()
+        limparDriverCompleto()
+        driverRef.current = null
         setAnimApontar(false)
         setFase('fim')
+        encerrarTourGuiadoRef.current = false
+        finalizandoRef.current = false
       },
       onDestroyed: () => {
         driverRef.current = null
         navLockRef.current = false
         setAnimApontar(false)
-        document.querySelectorAll('.driver-popover').forEach((el) => el.remove())
+        limparDriverCompleto()
       },
       onNextClick: (_el, _step, { driver: drv }) => {
         void (async () => {
@@ -745,10 +932,15 @@ export default function RafaelaTour() {
           navLockRef.current = true
           try {
             if (drv.isLastStep()) {
+              encerrarTourGuiadoRef.current = true
               finalizandoRef.current = true
               drv.destroy()
+              limparDriverCompleto()
+              driverRef.current = null
               setFase('fim')
               setAnimApontar(false)
+              encerrarTourGuiadoRef.current = false
+              finalizandoRef.current = false
               return
             }
             const next = passosRef.current[(drv.getActiveIndex() ?? 0) + 1]
@@ -810,10 +1002,15 @@ export default function RafaelaTour() {
         })()
       },
       onCloseClick: (_el, _step, { driver: drv }) => {
+        encerrarTourGuiadoRef.current = true
         finalizandoRef.current = true
         drv.destroy()
+        limparDriverCompleto()
+        driverRef.current = null
         setFase('fim')
         setAnimApontar(false)
+        encerrarTourGuiadoRef.current = false
+        finalizandoRef.current = false
       },
     })
 
@@ -859,6 +1056,27 @@ export default function RafaelaTour() {
         const data = (await res.json()) as TourPendente
         if (!data?.exibir || !data.versao) return
 
+        if (data.versao === '3.8') {
+          const perfil = lerUserData()
+          if (!perfil) {
+            // Evita marcar "visualizado" antes do login gravar userData (senão admin/financeiro perde o tour).
+            tentouBuscarRef.current = false
+            return
+          }
+          if (!usuarioDeveVerTourAlcadasCc()) {
+            try {
+              await apiFetch(`${API_BASE}/api/TourAssistente/visualizado`, {
+                method: 'POST',
+                headers: headers(),
+                body: JSON.stringify({ versao: data.versao }),
+              })
+            } catch {
+              /* silencioso */
+            }
+            return
+          }
+        }
+
         setTour(data)
       } catch {
         tentouBuscarRef.current = false
@@ -872,6 +1090,16 @@ export default function RafaelaTour() {
     tourIniciadoRef.current = true
     setAberto(true)
     setFase('intro')
+
+    // Tour Alçadas/CC: só avança no clique em Próximo (evita fechar a intro sozinho).
+    if (tourEhAlcadasCentrosCusto(tour)) {
+      return () => {
+        if (introTimerRef.current) {
+          window.clearTimeout(introTimerRef.current)
+          introTimerRef.current = null
+        }
+      }
+    }
 
     if (introTimerRef.current) window.clearTimeout(introTimerRef.current)
     introTimerRef.current = window.setTimeout(() => {
@@ -892,7 +1120,10 @@ export default function RafaelaTour() {
   }, [fase, tour, iniciarPassos])
 
   useEffect(() => {
-    if (fase === 'fim') fecharSolicitarSeAberto()
+    if (fase === 'fim') {
+      limparDriverCompleto()
+      fecharSolicitarSeAberto()
+    }
   }, [fase])
 
   useEffect(() => {
@@ -910,15 +1141,24 @@ export default function RafaelaTour() {
 
   const waySignCompleto = tourEhWaySignCompleto(tour)
   const docsNoWaySign = tourEhDocumentosNoWaySign(tour)
+  const alcadasCc = tourEhAlcadasCentrosCusto(tour)
   const balãoTexto =
     fase === 'intro' || fase === 'auto-start'
-      ? waySignCompleto
-        ? mensagemIntroWaySignCompleto()
-        : docsNoWaySign ? mensagemIntroDocumentosNoWaySign() : mensagemIntroPorPerfil()
+      ? alcadasCc
+        ? mensagemIntroAlcadasCentrosCusto()
+        : waySignCompleto
+          ? mensagemIntroWaySignCompleto()
+          : docsNoWaySign
+            ? mensagemIntroDocumentosNoWaySign()
+            : mensagemIntroPorPerfil()
       : fase === 'fim'
-        ? (waySignCompleto
-          ? mensagemFimWaySignCompleto()
-          : docsNoWaySign ? mensagemFimDocumentosNoWaySign() : mensagemFimPorPerfil()) + '\n\nComo deseja continuar?'
+        ? (alcadasCc
+            ? mensagemFimAlcadasCentrosCusto()
+            : waySignCompleto
+              ? mensagemFimWaySignCompleto()
+              : docsNoWaySign
+                ? mensagemFimDocumentosNoWaySign()
+                : mensagemFimPorPerfil()) + '\n\nComo deseja continuar?'
         : 'Siga os destaques na tela. Use Próximo e Anterior no guia.'
 
   return (
@@ -939,7 +1179,17 @@ export default function RafaelaTour() {
                   <button type="button" className="rafaela-btn ghost" onClick={irParaFinal}>
                     Agora não
                   </button>
-                  <button type="button" className="rafaela-btn primary" onClick={iniciarPassos}>
+                  <button
+                    type="button"
+                    className="rafaela-btn primary"
+                    onClick={() => {
+                      if (introTimerRef.current) {
+                        window.clearTimeout(introTimerRef.current)
+                        introTimerRef.current = null
+                      }
+                      iniciarPassos()
+                    }}
+                  >
                     Próximo <ChevronRight className="h-4 w-4" />
                   </button>
                 </>

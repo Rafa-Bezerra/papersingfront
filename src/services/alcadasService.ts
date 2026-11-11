@@ -142,6 +142,7 @@ export type AlcadaLoteRemoverAprovadorResultado = {
 
 export type AlcadaHistoricoEvento = {
     codusuario: string
+    nome?: string
     unidade: string
     dataHora: string
     titulo: string
@@ -192,6 +193,7 @@ export async function getAlcadasHistorico(params: {
         total: Number(data.total ?? data.Total ?? raw.length),
         eventos: raw.map((r) => ({
             codusuario: String(r.codusuario ?? r.Codusuario ?? ''),
+            nome: String(r.nome ?? r.Nome ?? '').trim() || undefined,
             unidade: String(r.unidade ?? r.Unidade ?? ''),
             dataHora: String(r.dataHora ?? r.DataHora ?? ''),
             titulo: String(r.titulo ?? r.Titulo ?? ''),

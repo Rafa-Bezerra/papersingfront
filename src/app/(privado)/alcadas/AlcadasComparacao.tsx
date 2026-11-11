@@ -382,7 +382,7 @@ export default function AlcadasComparacao({ unidadeLogada, podeEditar = false }:
   const pctOk = resumo && resumo.total_com_ancora > 0 ? Math.round((resumo.total_ok / resumo.total_com_ancora) * 100) : 0
 
   return (
-    <div className="space-y-4">
+    <div id="tour-alcadas-comparacao" className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">

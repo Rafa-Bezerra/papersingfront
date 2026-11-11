@@ -2,12 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, Download, GitCompare, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { ChevronsUpDown, Download, GitCompare, Info, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  classesCabecalhoColunaMarcacao,
+  classesCelulaColunaMarcacao,
+  ComparacaoColunaMarcacaoCabecalho,
   ComparacaoLinhaMarcarCheckbox,
   estadoCheckboxListaVisivel,
 } from '@/components/comparacao/ComparacaoMarcarCheckbox'
@@ -43,6 +47,7 @@ import { PopoverPortal } from '@radix-ui/react-popover'
 import {
   CcUsuarioComparacaoResposta,
   getComparacaoUsuariosCentroCusto,
+  incluirUsuariosCcEmLote,
   registrarExportacaoPlanilhaCentrosCustos,
   removerUsuariosCcEmLote,
 } from '@/services/mgoFinanceiroService'
@@ -84,6 +89,9 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
   const [marcadosIncompletos, setMarcadosIncompletos] = useState<Set<string>>(new Set())
   const [motivoRemocao, setMotivoRemocao] = useState('')
   const [removendo, setRemovendo] = useState(false)
+  const [dialogIncluir, setDialogIncluir] = useState(false)
+  const [motivoIncluir, setMotivoIncluir] = useState('')
+  const [incluindo, setIncluindo] = useState(false)
 
   useEffect(() => {
     getAllUsuarios()
@@ -214,13 +222,62 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
 
   function marcarOndeColaboradorEsta() {
     if (!usuarioRemover.trim()) {
-      toast.error('Selecione o colaborador a remover.')
+      toast.error('Selecione o colaborador.')
       return
     }
     setRemocaoSeguraAncora(false)
     const ids = linhasFiltradas.filter((l) => colaboradorPresenteNoCc(l, usuarioRemover)).map((l) => l.ccusto)
     setMarcadosCc(new Set(ids))
     if (ids.length === 0) toast.info('Este colaborador não está vinculado a nenhum CC da lista filtrada.')
+  }
+
+  function marcarOndeColaboradorFalta() {
+    if (!usuarioRemover.trim()) {
+      toast.error('Selecione o colaborador.')
+      return
+    }
+    setRemocaoSeguraAncora(false)
+    const ids = linhasFiltradas
+      .filter((l) => !colaboradorPresenteNoCc(l, usuarioRemover))
+      .map((l) => l.ccusto)
+    setMarcadosCc(new Set(ids))
+    if (ids.length === 0) toast.info('Este colaborador já está vinculado a todos os CCs da lista filtrada.')
+  }
+
+  async function confirmarInclusao() {
+    const login = usuarioRemover.trim()
+    const ccs = [...marcadosCc]
+    if (!login || ccs.length === 0 || !dados) return
+    const centros = ccs.map((cc) => {
+      const linha = dados.linhas.find((l) => l.ccusto === cc)
+      return {
+        ccusto: cc,
+        custo: linha?.custo,
+        diretoria: linha?.diretoria,
+      }
+    })
+    setIncluindo(true)
+    try {
+      const r = await incluirUsuariosCcEmLote({
+        usuario: login,
+        centros,
+        motivo: motivoIncluir.trim() || undefined,
+      })
+      toast.success(
+        `${login}: ${r.inseridos} vínculo(s) criado(s) em ${ccs.length} centro(s) marcado(s). Histórico gravado.`
+      )
+      if (r.centros_ja_existiam?.length) {
+        toast.info(`${r.centros_ja_existiam.length} CC(s) já tinham vínculo com este login.`)
+      }
+      setDialogIncluir(false)
+      setMotivoIncluir('')
+      setMarcadosCc(new Set())
+      await comparar()
+    } catch (e) {
+      mostrarErro(e)
+    } finally {
+      setIncluindo(false)
+    }
   }
 
   const ccsCompletosAncora = useMemo(() => {
@@ -292,16 +349,25 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
     if (dados) {
       cols.push({
         id: 'marcar-incompleto',
+        meta: {
+          headerClassName: classesCabecalhoColunaMarcacao('planilha'),
+          cellClassName: classesCelulaColunaMarcacao('planilha'),
+        },
         header: () => (
-          <Checkbox
-            checked={estadoCheckboxListaVisivel(qtdMarcadosVisiveis, linhasFiltradas.length)}
-            disabled={linhasFiltradas.length === 0}
-            onCheckedChange={(v) => {
-              if (v === true) marcarTodosVisiveis()
-              else desmarcarTodosVisiveis()
-            }}
-            aria-label="Marcar ou desmarcar todos os visíveis"
-            title="Marca todos os visíveis; se já estiverem marcados, desmarca só os visíveis"
+          <ComparacaoColunaMarcacaoCabecalho
+            tipo="planilha"
+            titulo="Planilha"
+            checkbox={
+              <Checkbox
+                checked={estadoCheckboxListaVisivel(qtdMarcadosVisiveis, linhasFiltradas.length)}
+                disabled={linhasFiltradas.length === 0}
+                onCheckedChange={(v) => {
+                  if (v === true) marcarTodosVisiveis()
+                  else desmarcarTodosVisiveis()
+                }}
+                aria-label="Marcar todos para exportação"
+              />
+            }
           />
         ),
         cell: ({ row }) => {
@@ -310,7 +376,8 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
             <ComparacaoLinhaMarcarCheckbox
               checked={marcadosIncompletos.has(cc)}
               onToggle={() => alternarMarcadoLinha(cc)}
-              aria-label={`Marcar ${cc}`}
+              aria-label={`Marcar ${cc} para exportar`}
+              alinhamento="center"
             />
           )
         },
@@ -319,27 +386,36 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
     if (usuarioRemover.trim()) {
       cols.push({
         id: 'marcar',
+        meta: {
+          headerClassName: classesCabecalhoColunaMarcacao('vinculo'),
+          cellClassName: classesCelulaColunaMarcacao('vinculo'),
+        },
         header: () => (
-          <Checkbox
-            checked={
-              linhasFiltradas.length > 0 && linhasFiltradas.every((l) => marcadosCc.has(l.ccusto))
+          <ComparacaoColunaMarcacaoCabecalho
+            tipo="vinculo"
+            titulo="Vínculo"
+            checkbox={
+              <Checkbox
+                checked={
+                  linhasFiltradas.length > 0 && linhasFiltradas.every((l) => marcadosCc.has(l.ccusto))
+                }
+                onCheckedChange={(v) => {
+                  if (v) setMarcadosCc(new Set(linhasFiltradas.map((l) => l.ccusto)))
+                  else setMarcadosCc(new Set())
+                }}
+                aria-label="Marcar todos para incluir ou remover"
+              />
             }
-            onCheckedChange={(v) => {
-              if (v) setMarcadosCc(new Set(linhasFiltradas.map((l) => l.ccusto)))
-              else setMarcadosCc(new Set())
-            }}
-            aria-label="Marcar todos filtrados"
           />
         ),
         cell: ({ row }) => {
           const cc = row.original.ccusto
-          const presente = colaboradorPresenteNoCc(row.original, usuarioRemover)
           return (
             <ComparacaoLinhaMarcarCheckbox
               checked={marcadosCc.has(cc)}
-              disabled={!presente}
               onToggle={() => alternarMarcado(cc)}
-              aria-label={`Marcar ${cc} para remoção`}
+              aria-label={`Marcar ${cc} para incluir ou remover`}
+              alinhamento="center"
             />
           )
         },
@@ -425,9 +501,16 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
         ? `Exportados ${base.length} centro(s) marcado(s).`
         : 'Planilha da comparação exportada.'
     )
+    const ancoraRotulo =
+      nomeAncora.trim() && nomeAncora.trim().toLowerCase() !== dados.ancora.toLowerCase()
+        ? `${nomeAncora.trim()} (${dados.ancora})`
+        : dados.ancora
+    const escopo = somenteMarcadosIncompletos
+      ? `${base.length} centro(s) marcado(s) na comparação`
+      : `${base.length} centro(s) na grade da comparação`
     void registrarExportacaoPlanilhaCentrosCustos(
       somenteMarcadosIncompletos ? 'cc_usuarios_comparacao_marcados' : 'cc_usuarios_comparacao',
-      `Âncora ${dados.ancora}: ${base.length} centro(s)`
+      `Âncora ${ancoraRotulo}: ${escopo}`
     )
   }
 
@@ -446,7 +529,7 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
   const pctOk = resumo && resumo.total_com_ancora > 0 ? Math.round((resumo.total_ok / resumo.total_com_ancora) * 100) : 0
 
   return (
-    <div className="space-y-4">
+    <div id="tour-cc-comparacao" className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -455,7 +538,7 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
           <p className="text-sm text-muted-foreground">
             Quem <strong>usa</strong> cada centro de custo (vínculo na USUARIOCCUSTO): liste CCs com o login âncora e
             confira se os demais colaboradores também estão no mesmo CC. Depois da comparação, você pode{' '}
-            <strong>remover um colaborador</strong> dos CCs marcados.
+            <strong>incluir ou remover colaboradores</strong> nos CCs marcados.
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -556,6 +639,75 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
         </CardContent>
       </Card>
 
+      {dados ? (
+        <Accordion type="single" collapsible className="rounded-lg border border-border bg-muted/20">
+          <AccordionItem value="guia-colunas" className="border-0 px-3">
+            <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+              <span className="flex items-center gap-2 text-left">
+                <Info className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                Dúvida sobre as duas colunas de marcação?
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3 pb-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Na tabela abaixo, a coluna{' '}
+                <span className="font-medium text-sky-700 dark:text-sky-400">azul (1)</span> é planilha; a{' '}
+                <span className="font-medium text-amber-800 dark:text-amber-400">âmbar (2)</span> é incluir ou remover
+                vínculo.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <article className="rounded-md border border-border bg-background p-3 shadow-sm space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
+                      Col. 1
+                    </Badge>
+                    <Download className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <h4 className="text-sm font-semibold text-foreground">Baixar planilha</h4>
+                  </div>
+                  <ul className="list-disc space-y-1.5 pl-4 text-xs text-muted-foreground leading-relaxed">
+                    <li>Marque as linhas e use os botões de exportação na tabela.</li>
+                    <li>
+                      <strong className="font-medium text-foreground">Não altera</strong> quem está cadastrado no centro
+                      de custo.
+                    </li>
+                  </ul>
+                </article>
+                <article className="rounded-md border border-border bg-background p-3 shadow-sm space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
+                      Col. 2
+                    </Badge>
+                    <Plus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <Trash2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <h4 className="text-sm font-semibold text-foreground">Incluir ou remover</h4>
+                  </div>
+                  <ul className="list-disc space-y-1.5 pl-4 text-xs text-muted-foreground leading-relaxed">
+                    <li>Escolha o colaborador no bloco da tabela (a coluna 2 só aparece depois disso).</li>
+                    <li className="flex flex-wrap items-center gap-1">
+                      Para <strong className="font-medium text-foreground">incluir</strong>: marque linhas com{' '}
+                      <Badge variant="outline" className="h-5 border-destructive/50 px-1.5 text-[10px] text-destructive">
+                        Não
+                      </Badge>{' '}
+                      na coluna dele — ou use <em>Marcar CCs onde falta</em>.
+                    </li>
+                    <li className="flex flex-wrap items-center gap-1">
+                      Para <strong className="font-medium text-foreground">remover</strong>: marque linhas com{' '}
+                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                        Sim
+                      </Badge>{' '}
+                      — ou use <em>Marcar CCs onde está vinculado</em>.
+                    </li>
+                  </ul>
+                </article>
+              </div>
+              <p className="text-xs text-muted-foreground border-t border-border/60 pt-3">
+                Dica: clique na linha para marcar a coluna 2 (com colaborador escolhido) ou a coluna 1 (sem colaborador).
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : null}
+
       {resumo && resumo.total_com_ancora > 0 && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -630,10 +782,10 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
         <Card>
           <CardContent className="space-y-4 pt-6">
             <div className="rounded-lg border border-border p-4 space-y-3">
-              <p className="text-sm font-medium">Remover colaborador de centros de custo (manual)</p>
+              <p className="text-sm font-medium">Incluir ou remover colaborador de centros de custo (manual)</p>
               <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
                 <div className="grid min-w-[14rem] gap-2 flex-1">
-                  <Label>Colaborador a remover</Label>
+                  <Label>Colaborador</Label>
                   <Popover modal open={comboRemover} onOpenChange={setComboRemover}>
                     <PopoverTrigger asChild>
                       <Button type="button" variant="outline" className="h-auto min-h-10 w-full justify-between py-2 font-normal">
@@ -668,99 +820,163 @@ export default function CentrosCustosComparacao({ unidadeLogada }: Props) {
                     </PopoverPortal>
                   </Popover>
                 </div>
+                <Button type="button" variant="outline" onClick={marcarOndeColaboradorFalta} disabled={!usuarioRemover}>
+                  Marcar CCs onde falta
+                </Button>
                 <Button type="button" variant="outline" onClick={marcarOndeColaboradorEsta} disabled={!usuarioRemover}>
                   Marcar CCs onde está vinculado
                 </Button>
                 <Button
                   type="button"
+                  disabled={!usuarioRemover || marcadosCc.size === 0}
+                  onClick={() => {
+                    setRemocaoSeguraAncora(false)
+                    setDialogIncluir(true)
+                  }}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Incluir nos {marcadosCc.size} CC marcado(s)
+                </Button>
+                <Button
+                  type="button"
                   variant="destructive"
                   disabled={!usuarioRemover || marcadosCc.size === 0}
-                  onClick={() => setDialogRemover(true)}
+                  onClick={() => {
+                    setRemocaoSeguraAncora(false)
+                    setDialogRemover(true)
+                  }}
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
                   Remover dos {marcadosCc.size} CC marcado(s)
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Para o caso “já conferi os obrigatórios e quero só tirar o âncora”, use o bloco{' '}
-                <strong>Remover o âncora com segurança</strong> acima. Aqui você escolhe outro login ou CCs à mão. A
-                remoção grava no histórico (Admin).
-              </p>
+              {usuarioRemover.trim() ? (
+                <p className="text-xs text-muted-foreground">
+                  Na tabela, <strong className="text-foreground">{marcadosCc.size}</strong> centro(s) de custo marcados
+                  para ação com <strong className="text-foreground">{usuarioRemover}</strong>.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Selecione um colaborador para liberar a 2ª coluna da tabela (incluir ou remover vínculos).
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                placeholder="Filtrar por centro de custo…"
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                className="max-w-md"
-              />
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={soIncompletos} onChange={(e) => setSoIncompletos(e.target.checked)} />
-                Só incompletos
-              </label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={linhasFiltradas.length === 0}
-                onClick={marcarTodosVisiveis}
-              >
-                Marcar todos ({linhasFiltradas.length})
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={incompletosFiltrados.length === 0}
-                onClick={marcarIncompletosVisiveis}
-              >
-                Marcar incompletos ({incompletosFiltrados.length})
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={marcadosIncompletos.size === 0}
-                onClick={() => setMarcadosIncompletos(new Set())}
-              >
-                Limpar marcação ({marcadosIncompletos.size})
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="sm:ml-auto"
-                onClick={() => void exportarComparacao()}
-                disabled={!linhasFiltradas.length}
-              >
-                <Download className="mr-1 h-4 w-4" /> Exportar comparação
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={marcadosIncompletos.size === 0}
-                onClick={() => void exportarComparacao(true)}
-              >
-                <Download className="mr-1 h-4 w-4" /> Exportar marcados
-              </Button>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <Input
+                  placeholder="Filtrar por centro de custo…"
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="max-w-md"
+                />
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={soIncompletos} onChange={(e) => setSoIncompletos(e.target.checked)} />
+                  Só incompletos
+                </label>
+              </div>
+
+              <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/15 p-3">
+                <p className="text-xs font-medium text-foreground">
+                  Coluna 1 — exportação · {qtdMarcadosVisiveis} linha(s) marcada(s)
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={linhasFiltradas.length === 0}
+                    onClick={marcarTodosVisiveis}
+                  >
+                    Marcar todos visíveis ({linhasFiltradas.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={incompletosFiltrados.length === 0}
+                    onClick={marcarIncompletosVisiveis}
+                  >
+                    Marcar incompletos ({incompletosFiltrados.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={marcadosIncompletos.size === 0}
+                    onClick={() => setMarcadosIncompletos(new Set())}
+                  >
+                    Limpar exportação ({marcadosIncompletos.size})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="sm:ml-auto"
+                    onClick={() => void exportarComparacao()}
+                    disabled={!linhasFiltradas.length}
+                  >
+                    <Download className="mr-1 h-4 w-4" /> Exportar comparação
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={marcadosIncompletos.size === 0}
+                    onClick={() => void exportarComparacao(true)}
+                  >
+                    <Download className="mr-1 h-4 w-4" /> Exportar marcados
+                  </Button>
+                </div>
+              </div>
             </div>
             <DataTable
               columns={colunas}
               data={linhasFiltradas}
               loading={carregando}
               hideSearch
-              onRowClick={(linha) => alternarMarcadoLinha(linha.ccusto)}
+              onRowClick={(linha) =>
+                usuarioRemover.trim()
+                  ? alternarMarcado(linha.ccusto)
+                  : alternarMarcadoLinha(linha.ccusto)
+              }
             />
-            <p className="text-xs text-muted-foreground">
-              <strong>Marcar todos</strong> e desmarque na coluna ou na linha o que não quiser exportar.{' '}
-              <strong>{qtdMarcadosVisiveis}</strong> marcado(s) na lista. Remoção de vínculo: coluna extra com
-              colaborador selecionado.
-            </p>
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={dialogIncluir} onOpenChange={setDialogIncluir}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Incluir colaborador em centros de custo</DialogTitle>
+            <DialogDescription asChild>
+              <p className="text-sm text-muted-foreground">
+                O login <strong>{usuarioRemover}</strong> será vinculado a{' '}
+                <strong>{marcadosCc.size}</strong> centro(s) de custo na unidade {unidade || 'logada'}. CCs que já
+                tiverem vínculo serão ignorados.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="motivo-cc-incluir">Motivo (opcional, auditoria)</Label>
+            <Input
+              id="motivo-cc-incluir"
+              value={motivoIncluir}
+              onChange={(e) => setMotivoIncluir(e.target.value)}
+              placeholder="Ex.: cobertura de férias"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogIncluir(false)} disabled={incluindo}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void confirmarInclusao()} disabled={incluindo}>
+              {incluindo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Confirmar inclusão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={dialogRemover}

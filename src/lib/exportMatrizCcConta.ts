@@ -84,3 +84,27 @@ export async function exportarContasDoCentroExcel(
   )
   toast.success(`${linhas.length} conta(s) exportada(s). Abra no Excel.`)
 }
+
+/** Planilha CSV (Excel) — centros de custo de uma conta contábil. */
+export async function exportarCentrosDaContaExcel(
+  conta: string,
+  nomeConta: string,
+  linhas: { centro_custo: string; centro_custo_nome: string }[]
+) {
+  if (!linhas.length) {
+    toast.info('Nenhum centro de custo vinculado a esta conta.')
+    return
+  }
+  const cab = ['Conta contábil', 'Nome conta', 'Centro de custo', 'Descrição CC']
+  const rows = linhas.map((l) =>
+    [conta, nomeConta, l.centro_custo, l.centro_custo_nome].map(escapeCsv).join(';')
+  )
+  const csv = `\uFEFF${cab.join(';')}\r\n${rows.join('\r\n')}\r\n`
+  const slug = conta.replace(/[^\w.-]+/g, '_')
+  await downloadBlobFile(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `conta-cc-${slug}.csv`)
+  void registrarExportacaoPlanilhaCentrosCustos(
+    'cc_conta_por_conta',
+    `Conta ${conta}${nomeConta ? ` — ${nomeConta}` : ''}: ${linhas.length} CC`
+  )
+  toast.success(`${linhas.length} centro(s) exportado(s). Abra no Excel.`)
+}

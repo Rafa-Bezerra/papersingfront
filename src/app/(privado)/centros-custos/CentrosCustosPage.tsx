@@ -461,7 +461,7 @@ export default function Page() {
               )}
               Baixar planilha CC × usuários (Excel)
             </Button>
-          <TabsList className="flex-wrap h-auto w-fit">
+          <TabsList id="tour-cc-abas" className="flex-wrap h-auto w-fit">
             <TabsTrigger value="vinculos">
               <Link2 className="w-4 h-4" /> Vínculos
             </TabsTrigger>
@@ -586,7 +586,7 @@ export default function Page() {
 
         {ehAdmin && (
           <TabsContent value="historico" className="mt-0">
-            <CentrosCustosHistorico unidadeLogada={unidadeLogada} podeFiltrarUnidade={ehCsc || ehAdmin} />
+            <CentrosCustosHistorico unidadeLogada={unidadeLogada} />
           </TabsContent>
         )}
 
