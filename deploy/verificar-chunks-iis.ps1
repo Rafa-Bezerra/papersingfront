@@ -1,7 +1,8 @@
 #Requires -Version 5.1
-# Diagnostico rapido no servidor: HTML vs arquivos em _next (evita "a.q is not a function" = chunk misturado).
+# Diagnostico rapido no servidor: HTML vs arquivos em _next (evita tela preta / 404 em chunk).
 param(
-    [string]$TargetDir = "C:\inetpub\wwwroot\papersign"
+    [string]$TargetDir = "C:\inetpub\wwwroot\papersign",
+    [string]$ZipPath = "C:\inetpub\wwwroot\papersign\papersignfront-dist.zip"
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +33,33 @@ function Test-Html([string]$rel, [string]$label) {
 Write-Host "Pasta: $TargetDir"
 $bi = Join-Path $TargetDir "build-info.txt"
 if (Test-Path $bi) { Write-Host "build-info: $((Get-Content $bi -Raw).Trim())" }
+
+$nextDir = Join-Path $TargetDir "_next"
+$nextCount = (Get-ChildItem -LiteralPath $nextDir -Recurse -File -ErrorAction SilentlyContinue).Count
+if ($nextCount -eq 0) {
+    Write-Host "FALHA: pasta _next vazia ou ausente no site ($nextCount arquivos). Rode aplicar-front.ps1." -ForegroundColor Red
+} else {
+    Write-Host "OK: $nextCount arquivo(s) em _next no disco." -ForegroundColor Green
+}
+
+if (Test-Path -LiteralPath $ZipPath) {
+    $zipItem = Get-Item -LiteralPath $ZipPath
+    Write-Host "ZIP: $($zipItem.FullName) ($([math]::Round($zipItem.Length/1MB, 2)) MB)"
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($zipItem.FullName)
+    try {
+        # No Windows o ZIP usa "\" em FullName; "_next/*" sempre da 0.
+        $nextInZip = ($z.Entries | Where-Object { $_.FullName -like "_next\*" }).Count
+        Write-Host "ZIP: $($z.Entries.Count) entrada(s), _next: $nextInZip"
+        if ($zipItem.Length -lt 80MB -or $nextInZip -lt 50) {
+            Write-Host "FALHA: ZIP pequeno ou sem _next — recopie papersignfront-dist.zip do PC de build." -ForegroundColor Red
+        }
+    } finally {
+        $z.Dispose()
+    }
+} else {
+    Write-Host "AVISO: ZIP nao encontrado em $ZipPath" -ForegroundColor Yellow
+}
 
 Test-Html "home\index.html" "home"
 Test-Html "frotas\index.html" "frotas"
