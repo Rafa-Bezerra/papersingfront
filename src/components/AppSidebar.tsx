@@ -305,6 +305,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                       if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
                       if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
                       if (item.url === "/contratos" && !userModuloContratos && !userAdmin) return null;
+                      if (item.url === "/requisicoes-contrato" && !userModuloContratos && !userAdmin) return null;
                       if (item.url === "/frotas" && FROTAS_FORA_DO_DEPLOY) return null;
                       // Frotas: só admin ou quem tem a flag (financeiro não herda).
                       if (item.url === "/frotas" && !userAdmin && (FROTAS_SO_ADMIN || !userFrotas)) return null;

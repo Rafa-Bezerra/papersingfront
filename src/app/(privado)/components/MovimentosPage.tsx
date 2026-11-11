@@ -6,6 +6,8 @@ interface Props {
     // Recebimento de materiais: consulta a view VW_MOVIMENTACOES_MATERIAIS_<unidade>
     // e considera apenas aprovadores de nível 0 a 2.
     materiais?: boolean;
+    // Só movimentos cuja origem foi marcada com "Gerar contrato" (tela Requisições de contrato).
+    somenteContrato?: boolean;
 }
 
 import React, {
@@ -84,7 +86,7 @@ import {
     FormMessage
 } from '@/components/ui/form'
 
-export default function Page({ titulo, tipos_movimento, materiais = false }: Props) {
+export default function Page({ titulo, tipos_movimento, materiais = false, somenteContrato = false }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -258,7 +260,7 @@ export default function Page({ titulo, tipos_movimento, materiais = false }: Pro
             const situacaoApi = situacaoFiltrada === "Avaliado" ? "" : situacaoFiltrada
             const isPendente = stripDiacritics((situacaoFiltrada ?? "").toUpperCase().trim()) === "EM ANDAMENTO"
             const fromApi = (isPendente && !datasManuais) ? "1900-01-01" : from
-            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, ac.signal, q, true)
+            const dados = await getAllRequisicoes(fromApi, to, tipos_movimento, situacaoApi, "", entregaFiltrada, apenasComNF, materiais, ac.signal, q, true, somenteContrato)
 
             const solicitantesUnicos = Array.from(
                 new Set(
