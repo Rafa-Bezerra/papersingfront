@@ -3,7 +3,7 @@ import { API_BASE, fetchJson } from "@/utils/constants";
 export type AreaContrato = "JURIDICO" | "DU" | "GAF";
 export type StatusContrato = "AGUARDANDO_CONTRATO" | "EM_ASSINATURA" | "CONCLUIDO" | "CANCELADO";
 export type TipoAnexoContrato = "CONTRATO_ASSINADO" | "DOC_ADICIONAL";
-export type SituacaoFiltro = "pendentes" | "concluidos";
+export type SituacaoFiltro = "pendentes" | "concluidos" | "cancelados";
 
 export const AREAS_CONTRATO: { valor: AreaContrato; label: string }[] = [
   { valor: "JURIDICO", label: "Jurídico" },

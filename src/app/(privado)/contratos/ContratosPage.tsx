@@ -837,6 +837,7 @@ export default function ContratosPage() {
             opcoes={[
               { valor: 'pendentes' as SituacaoFiltro, label: 'Pendentes' },
               { valor: 'concluidos' as SituacaoFiltro, label: 'Concluídos' },
+              { valor: 'cancelados' as SituacaoFiltro, label: 'Cancelados' },
             ]}
             valor={situacao}
             onChange={(v) => {
@@ -888,7 +889,7 @@ export default function ContratosPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex flex-col gap-2.5">
           {carregando && itens.length === 0 ? (
             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)
@@ -900,7 +901,9 @@ export default function ContratosPage() {
                 <p className="text-sm text-muted-foreground">
                   {situacao === 'pendentes'
                     ? 'Os contratos criados no TOTVS aparecem aqui.'
-                    : 'Nenhum contrato concluído com esses filtros.'}
+                    : situacao === 'cancelados'
+                      ? 'Nenhum contrato cancelado com esses filtros.'
+                      : 'Nenhum contrato concluído com esses filtros.'}
                 </p>
               </CardContent>
             </Card>
