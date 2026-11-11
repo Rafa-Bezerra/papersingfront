@@ -101,10 +101,6 @@ function usuarioDeveVerTourAlcadasCc(): boolean {
   return usuarioPodeAlcadas() || usuarioPodeCentrosCustos()
 }
 
-function usuarioEhAdmin(): boolean {
-  return Boolean(lerUserData()?.admin)
-}
-
 function passoEhReceitas(passo: TourPasso): boolean {
   const sel = (passo.seletorCss || '').trim().toLowerCase()
   const rota = (passo.rota || '').trim().toLowerCase()
