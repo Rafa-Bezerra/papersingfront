@@ -203,6 +203,20 @@ export async function getContasVinculadasAoCentro(ccusto: string): Promise<MgoFi
     return all.filter((l) => l.centro_custo.trim().toLowerCase() === cc.toLowerCase());
 }
 
+function normCodigoConta(codigo: string) {
+    return codigo.trim().toLowerCase().replace(/\./g, '');
+}
+
+export async function getCentrosVinculadosAConta(conta: string): Promise<MgoFinanceiro[]> {
+    const cod = conta.trim();
+    const qs = new URLSearchParams({ conta: cod });
+    const res = await fetch(`${API_BASE}/api/${caminho}/cc-conta/por-conta?${qs.toString()}`, { headers: headers() });
+    if (res.ok) return res.json();
+    const all = await getAll();
+    const alvo = normCodigoConta(cod);
+    return all.filter((l) => normCodigoConta(l.conta_contabil) === alvo);
+}
+
 /** Tipos gravados em AUDIT_LOG (histórico Admin e relatório de usuários). */
 export type CcPlanilhaAuditoriaTipo =
     | 'cc_usuarios_matriz'
@@ -210,6 +224,7 @@ export type CcPlanilhaAuditoriaTipo =
     | 'cc_usuarios_comparacao_marcados'
     | 'cc_conta_matriz'
     | 'cc_conta_centro'
+    | 'cc_conta_por_conta'
     | 'cc_conta_comparacao'
     | 'cc_conta_comparacao_marcados';
 
@@ -231,6 +246,7 @@ export async function registrarExportacaoPlanilhaCentrosCustos(tipo: CcPlanilhaA
 
 export type CcHistoricoEvento = {
     codusuario: string
+    nome?: string
     unidade: string
     dataHora: string
     titulo: string
@@ -268,6 +284,7 @@ export async function getCentrosCustosHistorico(params: {
         total: Number(data.total ?? data.Total ?? raw.length),
         eventos: raw.map((r) => ({
             codusuario: String(r.codusuario ?? r.Codusuario ?? ''),
+            nome: String(r.nome ?? r.Nome ?? '').trim() || undefined,
             unidade: String(r.unidade ?? r.Unidade ?? ''),
             dataHora: String(r.dataHora ?? r.DataHora ?? ''),
             titulo: String(r.titulo ?? r.Titulo ?? ''),
@@ -297,6 +314,36 @@ export async function removerUsuariosCcEmLote(data: {
     if (!res.ok) {
         const msg = await res.text()
         throw new Error(`Erro ${res.status} ao remover vínculos: ${msg}`)
+    }
+    return res.json()
+}
+
+export type CcUsuarioLoteIncluirItem = {
+    ccusto: string
+    custo?: string
+    diretoria?: string
+}
+
+export type CcUsuarioLoteIncluirResultado = {
+    usuario: string
+    inseridos: number
+    centros_solicitados: number
+    centros_ja_existiam?: string[]
+}
+
+export async function incluirUsuariosCcEmLote(data: {
+    usuario: string
+    centros: CcUsuarioLoteIncluirItem[]
+    motivo?: string
+}): Promise<CcUsuarioLoteIncluirResultado> {
+    const res = await fetch(`${API_BASE}/api/${caminho}/usuarios/lote/incluir`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+        const msg = await res.text()
+        throw new Error(`Erro ${res.status} ao incluir vínculos: ${msg}`)
     }
     return res.json()
 }

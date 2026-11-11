@@ -75,7 +75,6 @@ export default function Page() {
   )
   const [unidadeLogada, setUnidadeLogada] = useState('')
   const [ehAdmin, setEhAdmin] = useState(false)
-  const [ehCsc, setEhCsc] = useState(false)
   const [exportandoMatriz, setExportandoMatriz] = useState(false)
 
   const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
@@ -144,7 +143,6 @@ export default function Page() {
 
   useEffect(() => {
     let admin = false
-    let csc = false
     let unidade = ''
     try {
       const raw = sessionStorage.getItem('userData')
@@ -152,12 +150,10 @@ export default function Page() {
         const u = JSON.parse(raw)
         unidade = String(u.unidade ?? u.UNIDADE ?? '').trim()
         admin = Boolean(u.admin)
-        csc = unidade.toUpperCase() === 'WAY CSC'
       }
     } catch { /* ignore */ }
     setUnidadeLogada(unidade)
     setEhAdmin(admin)
-    setEhCsc(csc)
     if (!admin && aba === 'historico') {
       setAba('vinculos')
       const params = new URLSearchParams(searchParams.toString())
@@ -461,7 +457,7 @@ export default function Page() {
               )}
               Baixar planilha CC × usuários (Excel)
             </Button>
-          <TabsList className="flex-wrap h-auto w-fit">
+          <TabsList id="tour-cc-abas" className="flex-wrap h-auto w-fit">
             <TabsTrigger value="vinculos">
               <Link2 className="w-4 h-4" /> Vínculos
             </TabsTrigger>
@@ -586,7 +582,7 @@ export default function Page() {
 
         {ehAdmin && (
           <TabsContent value="historico" className="mt-0">
-            <CentrosCustosHistorico unidadeLogada={unidadeLogada} podeFiltrarUnidade={ehCsc || ehAdmin} />
+            <CentrosCustosHistorico unidadeLogada={unidadeLogada} />
           </TabsContent>
         )}
 

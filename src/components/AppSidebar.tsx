@@ -347,7 +347,11 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                                   ? 'tour-menu-receitas'
                                   : item.url === '/comunicados'
                                     ? 'tour-menu-pagamentos-ci'
-                                    : undefined
+                                    : item.url === '/alcadas'
+                                      ? 'tour-menu-alcadas'
+                                      : item.url === '/centros-custos'
+                                        ? 'tour-menu-centros-custos'
+                                        : undefined
                           }
                         >
                           <SidebarMenuButton
@@ -421,6 +425,13 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                         {configItems.map((item) => (
                           <SidebarMenuButton
                             key={item.url}
+                            id={
+                              item.url === '/alcadas'
+                                ? 'tour-menu-alcadas'
+                                : item.url === '/centros-custos'
+                                  ? 'tour-menu-centros-custos'
+                                  : undefined
+                            }
                             asChild
                             isActive={path === item.url || path.startsWith(item.url + '/')}
                             className={`ml-6 justify-start text-sm transition-colors ${path === item.url || path.startsWith(item.url + '/')

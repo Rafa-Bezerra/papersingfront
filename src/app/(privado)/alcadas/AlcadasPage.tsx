@@ -636,7 +636,7 @@ export default function Page() {
     return (
         <div className="p-6">
             <Tabs value={aba} onValueChange={trocarAba} className="space-y-4">
-                <TabsList className="flex-wrap h-auto w-fit">
+                <TabsList id="tour-alcadas-abas" className="flex-wrap h-auto w-fit">
                     <TabsTrigger value="centros">
                         <Users className="w-4 h-4" /> Centros de custo
                     </TabsTrigger>
@@ -761,7 +761,7 @@ export default function Page() {
                 )}
                 {ehAdmin && (
                     <TabsContent value="historico" className="mt-0">
-                        <AlcadasHistorico unidadeLogada={unidadeLogada} podeFiltrarUnidade={ehCsc || ehAdmin} />
+                        <AlcadasHistorico unidadeLogada={unidadeLogada} />
                     </TabsContent>
                 )}
             </Tabs>
