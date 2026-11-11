@@ -44,11 +44,13 @@ import {
   gerarPdfAlteracoesMes,
   gerarPdfMatrizPermissoes,
   gerarPdfRelatorioUsuario,
+  type PdfHistoricoUsuarioEvento,
   gerarPdfUsuariosComPermissao,
   salvarPdf,
   slugArquivo,
   usuarioCorrespondeBusca,
 } from '@/lib/usuarioPermissoesRelatorioPdf'
+import { listarHistoricoAtividadesUsuario } from '@/services/historicoUsuarioService'
 
 function labelAcao(acao: string) {
   switch ((acao || '').toUpperCase()) {
@@ -252,6 +254,26 @@ export default function RelatorioPermissoesUsuariosPanel() {
       const historicoUsuario = dedupeAuditoriaPorId(resultados.flatMap(r => r[0]))
       const alteracoesMes = dedupeAuditoriaPorId(resultados.flatMap(r => r[1]))
 
+      let atividadesAlcadasCentros: PdfHistoricoUsuarioEvento[] = []
+      try {
+        const hist = await listarHistoricoAtividadesUsuario({
+          codusuario: login,
+          top: 2500,
+        })
+        atividadesAlcadasCentros = hist.eventos
+          .filter((e) => e.modulo === 'Alçadas' || e.modulo === 'Centros de custo')
+          .map((e) => ({
+            categoria: e.categoria,
+            modulo: e.modulo,
+            unidade: e.unidade,
+            dataHora: e.dataHora,
+            titulo: e.titulo,
+            detalhe: e.detalhe,
+          }))
+      } catch {
+        toast.info('Histórico de alçadas/CC não incluído (API indisponível ou sem permissão CSC).')
+      }
+
       const doc = gerarPdfRelatorioUsuario({
         login,
         nome,
@@ -261,11 +283,12 @@ export default function RelatorioPermissoesUsuariosPanel() {
         cadastrosPorBase: cadastros,
         alteracoesNoMes: alteracoesMes,
         historicoUsuario,
+        atividadesAlcadasCentros,
       })
 
       salvarPdf(doc, `papersign-usuario-${slugArquivo(login)}-${mesRef}.pdf`)
       toast.success(
-        `PDF de ${nome}: ${cadastros.length} base(s) e histórico de permissões incluído.`
+        `PDF de ${nome}: ${cadastros.length} base(s), permissões e alçadas/CC incluídos.`
       )
     } catch (err) {
       toast.error((err as Error).message)

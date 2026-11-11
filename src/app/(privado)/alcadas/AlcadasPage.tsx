@@ -9,8 +9,9 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, History, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, UserSearch, X } from 'lucide-react'
+import { ChevronsUpDown, GitCompare, History, ListChecks, SearchIcon, SquarePlus, UserCog, Users, ArrowRightLeft, UserSearch, X } from 'lucide-react'
 import AlcadasPorUsuario from './AlcadasPorUsuario'
+import AlcadasComparacao from './AlcadasComparacao'
 import AlcadasHistorico from './AlcadasHistorico'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -94,13 +95,14 @@ export default function Page() {
             ? 'por-usuario'
             : tabParam === 'historico'
               ? 'historico'
-              : 'centros'
+              : tabParam === 'comparacao'
+                ? 'comparacao'
+                : 'centros'
     )
     const [ehCsc, setEhCsc] = useState(false)
     const [ehAdmin, setEhAdmin] = useState(false)
     const [podeEditarAlcadas, setPodeEditarAlcadas] = useState(false)
     const [unidadeLogada, setUnidadeLogada] = useState('')
-
     const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
     const [results, setResults] = useState<Alcada[]>([])
     const [alcadaSelecionada, setAlcadaSelecionada] = useState<Alcada>()
@@ -624,7 +626,7 @@ export default function Page() {
         if (value === 'historico' && !ehAdmin) return
         setAba(value)
         const params = new URLSearchParams(searchParams.toString())
-        if (value === 'substituicao' || value === 'transferencia' || value === 'por-usuario' || value === 'historico')
+        if (value === 'substituicao' || value === 'transferencia' || value === 'por-usuario' || value === 'historico' || value === 'comparacao')
             params.set('tab', value)
         else params.delete('tab')
         const qs = params.toString()
@@ -640,6 +642,9 @@ export default function Page() {
                     </TabsTrigger>
                     <TabsTrigger value="por-usuario">
                         <UserSearch className="w-4 h-4" /> Por usuário
+                    </TabsTrigger>
+                    <TabsTrigger value="comparacao">
+                        <GitCompare className="w-4 h-4" /> Comparação
                     </TabsTrigger>
                     {ehCsc && (
                         <TabsTrigger value="substituicao">
@@ -696,6 +701,7 @@ export default function Page() {
                     <Button onClick={handleAbrirLote} variant="outline" className="flex items-center">
                         <ListChecks className="mr-1 h-4 w-4" /> Incluir aprovador em vários CCs
                     </Button>
+
                 </CardContent>
             </Card>
 
@@ -730,6 +736,14 @@ export default function Page() {
                     <AlcadasPorUsuario
                         unidadeLogada={unidadeLogada}
                         podeTrocarUnidade={ehCsc || ehAdmin}
+                        podeEditar={podeEditarAlcadas}
+                        onAbrirCentro={irParaCentroDeCusto}
+                    />
+                </TabsContent>
+
+                <TabsContent value="comparacao" className="mt-0">
+                    <AlcadasComparacao
+                        unidadeLogada={unidadeLogada}
                         podeEditar={podeEditarAlcadas}
                         onAbrirCentro={irParaCentroDeCusto}
                     />

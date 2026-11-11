@@ -201,6 +201,65 @@ export async function getAlcadasHistorico(params: {
     }
 }
 
+export type AlcadaMatrizLinha = {
+    id_alcada: number
+    centro_custo: string
+    centro_custo_nome: string
+    usuario: string
+    cargo: string
+    nivel: number
+    valor_inicial: number
+    valor_final: number
+}
+
+export type AlcadaMatrizResposta = {
+    unidade: string
+    linhas: AlcadaMatrizLinha[]
+    total_linhas: number
+    total_centros: number
+}
+
+export async function getMatrizAlcadas(unidade?: string): Promise<AlcadaMatrizResposta> {
+    const qs = new URLSearchParams()
+    if (unidade?.trim()) qs.set('unidade', unidade.trim())
+    const res = await fetch(`${API_BASE}/api/${caminho}/matriz?${qs.toString()}`, { headers: headers() })
+    if (!res.ok) throw await erroDaResposta(res, 'exportar matriz de alçadas')
+    return res.json()
+}
+
+export type AlcadaComparacaoLinha = {
+    id_alcada: number
+    centro_custo: string
+    centro_custo_nome: string
+    obrigatorios: { usuario: string; presente: boolean }[]
+    completo: boolean
+}
+
+export type AlcadaComparacaoResposta = {
+    ancora: string
+    unidade: string
+    obrigatorios: string[]
+    linhas: AlcadaComparacaoLinha[]
+    resumo: {
+        total_com_ancora: number
+        total_ok: number
+        total_incompletos: number
+        faltando_por_obrigatorio: Record<string, number>
+    }
+}
+
+export async function getComparacaoAlcadas(
+    ancora: string,
+    obrigatorios: string[],
+    unidade?: string
+): Promise<AlcadaComparacaoResposta> {
+    const qs = new URLSearchParams({ ancora: ancora.trim(), obrigatorios: obrigatorios.join(',') })
+    if (unidade?.trim()) qs.set('unidade', unidade.trim())
+    const res = await fetch(`${API_BASE}/api/${caminho}/comparacao?${qs.toString()}`, { headers: headers() })
+    if (!res.ok) throw await erroDaResposta(res, 'comparar cobertura de aprovadores')
+    return res.json()
+}
+
 export async function removerAprovadorEmLote(data: AlcadaLoteRemoverAprovador): Promise<AlcadaLoteRemoverAprovadorResultado> {
     const res = await fetch(`${API_BASE}/api/${caminho}/lote/remover-aprovador`, {
         method: 'POST',

@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { ChevronsUpDown, Link2, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
+import { ChevronsUpDown, Download, GitCompare, History, Link2, Loader2, SearchIcon, SquarePlus, Trash2, X } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -50,12 +50,33 @@ import {
 } from '@/services/usuariosService'
 import CadastroCentroCustoPanel from '@/components/CadastroCentroCustoPanel'
 import CadastroContaContabilPanel from '@/components/CadastroContaContabilPanel'
+import CentrosCustosComparacao from './CentrosCustosComparacao'
+import CentrosCustosComparacaoConta from './CentrosCustosComparacaoConta'
+import { exportarMatrizCcUsuariosExcel } from '@/lib/exportMatrizCcUsuarios'
+import CentrosCustosHistorico from './CentrosCustosHistorico'
+import { mostrarErro } from '@/utils/avisoApi'
 
 
 export default function Page() {
   const titulo = 'Centros de custos'
   const router = useRouter()
   const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [aba, setAba] = useState(
+    tabParam === 'comparacao' || tabParam === 'comparacao-usuarios'
+      ? 'comparacao'
+      : tabParam === 'comparacao-contas'
+        ? 'comparacao-contas'
+        : tabParam === 'cadastro'
+          ? 'cadastro'
+          : tabParam === 'historico'
+            ? 'historico'
+            : 'vinculos'
+  )
+  const [unidadeLogada, setUnidadeLogada] = useState('')
+  const [ehAdmin, setEhAdmin] = useState(false)
+  const [ehCsc, setEhCsc] = useState(false)
+  const [exportandoMatriz, setExportandoMatriz] = useState(false)
 
   const [query, setQuery] = useState<string>(searchParams.get('q') ?? '')
   const [results, setResults] = useState<MgoFinanceiro[]>([])
@@ -119,6 +140,32 @@ export default function Page() {
     buscaCentrosDeCusto()
     buscaContasFinanceiras()
     buscaUsuarios();
+  }, [])
+
+  useEffect(() => {
+    let admin = false
+    let csc = false
+    let unidade = ''
+    try {
+      const raw = sessionStorage.getItem('userData')
+      if (raw) {
+        const u = JSON.parse(raw)
+        unidade = String(u.unidade ?? u.UNIDADE ?? '').trim()
+        admin = Boolean(u.admin)
+        csc = unidade.toUpperCase() === 'WAY CSC'
+      }
+    } catch { /* ignore */ }
+    setUnidadeLogada(unidade)
+    setEhAdmin(admin)
+    setEhCsc(csc)
+    if (!admin && aba === 'historico') {
+      setAba('vinculos')
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('tab')
+      const qs = params.toString()
+      router.replace(qs ? `/centros-custos?${qs}` : '/centros-custos', { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -372,19 +419,68 @@ export default function Page() {
     [handleExcluirUsuario]
   )
 
+  function trocarAba(value: string) {
+    if (value === 'historico' && !ehAdmin) return
+    setAba(value)
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === 'comparacao') params.set('tab', 'comparacao-usuarios')
+    else if (value === 'comparacao-contas' || value === 'cadastro' || value === 'historico') params.set('tab', value)
+    else params.delete('tab')
+    const qs = params.toString()
+    router.replace(qs ? `/centros-custos?${qs}` : '/centros-custos', { scroll: false })
+  }
+
+  async function baixarPlanilhaCcUsuarios() {
+    setExportandoMatriz(true)
+    try {
+      await exportarMatrizCcUsuariosExcel()
+    } catch (e) {
+      mostrarErro(e)
+    } finally {
+      setExportandoMatriz(false)
+    }
+  }
+
   return (
     <div className="p-6">
-      <Tabs defaultValue="vinculos" className="space-y-4">
+      <Tabs value={aba} onValueChange={trocarAba} className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">{titulo}</h1>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => void baixarPlanilhaCcUsuarios()}
+              disabled={exportandoMatriz}
+            >
+              {exportandoMatriz ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-1 h-4 w-4" />
+              )}
+              Baixar planilha CC × usuários (Excel)
+            </Button>
           <TabsList className="flex-wrap h-auto w-fit">
             <TabsTrigger value="vinculos">
               <Link2 className="w-4 h-4" /> Vínculos
             </TabsTrigger>
+            <TabsTrigger value="comparacao">
+              <GitCompare className="w-4 h-4" /> Comparação usuários
+            </TabsTrigger>
+            <TabsTrigger value="comparacao-contas">
+              <GitCompare className="w-4 h-4" /> Contas por CC
+            </TabsTrigger>
             <TabsTrigger value="cadastro">
               <SquarePlus className="w-4 h-4" /> Cadastro
             </TabsTrigger>
+            {ehAdmin && (
+              <TabsTrigger value="historico">
+                <History className="w-4 h-4" /> Histórico
+              </TabsTrigger>
+            )}
           </TabsList>
+          </div>
         </div>
 
         <TabsContent value="vinculos" className="space-y-6">
@@ -424,8 +520,21 @@ export default function Page() {
 
           {/* Centro de custo vs usuários */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-2xl font-bold">Centro de custo vs Usuários</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void baixarPlanilhaCcUsuarios()}
+                disabled={exportandoMatriz}
+              >
+                {exportandoMatriz ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-4 w-4" />
+                )}
+                Baixar planilha (Excel)
+              </Button>
             </CardHeader>
             <CardContent className="flex flex-col">
               <DataTable
@@ -466,6 +575,20 @@ export default function Page() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="comparacao" className="mt-0">
+          <CentrosCustosComparacao unidadeLogada={unidadeLogada} />
+        </TabsContent>
+
+        <TabsContent value="comparacao-contas" className="mt-0">
+          <CentrosCustosComparacaoConta unidadeLogada={unidadeLogada} />
+        </TabsContent>
+
+        {ehAdmin && (
+          <TabsContent value="historico" className="mt-0">
+            <CentrosCustosHistorico unidadeLogada={unidadeLogada} podeFiltrarUnidade={ehCsc || ehAdmin} />
+          </TabsContent>
+        )}
 
         <TabsContent value="cadastro" className="space-y-6">
           <p className="text-sm text-muted-foreground">

@@ -522,6 +522,8 @@ export type PdfRelatorioUsuarioInput = {
   cadastrosPorBase: Usuario[]
   alteracoesNoMes: UsuarioPermAuditItem[]
   historicoUsuario: UsuarioPermAuditItem[]
+  /** Alçadas e centros de custo (AUDIT_LOG), quando disponível. */
+  atividadesAlcadasCentros?: PdfHistoricoUsuarioEvento[]
 }
 
 export function gerarPdfRelatorioUsuario(input: PdfRelatorioUsuarioInput): jsPDF {
@@ -601,6 +603,34 @@ export function gerarPdfRelatorioUsuario(input: PdfRelatorioUsuarioInput): jsPDF
     y = drawEmptyState(doc, y, 'Nenhuma alteração de permissão feita por esta pessoa em cadastros de terceiros.')
   } else {
     for (const ev of agruparEventosAuditoria(historicoAutor)) y = drawAuditEvent(doc, y, ev)
+  }
+
+  const cfg = (input.atividadesAlcadasCentros ?? []).slice().sort(
+    (a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime()
+  )
+  const cfgNoMes = cfg.filter(
+    (e) => e.dataHora && new Date(e.dataHora) >= new Date(input.periodoDe) && new Date(e.dataHora) < new Date(input.periodoAte)
+  )
+
+  y = drawSectionTitle(doc, y, 4, 'Alçadas e centros de custo (ações desta pessoa)')
+  y = ensureY(doc, y, 10)
+  rgb(doc, C.muted)
+  doc.setFontSize(8)
+  doc.text(
+    `${cfg.length} registro(s) no histórico · ${cfgNoMes.length} em ${labelMesReferencia(input.mesRef)}`,
+    MARGIN,
+    y + 4
+  )
+  y += 10
+
+  if (cfg.length === 0) {
+    y = drawEmptyState(
+      doc,
+      y,
+      'Nenhuma alteração registrada em alçadas ou centros de custo (vínculos, planilhas baixadas, etc.).'
+    )
+  } else {
+    for (const ev of cfg) y = drawHistoricoEvento(doc, y, ev)
   }
 
   drawFooters(doc, docTitle)

@@ -59,6 +59,46 @@ function escapeCsv(c: string) {
   return c
 }
 
+const REMOCAO_ALCADA_OPCOES: {
+  modo: AlcadaLoteRemoverModo
+  titulo: string
+  descricao: string
+  exemplo: string
+  variant: 'outline' | 'destructive'
+  buttonClass?: string
+}[] = [
+  {
+    modo: 'usuario',
+    titulo: 'Só o usuário consultado',
+    descricao:
+      'Remove unicamente o login que você pesquisou, nas linhas da lista (cada combinação CC + nível). Ninguém mais é afetado no mesmo nível.',
+    exemplo: 'Ex.: tirar o akazuo do nível 1 nos CC filtrados; os outros aprovadores do nível 1 continuam.',
+    variant: 'outline',
+    buttonClass: 'border-destructive/40 text-destructive hover:bg-destructive/10',
+  },
+  {
+    modo: 'todos_nivel',
+    titulo: 'Todos aprovadores do nível',
+    descricao:
+      'Para cada linha listada, apaga todo mundo daquele nível de aprovação naquele centro de custo — não só o usuário consultado.',
+    exemplo: 'Ex.: na linha “CC X · nível 2”, remove todos os aprovadores do nível 2 naquele CC.',
+    variant: 'destructive',
+  },
+  {
+    modo: 'todos_centro',
+    titulo: 'Toda a alçada do CC',
+    descricao:
+      'Para cada centro de custo que aparece na lista, remove todos os aprovadores de todos os níveis. O CC fica sem alçada na unidade.',
+    exemplo: 'Ex.: no CC X some nível 1, 2, 3… — use só quando quiser esvaziar a alçada do centro.',
+    variant: 'destructive',
+    buttonClass: 'bg-destructive/90',
+  },
+]
+
+function tituloDialogRemocao(modo: AlcadaLoteRemoverModo) {
+  return REMOCAO_ALCADA_OPCOES.find((o) => o.modo === modo)?.titulo ?? 'Confirmar remoção'
+}
+
 export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, podeEditar = false, onAbrirCentro }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [usuario, setUsuario] = useState('')
@@ -417,47 +457,38 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, po
               <CardContent className="flex flex-col gap-3 pt-4">
                 <div className="space-y-1">
                   <p className="text-sm font-semibold flex items-center gap-2">
-                    <ListChecks className="h-4 w-4" /> Remoção em lote (por usuário consultado)
+                    <ListChecks className="h-4 w-4" /> Remoção em lote — alçadas (aprovadores)
                   </p>
                   <p className="text-xs text-muted-foreground max-w-3xl">
-                    Use o filtro para limitar os CCs. Você pode retirar <strong>só {dados.usuario}</strong> ou{' '}
-                    <strong>todos os aprovadores</strong> daqueles centros (nível da linha ou todos os níveis do CC).
+                    Ações sobre <strong>aprovadores da alçada</strong>, não sobre vínculo CC×usuário do RM (isso fica em{' '}
+                    <strong>Centros de custos → Comparação</strong>). Use o filtro abaixo para limitar quais linhas entram
+                    no lote.
                     {filtro.trim()
-                      ? ` Visíveis agora: ${linhasFiltradas.length} linha(s) de ${dados.linhas.length}.`
-                      : ` ${dados.linhas.length} linha(s) na consulta.`}
+                      ? ` Agora: ${linhasFiltradas.length} linha(s) visível(is) de ${dados.linhas.length}.`
+                      : ` ${dados.linhas.length} linha(s) na consulta de ${dados.usuario}.`}
                   </p>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
-                    disabled={linhasFiltradas.length === 0}
-                    onClick={() => abrirRemoverTodasListadas('usuario')}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Só {dados.usuario} — todas listadas ({linhasFiltradas.length})
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="shrink-0"
-                    disabled={linhasFiltradas.length === 0}
-                    onClick={() => abrirRemoverTodasListadas('todos_nivel')}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Todos do nível da linha — CCs listados ({linhasFiltradas.length})
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="shrink-0 bg-destructive/90"
-                    disabled={linhasFiltradas.length === 0}
-                    onClick={() => abrirRemoverTodasListadas('todos_centro')}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Todos os níveis do CC — centros listados
-                  </Button>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {REMOCAO_ALCADA_OPCOES.map((op) => (
+                    <div
+                      key={op.modo}
+                      className="flex flex-col gap-2 rounded-lg border border-border bg-background/80 p-3"
+                    >
+                      <p className="text-sm font-medium leading-snug">{op.titulo}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{op.descricao}</p>
+                      <p className="text-xs text-muted-foreground/90 italic leading-relaxed">{op.exemplo}</p>
+                      <Button
+                        type="button"
+                        variant={op.variant}
+                        className={`mt-auto w-full justify-start text-left h-auto min-h-9 py-2 whitespace-normal ${op.buttonClass ?? ''}`}
+                        disabled={linhasFiltradas.length === 0}
+                        onClick={() => abrirRemoverTodasListadas(op.modo)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4 shrink-0" />
+                        Aplicar nas {linhasFiltradas.length} linha(s) listada(s)
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -503,31 +534,35 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, po
                     </Button>
                     <Button
                       type="button"
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
+                      className="border-destructive/40 text-destructive"
                       disabled={marcados.size === 0}
+                      title="Remove só o usuário consultado nas linhas marcadas"
                       onClick={() => abrirRemover('usuario')}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Remover selecionadas ({marcados.size})
+                      Só o usuário · {marcados.size} linha(s)
                     </Button>
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       disabled={marcados.size === 0}
+                      title="Remove todos os aprovadores do nível de cada linha marcada"
                       onClick={() => abrirRemover('todos_nivel')}
                     >
-                      Todos do nível (sel.)
+                      Todos do nível · {marcados.size} linha(s)
                     </Button>
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       disabled={marcados.size === 0}
+                      title="Remove toda a alçada (todos os níveis) de cada CC das linhas marcadas"
                       onClick={() => abrirRemover('todos_centro')}
                     >
-                      Todos do CC (sel.)
+                      Toda a alçada do CC · {marcados.size} linha(s)
                     </Button>
                   </>
                 )}
@@ -570,59 +605,64 @@ export default function AlcadasPorUsuario({ unidadeLogada, podeTrocarUnidade, po
       <Dialog open={dialogRemover} onOpenChange={setDialogRemover}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirmar remoção em lote</DialogTitle>
+            <DialogTitle>{tituloDialogRemocao(modoRemocao)}</DialogTitle>
             <DialogDescription asChild>
               {dados && (
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <p>
-                    Unidade <strong className="text-foreground">{dados.unidade}</strong> ·{' '}
-                    <strong className="text-foreground">{resumoRemocao.centros}</strong> centro(s) de custo ·{' '}
+                    Unidade <strong className="text-foreground">{dados.unidade}</strong> · usuário consultado{' '}
+                    <strong className="text-foreground">{dados.usuario}</strong> ·{' '}
+                    <strong className="text-foreground">{resumoRemocao.centros}</strong> centro(s) ·{' '}
                     <strong className="text-foreground">{marcados.size}</strong> linha(s) de referência
                   </p>
-                  {modoRemocao === 'usuario' && (
-                    <p>
-                      Remove <strong className="text-foreground">{dados.usuario}</strong> apenas —{' '}
-                      <strong className="text-foreground">{resumoRemocao.aprovadores}</strong> registro(s) de aprovador.
-                    </p>
-                  )}
-                  {modoRemocao === 'todos_nivel' && (
-                    <p>
-                      Remove <strong className="text-foreground">todos os aprovadores do mesmo nível</strong> (ordem da
-                      linha) em cada CC marcado — inclui colegas além de {dados.usuario}. Estimativa:{' '}
-                      <strong className="text-foreground">{resumoRemocao.aprovadores ?? '—'}</strong> registro(s).
-                    </p>
-                  )}
-                  {modoRemocao === 'todos_centro' && (
-                    <p className="text-destructive/90">
-                      Remove <strong>todos os aprovadores de todos os níveis</strong> nos centros de custo das linhas
-                      marcadas. Operação ampla — confira o filtro antes de confirmar.
-                    </p>
-                  )}
+                  <p className="text-foreground font-medium">O que vai acontecer:</p>
+                  <ul className="list-disc space-y-2 pl-5 text-xs leading-relaxed">
+                    {modoRemocao === 'usuario' && (
+                      <>
+                        <li>
+                          Serão apagadas cerca de{' '}
+                          <strong className="text-foreground">{resumoRemocao.aprovadores}</strong> linha(s) em que só
+                          participa <strong className="text-foreground">{dados.usuario}</strong>.
+                        </li>
+                        <li>Outros aprovadores no mesmo nível do mesmo CC não são removidos.</li>
+                      </>
+                    )}
+                    {modoRemocao === 'todos_nivel' && (
+                      <>
+                        <li>
+                          Em cada linha marcada, <strong className="text-foreground">todos</strong> os aprovadores
+                          daquele <strong className="text-foreground">nível</strong> naquele CC são removidos (inclui
+                          colegas além de {dados.usuario}).
+                        </li>
+                        <li>
+                          Estimativa: <strong className="text-foreground">{resumoRemocao.aprovadores ?? '—'}</strong>{' '}
+                          registro(s) no total.
+                        </li>
+                      </>
+                    )}
+                    {modoRemocao === 'todos_centro' && (
+                      <>
+                        <li className="text-destructive">
+                          Em cada CC das linhas marcadas, <strong>todos os níveis</strong> da alçada são esvaziados — o
+                          centro fica sem aprovadores na unidade.
+                        </li>
+                        <li>Confira o filtro da tabela antes de confirmar; esta é a opção mais abrangente.</li>
+                      </>
+                    )}
+                  </ul>
+                  <p className="text-xs">Troque o tipo de remoção antes de confirmar, se precisar:</p>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant={modoRemocao === 'usuario' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setModoRemocao('usuario')}
-                    >
-                      Só o usuário
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={modoRemocao === 'todos_nivel' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setModoRemocao('todos_nivel')}
-                    >
-                      Todos do nível
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={modoRemocao === 'todos_centro' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setModoRemocao('todos_centro')}
-                    >
-                      Todos do CC
-                    </Button>
+                    {REMOCAO_ALCADA_OPCOES.map((op) => (
+                      <Button
+                        key={op.modo}
+                        type="button"
+                        variant={modoRemocao === op.modo ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setModoRemocao(op.modo)}
+                      >
+                        {op.titulo}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               )}
