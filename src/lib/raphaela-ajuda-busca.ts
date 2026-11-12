@@ -47,6 +47,8 @@ export function ehCumprimento(q: string): boolean {
 export type ResultadoBuscaAjuda = {
   artigo: RaphaelaAjudaArtigo
   score: number
+  /** Todas as palavras da pergunta aparecem no título ou nas palavras-chave. */
+  completo: boolean
 }
 
 export function buscarArtigosAjuda(artigos: RaphaelaAjudaArtigo[], consulta: string, limite = 5): ResultadoBuscaAjuda[] {
@@ -64,6 +66,7 @@ export function buscarArtigosAjuda(artigos: RaphaelaAjudaArtigo[], consulta: str
     let score = 0
     let fortes = 0
     let achados = 0
+    let noTitulo = 0
     for (const t of tokens) {
       const emChaves = contem(chaves, t)
       const emTitulo = contem(titulo, t)
@@ -73,11 +76,12 @@ export function buscarArtigosAjuda(artigos: RaphaelaAjudaArtigo[], consulta: str
       if (emTitulo) score += 8
       if (emResumo) score += 4
       if (emMensagem) score += 2
+      if (emChaves || emTitulo) noTitulo++
       if (emChaves || emTitulo || emResumo) fortes++
       if (emChaves || emTitulo || emResumo || emMensagem) achados++
     }
     // A maioria das palavras da pergunta precisa bater, e uma delas no título, resumo ou palavras-chave.
-    if (fortes > 0 && achados * 2 > tokens.length) scored.push({ artigo, score })
+    if (fortes > 0 && achados * 2 > tokens.length) scored.push({ artigo, score, completo: noTitulo === tokens.length })
   }
 
   scored.sort((a, b) => b.score - a.score || a.artigo.ordem - b.artigo.ordem)

@@ -4,7 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { EyeOff, ExternalLink, Headset, LayoutGrid, MousePointerClick, PlayCircle, Send, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  ExternalLink,
+  Headset,
+  LayoutGrid,
+  Lightbulb,
+  MousePointerClick,
+  PlayCircle,
+  Send,
+  X,
+} from 'lucide-react'
 import { API_BASE, apiFetch, GLPI_SUPPORT_URL, headers } from '@/utils/constants'
 import {
   RAFAELA_AJUDA_BLOQUEADA_EVENT,
@@ -41,6 +53,16 @@ const MARGEM = 8
 
 const RESPOSTA_NAO_SEI =
   'Ainda estou em desenvolvimento e esta pergunta não sei te responder no momento, abra um chamado no GLPI onde a equipe de T.I, poderá te orientar e assim aprendermos juntos.'
+
+/** Faz o ícone de suporte do topo piscar sem fechar o chat; para no clique ou depois de 12s. */
+function piscarIconeGlpi() {
+  const el = document.querySelector<HTMLElement>('#tour-suporte')
+  if (!el) return
+  el.classList.add('raphaela-pulsar')
+  const parar = () => el.classList.remove('raphaela-pulsar')
+  el.addEventListener('click', parar, { once: true })
+  window.setTimeout(parar, 12000)
+}
 
 const PASSO_GLPI: PassoRoteiro = {
   seletor: '#tour-suporte',
@@ -88,6 +110,7 @@ export default function RaphaelaAjuda() {
   const [guiando, setGuiando] = useState(false)
   const [saudacao, setSaudacao] = useState(false)
   const [verModulos, setVerModulos] = useState(false)
+  const [verSugestoes, setVerSugestoes] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const [artigos, setArtigos] = useState<RaphaelaAjudaArtigo[]>([])
   const [input, setInput] = useState('')
@@ -95,7 +118,7 @@ export default function RaphaelaAjuda() {
     {
       tipo: 'raphaela',
       texto:
-        'Oi! Sou a Raphaela. Digite sua dúvida ou escolha um módulo abaixo: eu te mostro o passo a passo na tela.',
+        'Oi! Digite sua dúvida ou escolha uma das opções abaixo: eu te mostro o passo a passo na tela.',
     },
   ])
   const raizRef = useRef<HTMLDivElement>(null)
@@ -293,10 +316,20 @@ export default function RaphaelaAjuda() {
     [guiaAtual, userData]
   )
 
+  const mostrarEstaTela = () => {
+    if (!guiaAtual) return
+    if (roteiroAtual) iniciarRoteiro(guiaAtual.titulo, roteiroAtual)
+    else iniciarGuia(guiaAtual)
+  }
+
+  const mostrarSugestoes = verSugestoes || !mensagens.some((m) => m.tipo === 'usuario')
+
   const enviarPergunta = useCallback(() => {
     const q = input.trim()
     if (!q) return
     setInput('')
+    setVerSugestoes(false)
+    setVerModulos(false)
     setMensagens((prev) => [...prev, { tipo: 'usuario', texto: q }])
 
     const responder = (...novas: ChatMsg[]) => setMensagens((prev) => [...prev, ...novas])
@@ -322,11 +355,14 @@ export default function RaphaelaAjuda() {
         texto: RESPOSTA_NAO_SEI,
         glpi: true,
       })
-      window.setTimeout(mostrarGlpi, 600)
+      window.setTimeout(() => (window.innerWidth <= 640 ? mostrarGlpi() : piscarIconeGlpi()), 900)
       return
     }
-    if (hits.length === 1) {
-      responder({ tipo: 'raphaela', texto: hits[0].artigo.mensagem, artigo: hits[0].artigo })
+    const completos = hits.filter((h) => h.completo)
+    const certeiro =
+      hits.length === 1 || hits[0].score >= hits[1].score * 1.5 ? hits[0] : completos.length === 1 ? completos[0] : null
+    if (certeiro) {
+      responder({ tipo: 'raphaela', texto: certeiro.artigo.mensagem, artigo: certeiro.artigo })
       return
     }
     responder(
@@ -465,8 +501,18 @@ export default function RaphaelaAjuda() {
     >
       {aberto ? (
         <div className={`${classeBalao} rafaela-ajuda-balloon`} style={estiloBalao} role="dialog" aria-label="Pergunte à Raphaela">
-          <div className="rafaela-balloon-kicker">Raphaela</div>
-          <div className="rafaela-balloon-title">Como posso ajudar?</div>
+          <div className="rafaela-ajuda-header">
+            <Image src="/raphaela.jpg" alt="" width={36} height={36} className="rafaela-ajuda-header-img" unoptimized />
+            <div className="rafaela-ajuda-header-txt">
+              <strong>Raphaela</strong>
+              <span>
+                <i className="rafaela-ajuda-online" aria-hidden /> Assistente de dúvidas do PaperSign
+              </span>
+            </div>
+            <button type="button" className="rafaela-ajuda-fechar" aria-label="Fechar" onClick={() => setAberto(false)}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
           <div ref={listaRef} className="rafaela-balloon-text rafaela-ajuda-msgs">
             {mensagens.map((m, idx) => {
@@ -537,6 +583,11 @@ export default function RaphaelaAjuda() {
                     <>
                       <p className="rafaela-ajuda-line whitespace-pre-wrap">{m.texto}</p>
                       {m.tipo === 'raphaela' && m.glpi && (
+                        <p className="rafaela-ajuda-line">
+                          <strong>Veja o ícone de suporte (fone de ouvido) destacado no topo da tela: clique nele para abrir o chamado.</strong>
+                        </p>
+                      )}
+                      {m.tipo === 'raphaela' && m.glpi && (
                         <div className="rafaela-ajuda-acoes">
                           <button type="button" className="rafaela-btn primary sm" onClick={mostrarGlpi}>
                             <MousePointerClick className="h-3.5 w-3.5" /> Me mostre onde fica
@@ -555,45 +606,87 @@ export default function RaphaelaAjuda() {
             {carregando && <p className="rafaela-ajuda-loading">Carregando guias…</p>}
           </div>
 
-          <div className="rafaela-ajuda-chips">
-            {guiaAtual && (
-              <button
-                type="button"
-                className="rafaela-btn primary sm"
-                onClick={() => (roteiroAtual ? iniciarRoteiro(guiaAtual.titulo, roteiroAtual) : iniciarGuia(guiaAtual))}
-              >
-                <MousePointerClick className="h-3.5 w-3.5" /> Me mostre esta tela
-              </button>
-            )}
-            {destaques.map((a) => (
-              <button
-                key={a.slug}
-                type="button"
-                className="rafaela-btn ghost sm"
-                onClick={() => responderArtigo(a)}
-              >
-                {a.titulo.length > 42 ? `${a.titulo.slice(0, 40)}…` : a.titulo}
-              </button>
-            ))}
-            {guias.length > 0 && (
-              <button
-                type="button"
-                className="rafaela-btn ghost sm"
-                aria-expanded={verModulos}
-                onClick={() => setVerModulos((v) => !v)}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> {verModulos ? 'Ocultar módulos' : `Seus módulos (${guias.length})`}
-              </button>
-            )}
-          </div>
-
-          {verModulos && (
-            <div className="rafaela-ajuda-modulos">
-              {guias.map((g) => (
-                <button key={g.url} type="button" className="rafaela-btn ghost sm" onClick={() => responderGuia(g)}>
-                  {g.titulo}
+          {mostrarSugestoes && verModulos ? (
+            <div className="rafaela-ajuda-sugestoes">
+              <div className="rafaela-ajuda-rotulo-linha">
+                <button type="button" className="rafaela-ajuda-voltar" onClick={() => setVerModulos(false)}>
+                  <ChevronLeft className="h-4 w-4" /> Voltar
                 </button>
-              ))}
+                <p className="rafaela-ajuda-rotulo">Seus módulos ({guias.length})</p>
+              </div>
+              <div className="rafaela-ajuda-modulos">
+                {guias.map((g) => (
+                  <button
+                    key={g.url}
+                    type="button"
+                    className="rafaela-btn ghost sm"
+                    onClick={() => {
+                      setVerSugestoes(false)
+                      setVerModulos(false)
+                      responderGuia(g)
+                    }}
+                  >
+                    {g.titulo}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : mostrarSugestoes ? (
+            <div className="rafaela-ajuda-sugestoes">
+              {guiaAtual && (
+                <button type="button" className="rafaela-ajuda-tela" onClick={mostrarEstaTela}>
+                  <MousePointerClick className="h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Me mostre esta tela</strong>
+                    <small>{guiaAtual.titulo}</small>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                </button>
+              )}
+              <div className="rafaela-ajuda-rotulo-linha">
+                <p className="rafaela-ajuda-rotulo">Dúvidas frequentes</p>
+                {verSugestoes && (
+                  <button type="button" className="rafaela-ajuda-voltar" onClick={() => setVerSugestoes(false)}>
+                    Ocultar <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="rafaela-ajuda-lista">
+                {destaques.map((a) => (
+                  <button
+                    key={a.slug}
+                    type="button"
+                    className="rafaela-ajuda-item"
+                    onClick={() => {
+                      setVerSugestoes(false)
+                      responderArtigo(a)
+                    }}
+                  >
+                    <span>{a.titulo}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  </button>
+                ))}
+                {guias.length > 0 && (
+                  <button type="button" className="rafaela-ajuda-item" onClick={() => setVerModulos(true)}>
+                    <span>
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      Ver todos os módulos ({guias.length})
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="rafaela-ajuda-atalhos">
+              {guiaAtual && (
+                <button type="button" className="rafaela-ajuda-atalho" onClick={mostrarEstaTela}>
+                  <MousePointerClick className="h-3.5 w-3.5" /> Me mostre esta tela
+                </button>
+              )}
+              <button type="button" className="rafaela-ajuda-atalho" onClick={() => setVerSugestoes(true)}>
+                <Lightbulb className="h-3.5 w-3.5" /> Dúvidas frequentes
+              </button>
             </div>
           )}
 
@@ -608,26 +701,21 @@ export default function RaphaelaAjuda() {
               type="search"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ex.: como aprovar RDV?"
+              placeholder="Digite sua dúvida…"
               className="rafaela-ajuda-input"
               autoComplete="off"
             />
-            <button type="submit" className="rafaela-ajuda-send" aria-label="Enviar">
+            <button type="submit" className="rafaela-ajuda-send" aria-label="Enviar" disabled={!input.trim()}>
               <Send className="h-4 w-4" />
             </button>
           </form>
 
-          <div className="rafaela-balloon-actions stack">
-            <a href={GLPI_SUPPORT_URL} target="_blank" rel="noreferrer" className="rafaela-btn ghost sm">
-              <Headset className="h-3.5 w-3.5" />
-              Abrir GLPI
-              <ExternalLink className="h-3 w-3" />
+          <p className="rafaela-ajuda-rodape">
+            <Headset className="h-3.5 w-3.5" /> Não achou?{' '}
+            <a href={GLPI_SUPPORT_URL} target="_blank" rel="noreferrer">
+              Abrir chamado no GLPI <ExternalLink className="inline h-3 w-3" />
             </a>
-          </div>
-
-          <button type="button" className="rafaela-close" aria-label="Fechar" onClick={() => setAberto(false)}>
-            <X className="h-4 w-4" />
-          </button>
+          </p>
         </div>
       ) : saudacao && !guiando ? (
         <button
@@ -722,14 +810,248 @@ export default function RaphaelaAjuda() {
         }
         .rafaela-ajuda-bubble.bot {
           align-self: flex-start;
-          background: #eff6ff;
+          background: #f1f5f9;
           color: #0f172a;
-          border: 1px solid #bfdbfe;
+          border-radius: 4px 14px 14px 14px;
         }
         .rafaela-ajuda-bubble.user {
           align-self: flex-end;
           background: #1d4ed8;
           color: #fff;
+          border-radius: 14px 4px 14px 14px;
+        }
+        .rafaela-ajuda-header {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          padding: 0.75rem 0.85rem;
+          margin-bottom: 0.65rem;
+          background: linear-gradient(135deg, #1e40af, #2563eb 60%, #3b82f6);
+          color: #fff;
+          border-radius: 17px 17px 0 0;
+        }
+        .rafaela-ajuda-header-img {
+          width: 38px;
+          height: 38px;
+          border-radius: 999px;
+          object-fit: cover;
+          border: 2px solid rgba(255, 255, 255, 0.75);
+          flex-shrink: 0;
+        }
+        .rafaela-ajuda-header-txt {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-width: 0;
+          line-height: 1.25;
+        }
+        .rafaela-ajuda-header-txt strong {
+          font-size: 0.95rem;
+        }
+        .rafaela-ajuda-header-txt span {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.72rem;
+          opacity: 0.9;
+        }
+        .rafaela-ajuda-online {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: #4ade80;
+          box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.3);
+        }
+        .rafaela-ajuda-fechar {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          border: 0;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.15);
+          color: #fff;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .rafaela-ajuda-fechar:hover {
+          background: rgba(255, 255, 255, 0.28);
+        }
+        .rafaela-ajuda-msgs,
+        .rafaela-ajuda-sugestoes,
+        .rafaela-ajuda-modulos {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .rafaela-ajuda-sugestoes {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          flex-shrink: 0;
+          max-height: 42vh;
+          overflow-y: auto;
+          margin-bottom: 0.6rem;
+        }
+        .rafaela-ajuda-tela {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          width: 100%;
+          padding: 0.6rem 0.7rem;
+          border: 1px solid #bfdbfe;
+          border-radius: 12px;
+          background: #eff6ff;
+          color: #1d4ed8;
+          text-align: left;
+          font: inherit;
+          cursor: pointer;
+        }
+        .rafaela-ajuda-tela:hover {
+          background: #dbeafe;
+        }
+        .rafaela-ajuda-tela span {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-width: 0;
+        }
+        .rafaela-ajuda-tela strong {
+          font-size: 0.82rem;
+          color: #1e3a8a;
+        }
+        .rafaela-ajuda-tela small {
+          font-size: 0.72rem;
+          color: #475569;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .rafaela-ajuda-rotulo-linha {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          padding: 0.15rem 0;
+          background: #fff;
+        }
+        .rafaela-ajuda-rotulo-linha .rafaela-ajuda-rotulo {
+          margin: 0;
+        }
+        .rafaela-ajuda-voltar {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+          padding: 0.25rem 0.55rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 999px;
+          background: #fff;
+          color: #1d4ed8;
+          font: inherit;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .rafaela-ajuda-voltar:hover {
+          background: #eff6ff;
+          border-color: #bfdbfe;
+        }
+        .rafaela-ajuda-sugestoes .rafaela-ajuda-modulos {
+          max-height: none;
+          overflow: visible;
+          margin-bottom: 0;
+        }
+        .rafaela-ajuda-rotulo {
+          margin: 0.2rem 0 0;
+          font-size: 0.68rem;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .rafaela-ajuda-lista {
+          display: flex;
+          flex-direction: column;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          background: #fff;
+          overflow: hidden;
+        }
+        .rafaela-ajuda-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          width: 100%;
+          padding: 0.55rem 0.7rem;
+          border: 0;
+          border-bottom: 1px solid #f1f5f9;
+          background: transparent;
+          color: #0f172a;
+          text-align: left;
+          font: inherit;
+          font-size: 0.8rem;
+          cursor: pointer;
+        }
+        .rafaela-ajuda-item:last-child {
+          border-bottom: 0;
+        }
+        .rafaela-ajuda-item:hover {
+          background: #f8fafc;
+          color: #1d4ed8;
+        }
+        .rafaela-ajuda-item span {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+        .rafaela-ajuda-item > svg {
+          color: #94a3b8;
+        }
+        .rafaela-ajuda-atalhos {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          flex-shrink: 0;
+          margin-bottom: 0.55rem;
+        }
+        .rafaela-ajuda-atalho {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.3rem 0.7rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 999px;
+          background: #fff;
+          color: #1e3a8a;
+          font: inherit;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .rafaela-ajuda-atalho:hover {
+          border-color: #bfdbfe;
+          background: #eff6ff;
+        }
+        .rafaela-ajuda-rodape {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.3rem;
+          margin: 0.1rem 0 0;
+          font-size: 0.72rem;
+          color: #64748b;
+        }
+        .rafaela-ajuda-rodape a {
+          color: #1d4ed8;
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .rafaela-ajuda-rodape a:hover {
+          text-decoration: underline;
         }
         .rafaela-ajuda-line {
           margin: 0.2rem 0;
@@ -754,12 +1076,6 @@ export default function RaphaelaAjuda() {
           flex-wrap: wrap;
           gap: 0.35rem;
           margin-top: 0.5rem;
-        }
-        .rafaela-ajuda-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.35rem;
-          margin-bottom: 0.5rem;
         }
         .rafaela-ajuda-modulos {
           display: flex;
@@ -805,6 +1121,16 @@ export default function RaphaelaAjuda() {
         .rafaela-ajuda-send:hover {
           background: #1e40af;
         }
+        .rafaela-ajuda-send:disabled {
+          opacity: 0.45;
+          cursor: default;
+        }
+        .rafaela-ajuda-input {
+          background: #f8fafc;
+        }
+        .rafaela-ajuda-input:focus {
+          background: #fff;
+        }
         .rafaela-ajuda-loading {
           font-size: 0.75rem;
           color: #64748b;
@@ -825,6 +1151,12 @@ export default function RaphaelaAjuda() {
         }
         .rafaela-ajuda-root .rafaela-balloon.rafaela-ajuda-balloon {
           width: min(380px, calc(100vw - 2rem));
+          padding: 0 0 0.75rem;
+          background: #fff;
+        }
+        .rafaela-ajuda-balloon > :not(.rafaela-ajuda-header) {
+          margin-left: 0.9rem;
+          margin-right: 0.9rem;
         }
         .rafaela-ajuda-root .rafaela-balloon::after {
           content: '';
@@ -879,17 +1211,6 @@ export default function RaphaelaAjuda() {
           justify-content: flex-end;
           gap: 0.5rem;
           margin-top: 0.45rem;
-        }
-        .rafaela-ajuda-root .rafaela-close {
-          position: absolute;
-          top: 0.55rem;
-          right: 0.55rem;
-          border: 0;
-          background: transparent;
-          color: #64748b;
-          cursor: pointer;
-          border-radius: 999px;
-          padding: 0.2rem;
         }
         .rafaela-ajuda-root .rafaela-btn {
           display: inline-flex;
@@ -978,6 +1299,22 @@ export default function RaphaelaAjuda() {
             opacity: 1;
           }
         }
+        #tour-suporte.raphaela-pulsar {
+          border-radius: 999px;
+          background: #dbeafe;
+          animation: raphaela-pulsar 1.2s ease-out infinite;
+        }
+        #tour-suporte.raphaela-pulsar svg {
+          color: #1d4ed8;
+        }
+        @keyframes raphaela-pulsar {
+          0% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.65);
+          }
+          100% {
+            box-shadow: 0 0 0 14px rgba(37, 99, 235, 0);
+          }
+        }
         @media (max-width: 640px) {
           .rafaela-ajuda-root .rafaela-balloon.rafaela-ajuda-balloon {
             position: fixed;
@@ -988,7 +1325,6 @@ export default function RaphaelaAjuda() {
             width: auto;
             max-width: none !important;
             max-height: calc(100dvh - 16px) !important;
-            padding: 0.85rem 0.85rem 0.7rem;
           }
           .rafaela-ajuda-root .rafaela-balloon.rafaela-ajuda-balloon::after {
             display: none;
@@ -997,19 +1333,17 @@ export default function RaphaelaAjuda() {
             max-height: none;
             min-height: 120px;
           }
-          .rafaela-ajuda-chips {
-            flex-wrap: nowrap;
-            flex-shrink: 0;
-            overflow-x: auto;
-            padding-bottom: 2px;
+          .rafaela-ajuda-sugestoes {
+            max-height: 38dvh;
           }
-          .rafaela-ajuda-modulos,
+          .rafaela-ajuda-item {
+            padding: 0.7rem 0.75rem;
+          }
+          .rafaela-ajuda-header,
+          .rafaela-ajuda-atalhos,
           .rafaela-ajuda-form,
-          .rafaela-ajuda-root .rafaela-balloon-actions {
+          .rafaela-ajuda-rodape {
             flex-shrink: 0;
-          }
-          .rafaela-ajuda-chips > * {
-            flex: 0 0 auto;
           }
           .rafaela-ajuda-input {
             font-size: 16px;
@@ -1022,8 +1356,9 @@ export default function RaphaelaAjuda() {
             padding: 0.45rem 0.8rem;
             font-size: 0.8rem;
           }
-          .rafaela-ajuda-root .rafaela-close {
-            padding: 0.45rem;
+          .rafaela-ajuda-fechar {
+            width: 36px;
+            height: 36px;
           }
         }
       `}</style>
