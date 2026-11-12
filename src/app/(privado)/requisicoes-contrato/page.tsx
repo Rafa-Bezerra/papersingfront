@@ -1,19 +1,14 @@
-import { Suspense } from "react"
-import MovimentosPage from "../components/MovimentosPage";
+'use client'
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import LoadingFallback from "@/components/LoadingFallback";
-import { codTmvListaOrdensCompraApi } from "@/constants/ordensCompraTipos";
 
-const titulo = 'Requisições de contrato'
-const tipos_movimento: string[] = codTmvListaOrdensCompraApi()
-
+/** Virou aba da Ordem de compra; o endereço antigo continua valendo para links salvos. */
 export default function Page() {
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <MovimentosPage
-        titulo={titulo}
-        tipos_movimento={tipos_movimento}
-        somenteContrato
-      />
-    </Suspense>
-  )
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/ordens?aba=contrato')
+  }, [router])
+  return <LoadingFallback />
 }
