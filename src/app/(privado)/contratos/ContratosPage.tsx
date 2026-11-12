@@ -54,6 +54,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
@@ -77,6 +78,7 @@ import {
   listarEventosContrato,
   obterAprovacaoContrato,
   obterArquivoAnexoContrato,
+  obterArquivoDocumentoOrigem,
   obterContrato,
   obterIndicadoresContratos,
   reabrirContrato,
@@ -774,6 +776,17 @@ export default function ContratosPage() {
     }
   }
 
+  async function abrirDocumentoOrigem(contratoId: number, anexoId: number, nome: string) {
+    try {
+      const arquivo = await obterArquivoDocumentoOrigem(contratoId, anexoId);
+      setPdfTitulo(nome);
+      setPdfBase64(arquivo);
+      setPdfAberto(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
   function limparFiltros() {
     setDataDe('');
     setDataAte('');
@@ -1155,6 +1168,54 @@ export default function ContratosPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {(detalhe.movimentos_origem?.length ?? 0) > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Carrinho / ordem de compra</p>
+                  <Table className="text-xs">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="h-8">ID</TableHead>
+                        <TableHead className="h-8">Movimento</TableHead>
+                        <TableHead className="h-8">Tipo movimento</TableHead>
+                        <TableHead className="h-8">Origem</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detalhe.movimentos_origem?.map((m) => (
+                        <React.Fragment key={m.idmov}>
+                          <TableRow className="border-b-0">
+                            <TableCell className="font-medium">{m.idmov}</TableCell>
+                            <TableCell>{m.numero_movimento || '—'}</TableCell>
+                            <TableCell>{m.tipo_movimento || '—'}</TableCell>
+                            <TableCell className="text-muted-foreground">{m.origem}</TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell colSpan={4} className="whitespace-normal pt-0">
+                              {m.anexos.length === 0 ? (
+                                <span className="pl-2 text-[11px] text-muted-foreground">Sem anexos</span>
+                              ) : (
+                                m.anexos.map((a) => (
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={() => void abrirDocumentoOrigem(detalhe.id, a.id, a.nome)}
+                                    className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-muted"
+                                    title={a.nome}
+                                  >
+                                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">{a.nome}</span>
+                                  </button>
+                                ))
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
 

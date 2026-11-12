@@ -40,6 +40,21 @@ export type ContratoAnexo = {
   data?: string | null;
 };
 
+/** Anexo do carrinho / ordem de compra que originou o contrato. */
+export type ContratoDocumentoOrigem = {
+  id: number;
+  nome: string;
+};
+
+/** Movimento (carrinho, ordem de compra...) que originou o contrato, com os anexos dele. */
+export type ContratoMovimentoOrigem = {
+  idmov: number;
+  numero_movimento: string;
+  tipo_movimento: string;
+  origem: string;
+  anexos: ContratoDocumentoOrigem[];
+};
+
 export type Contrato = {
   id: number;
   unidade: string;
@@ -71,6 +86,8 @@ export type Contrato = {
   sync_totvs_erro?: string | null;
   sync_totvs_em?: string | null;
   anexos: ContratoAnexo[];
+  /** Só no detalhe (obterContrato). */
+  movimentos_origem?: ContratoMovimentoOrigem[];
 };
 
 export type ContratoEvento = {
@@ -165,6 +182,15 @@ export async function anexarArquivoContrato(
 
 export async function obterArquivoAnexoContrato(anexoId: number): Promise<string> {
   return fetchJson<string>(`${BASE()}/anexos/${anexoId}`, undefined, "Erro ao abrir o anexo", 120_000);
+}
+
+export async function obterArquivoDocumentoOrigem(id: number, anexoId: number): Promise<string> {
+  return fetchJson<string>(
+    `${BASE()}/${id}/documentos-origem/${anexoId}`,
+    undefined,
+    "Erro ao abrir o documento",
+    120_000
+  );
 }
 
 export async function enviarContratoWaySign(
