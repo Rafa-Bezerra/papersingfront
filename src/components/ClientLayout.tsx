@@ -6,6 +6,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./AppSidebar";
 import TopNav from "./TopNav";
 import RafaelaTour from "./RafaelaTour";
+import RaphaelaAjuda from "./RaphaelaAjuda";
 import PendenciasLoginModal from "./PendenciasLoginModal";
 import GestorUnidadeBanner from "./GestorUnidadeBanner";
 import { canAccessConfigRoute, isConfigMenuRoute } from "@/lib/configuracoes-permissoes";
@@ -51,6 +52,7 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
         </main>
       </div>
       <RafaelaTour />
+      <RaphaelaAjuda />
       <PendenciasLoginModal />
     </div>
   );
@@ -318,6 +320,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <div className="w-full">{children}</div>
         </main>
         <RafaelaTour />
+        <RaphaelaAjuda />
         <PendenciasLoginModal />
       </div>
     );

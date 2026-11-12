@@ -565,7 +565,7 @@ export default function Page() {
     return (
         <div className="p-6">
             {/* Título */}
-            <Card className="mb-6">
+            <Card id="tour-rdv-lista" className="mb-6">
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-2xl font-bold">Últimas requisições</CardTitle>
                     <div className="flex flex-wrap justify-start md:justify-end items-end gap-3 w-full md:w-auto">
@@ -610,7 +610,7 @@ export default function Page() {
             </Card>
 
             {/* Main */}
-            <Card className="mb-6">
+            <Card id="tour-rdv-dados" className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}{ editar ? " - Editando " + editar : "" }</CardTitle>
                 </CardHeader>
@@ -622,7 +622,7 @@ export default function Page() {
                             name={`codcfo`}
                             rules={{ required: "Fornecedor obrigatório" }}
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem id="tour-rdv-fornecedor">
                                     <FormControl>
                                         <Popover
                                             open={openFornecedorSearch}
@@ -758,7 +758,7 @@ export default function Page() {
             </Card>
 
             {/* Anexos */}
-            <Card className="mb-6">
+            <Card id="tour-rdv-anexos" className="mb-6">
                 <CardHeader>
                     <CardTitle>Anexos</CardTitle>
                 </CardHeader>
@@ -806,7 +806,7 @@ export default function Page() {
             </Card>
 
             {/* Itens */}
-            <Card className="mb-6">
+            <Card id="tour-rdv-itens" className="mb-6">
                 <CardHeader>
                     <CardTitle>Itens Adicionados</CardTitle>
                 </CardHeader>
@@ -1062,7 +1062,7 @@ export default function Page() {
             </Card>
 
             {/* Aprovadores */}
-            <Card className="mb-6">
+            <Card id="tour-rdv-aprovadores" className="mb-6">
                 <CardHeader>
                     <CardTitle>Aprovadores</CardTitle>
                 </CardHeader>
@@ -1146,7 +1146,7 @@ export default function Page() {
                 </CardContent>
             </Card>
 
-            <Button onClick={onSubmit} disabled={bloqueado}>Enviar carrinho</Button>
+            <Button id="tour-rdv-enviar" onClick={onSubmit} disabled={bloqueado}>Enviar carrinho</Button>
 
             {/* Loading */}
             <Dialog open={isLoading} onOpenChange={setIsLoading}>

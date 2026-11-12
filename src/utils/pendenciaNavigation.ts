@@ -254,19 +254,41 @@ export function markPendenciasModalDismissed(): void {
 }
 
 export const TOUR_RAPHAELA_ENCERRADO_EVENT = "papersign-tour-raphaela-encerrado";
+export const RAFAELA_AJUDA_LIBERADA_EVENT = "papersign-rafaela-ajuda-liberada";
+export const RAFAELA_AJUDA_BLOQUEADA_EVENT = "papersign-rafaela-ajuda-bloqueada";
 
 let tourRaphaelaAberto = false;
+
+export function bloquearRafaelaAjuda(): void {
+  try {
+    window.dispatchEvent(new Event(RAFAELA_AJUDA_BLOQUEADA_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function liberarRafaelaAjuda(): void {
+  try {
+    window.dispatchEvent(new Event(RAFAELA_AJUDA_LIBERADA_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** O modal de pendências é modal (bloqueia cliques fora): não pode abrir por cima do tour. */
 export function marcarTourRaphaelaAberto(aberto: boolean): void {
   if (tourRaphaelaAberto === aberto) return;
   tourRaphaelaAberto = aberto;
-  if (aberto) return;
+  if (aberto) {
+    bloquearRafaelaAjuda();
+    return;
+  }
   try {
     window.dispatchEvent(new Event(TOUR_RAPHAELA_ENCERRADO_EVENT));
   } catch {
     /* ignore */
   }
+  liberarRafaelaAjuda();
 }
 
 export function tourRaphaelaEstaAberto(): boolean {

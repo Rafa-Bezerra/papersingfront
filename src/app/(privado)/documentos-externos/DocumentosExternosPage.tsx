@@ -456,7 +456,7 @@ export default function Page() {
     return (
         <div className="p-6">
             {/* Header */}
-            <Card className="mb-6">
+            <Card id="tour-docext-topo" className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-2xl font-bold">{titulo}</CardTitle>
                     <div className="flex justify-end items-end gap-4">
@@ -529,14 +529,14 @@ export default function Page() {
                         <SearchIcon className="mr-1 h-4 w-4" /> Buscar
                     </Button>
 
-                    <Button onClick={handleInserirDocumento} className="flex items-center">
+                    <Button id="tour-docext-novo" onClick={handleInserirDocumento} className="flex items-center">
                         <SquarePlus className="mr-1 h-4 w-4" /> Novo
                     </Button>
                 </CardContent>
             </Card>
 
             {/* Main */}
-            <Card className="mb-6">
+            <Card id="tour-docext-lista" className="mb-6">
                 <CardContent className="flex flex-col">
                     <DataTable columns={colunas} data={results} loading={isLoading} />
                 </CardContent>
@@ -575,7 +575,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                <DialogContent id="tour-docext-form" className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             Novo documento
@@ -585,7 +585,7 @@ export default function Page() {
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(submitDocumento)} className="grid gap-4">
                             {/** Arquivo */}
-                            <FormItem>
+                            <FormItem id="tour-docext-arquivo">
                                 <FormLabel>Arquivo (PDF)</FormLabel>
                                 <FormControl>
                                     <Input
@@ -601,7 +601,7 @@ export default function Page() {
                                 name="assunto"
                                 rules={{ required: 'Descrição é obrigatório' }}
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem id="tour-docext-assunto">
                                         <FormLabel>Assunto</FormLabel>
                                         <FormControl>
                                             <Input {...field} />
@@ -616,7 +616,7 @@ export default function Page() {
                                 name={`id_externo`}
                                 rules={{ required: "Externo é obrigatório" }}
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem id="tour-docext-externo">
                                         <FormLabel>Externo</FormLabel>
                                         <FormControl>
                                             <Popover
@@ -675,7 +675,7 @@ export default function Page() {
                             {/* --- Aprovadores (useFieldArray) --- */}
                             <AprovadoresSection form={form} usuarios={usuarios} />
 
-                            <Button type="submit" disabled={isLoading}>
+                            <Button id="tour-docext-salvar" type="submit" disabled={isLoading}>
                                 {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
@@ -744,7 +744,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<DocumentoE
     });
 
     return (
-        <div className="flex flex-col gap-2 border p-3 rounded-md">
+        <div id="tour-docext-aprovadores" className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
 
             {fields.map((field, index) => (

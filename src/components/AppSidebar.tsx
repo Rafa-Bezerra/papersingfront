@@ -10,7 +10,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from '@/components/ui/sidebar'
-import { FROTAS_FORA_DO_DEPLOY, FROTAS_SO_ADMIN, NavSection } from '@/lib/data'
+import { NavSection } from '@/lib/data'
+import { moduloMenuVisivel, type UsuarioMenu } from '@/lib/modulosMenuPermissao'
 import { Button } from '@/components/ui/button'
 import {
   Home,
@@ -200,6 +201,30 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
 
   const showConfigMenu = showPapersignAdmin && hasAnyConfigMenuAccess(configSession)
 
+  const usuarioMenu = useMemo<UsuarioMenu>(() => ({
+    admin: Boolean(userAdmin),
+    financeiro: Boolean(userFinanceiro),
+    documentos: Boolean(userDocumentos),
+    bordero: Boolean(userBordero),
+    externo: Boolean(userExterno),
+    comunicados: Boolean(userComunicados),
+    fiscal: Boolean(userFiscal),
+    pagamento_rh: Boolean(userPagamentoRh),
+    pagamento_impostos: Boolean(userPagamentoImpostos),
+    restrito: Boolean(userRestrito),
+    rdv: Boolean(userRdv),
+    docusign: Boolean(userDocusign),
+    projetos: Boolean(userProjetos),
+    receitas: Boolean(userReceitas),
+    extrato_gestor: userExtratoGestor,
+    controle_medicao: userControleMedicao,
+    modulo_contratos: userModuloContratos,
+    frotas: userFrotas,
+    unidade: userUnidade,
+  }), [userAdmin, userFinanceiro, userDocumentos, userBordero, userExterno, userComunicados, userFiscal,
+    userPagamentoRh, userPagamentoImpostos, userRestrito, userRdv, userDocusign, userProjetos, userReceitas,
+    userExtratoGestor, userControleMedicao, userModuloContratos, userFrotas, userUnidade])
+
   useEffect(() => {
     if (collapsed) {
       setConfigOpen(false)
@@ -298,46 +323,12 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
 
                     {section.items.map(item => {
                       if (configItems.some(c => c.url === item.url)) return null
-                      if (item.url === "/projetos" && userUnidade.trim().toUpperCase() !== "WAY CSC") return null
-                      // Receitas: só quem tem a flag (admin sempre vê).
-                      // Financeiro NÃO herda este módulo automaticamente.
-                      if (item.url === "/receitas" && !userReceitas && !userAdmin) return null;
-                      if (item.url === "/extrato-gestor" && !userExtratoGestor && !userAdmin) return null;
-                      if (item.url === "/controle-medicao" && !userControleMedicao && !userAdmin) return null;
-                      if (item.url === "/contratos" && !userModuloContratos && !userAdmin) return null;
-                      if (item.url === "/requisicoes-contrato" && !userModuloContratos && !userAdmin) return null;
-                      if (item.url === "/frotas" && FROTAS_FORA_DO_DEPLOY) return null;
-                      // Frotas: só admin ou quem tem a flag (financeiro não herda).
-                      if (item.url === "/frotas" && !userAdmin && (FROTAS_SO_ADMIN || !userFrotas)) return null;
-                      // Financeiro tem acesso a todas as rotinas, exceto as configurações
-                      // (que já ficam ocultas acima e só aparecem no bloco Configurações do admin).
-                      if (!userAdmin && !userFinanceiro) {
-                        if (item.url === "/documentos" && !userDocumentos) return null;
-                        if (item.url === "/comunicados" && !userComunicados) return null;
-                        if (item.url === "/bordero" && !userBordero) return null;
-                        if (item.url === "/aprovacaordv" && !userRdv) return null;
-                        if (item.url === "/gestao-pessoas" && !userRestrito) return null;
-                        if (item.url === "/documentos-externos" && !userExterno) return null;
-                        if (item.url === "/pagamentos-rh" && !userPagamentoRh) return null;
-                        if (item.url === "/pagamentos-impostos" && !userPagamentoImpostos) return null;
-                        if (item.url === "/fiscal" && !userFiscal) return null;
-                        if (item.url === "/docusign" && !userDocusign && !userDocumentos) return null;
-                        if (item.url === "/projetos" && !userProjetos) return null;
-                        if ([
-                            "/alcadas",
-                            "/usuarios",
-                            "/borderoaprovadores", 
-                            '/restritoaprovadores',
-                            '/impostosaprovadores',
-                            '/rhaprovadores',
-                            '/centros-custos',
-                            '/disparos',
-                            '/cadastro-externos'
-                          ].includes(item.url)) return null;
-                      }
+                      // Regras por permissão em modulosMenuPermissao.ts (a ajuda da Raphaela usa as mesmas).
+                      if (!moduloMenuVisivel(item.url, usuarioMenu)) return null
                       return (
                         <SidebarMenuItem
                           key={item.title}
+                          data-menu-url={item.url}
                           id={
                             item.url === '/pendencias'
                               ? 'tour-menu-pendencias'
@@ -425,6 +416,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
                         {configItems.map((item) => (
                           <SidebarMenuButton
                             key={item.url}
+                            data-menu-url={item.url}
                             id={
                               item.url === '/alcadas'
                                 ? 'tour-menu-alcadas'

@@ -7,10 +7,10 @@ import { driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { API_BASE, headers, apiFetch } from '@/utils/constants'
 import { canAccessConfigRoute, type ConfigMenuSession } from '@/lib/configuracoes-permissoes'
-import { marcarTourRaphaelaAberto } from '@/utils/pendenciaNavigation'
+import { bloquearRafaelaAjuda, liberarRafaelaAjuda, marcarTourRaphaelaAberto } from '@/utils/pendenciaNavigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-type TourPasso = {
+export type TourPasso = {
   ordem: number
   seletorCss?: string | null
   titulo?: string | null
@@ -680,7 +680,7 @@ function limparDriverCompleto(): void {
   document.documentElement.classList.remove('driver-active')
 }
 
-async function prepararPasso(
+export async function prepararPasso(
   passo: TourPasso,
   routerPush: (href: string) => void
 ): Promise<boolean> {
@@ -736,6 +736,7 @@ export default function RafaelaTour() {
   const [aberto, setAberto] = useState(false)
   const [animApontar, setAnimApontar] = useState(false)
   const [liberadoAposPendencias, setLiberadoAposPendencias] = useState(false)
+  const [semTourPendente, setSemTourPendente] = useState<boolean | null>(null)
   const driverRef = useRef<ReturnType<typeof driver> | null>(null)
   const finalizandoRef = useRef(false)
   const passosRef = useRef<TourPasso[]>([])
@@ -1032,6 +1033,11 @@ export default function RafaelaTour() {
   }, [])
 
   useEffect(() => {
+    if (!liberadoAposPendencias) return
+    if (semTourPendente === true) liberarRafaelaAjuda()
+  }, [liberadoAposPendencias, semTourPendente])
+
+  useEffect(() => {
     const token = sessionStorage.getItem('authToken')
     if (!token) {
       tentouBuscarRef.current = false
@@ -1050,7 +1056,12 @@ export default function RafaelaTour() {
           return
         }
         const data = (await res.json()) as TourPendente
-        if (!data?.exibir || !data.versao) return
+        if (!data?.exibir || !data.versao) {
+          setSemTourPendente(true)
+          return
+        }
+        setSemTourPendente(false)
+        bloquearRafaelaAjuda()
 
         if (data.versao === '3.8') {
           const perfil = lerUserData()
@@ -1069,6 +1080,7 @@ export default function RafaelaTour() {
             } catch {
               /* silencioso */
             }
+            setSemTourPendente(true)
             return
           }
         }

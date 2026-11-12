@@ -1556,14 +1556,14 @@ export default function Page() {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-80">
-                            <DropdownMenuItem onSelect={() => handleInserirDocumento()} className="flex-col items-start gap-0.5">
+                            <DropdownMenuItem id="tour-plugsign-novo-interno" onSelect={() => handleInserirDocumento()} className="flex-col items-start gap-0.5">
                                 <span className="font-medium">Aprovação interna (em níveis)</span>
                                 <span className="text-xs text-muted-foreground">
                                     Aprovadores do PaperSign, em ordem, assinando aqui dentro (certificado A1 opcional).
                                 </span>
                             </DropdownMenuItem>
                             {temWaySign && (
-                            <DropdownMenuItem onSelect={() => setSolicitarOpen(true)} className="flex-col items-start gap-0.5">
+                            <DropdownMenuItem id="tour-plugsign-novo-externo" onSelect={() => setSolicitarOpen(true)} className="flex-col items-start gap-0.5">
                                 <span className="font-medium">Enviar para assinatura (PlugSign)</span>
                                 <span className="text-xs text-muted-foreground">
                                     Para fornecedores, parceiros e quem assina pelo link do e-mail.
@@ -1714,7 +1714,7 @@ export default function Page() {
 
             {/* Form documento */}
             <Dialog open={isFormDocumentoOpen} onOpenChange={setIsFormDocumentoOpen}>
-                <DialogContent className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
+                <DialogContent id="tour-doc-form" className="max-w-2xl overflow-x-auto overflow-y-auto max-h-[90dvh]">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-center">
                             {updateDocumentoMode ? `Editar: ${requisicaoSelecionada?.nome}` : `Novo documento`}
@@ -1722,7 +1722,7 @@ export default function Page() {
                     </DialogHeader>
 
                     {/* Anexos */}
-                    <Card className="mb-6">
+                    <Card id="tour-doc-anexos" className="mb-6">
                         <CardHeader>
                             <CardTitle>Anexos</CardTitle>
                         </CardHeader>
@@ -1800,7 +1800,7 @@ export default function Page() {
                                     maxLength: { value: 100, message: 'Descrição com no máximo 100 caracteres' },
                                 }}
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem id="tour-doc-descricao">
                                         <FormLabel>Descrição ({(field.value ?? '').length}/100)</FormLabel>
                                         <FormControl>
                                             <Input {...field} maxLength={100} />
@@ -1813,7 +1813,7 @@ export default function Page() {
                             {/* --- Aprovadores (useFieldArray) --- */}
                             <AprovadoresSection form={form} usuarios={usuarios} />
 
-                            <Button type="submit" disabled={isLoading}>
+                            <Button id="tour-doc-salvar" type="submit" disabled={isLoading}>
                                 {isLoading ? 'Salvando…' : 'Salvar'}
                             </Button>
                         </form>
@@ -2187,7 +2187,7 @@ function AprovadoresSection({ form, usuarios }: { form: UseFormReturn<Documento>
     });
 
     return (
-        <div className="flex flex-col gap-2 border p-3 rounded-md">
+        <div id="tour-doc-aprovadores" className="flex flex-col gap-2 border p-3 rounded-md">
             <label className="font-semibold">Aprovadores</label>
             {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 border p-2 rounded">
