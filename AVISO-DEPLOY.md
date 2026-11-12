@@ -8,8 +8,8 @@ Os módulos abaixo estão no código, mas **não vão entrar em produção agora
 
 - Front: `src/components/RaphaelaAjuda.tsx`, `src/lib/raphaela-*.ts`, montado em `src/components/ClientLayout.tsx`.
 - API: `RaphaelaAjudaController` / `RaphaelaAjudaStore` (repositório papersing).
-- Ainda **não tem chave para desligar**: quem gerar o ZIP do front a partir da `master` leva a Raphaela junto.
-  Antes de publicar outra correção, retirar `<RaphaelaAjuda />` do `ClientLayout.tsx` no pacote ou aguardar liberação.
+- Desligada no build de produção: `RAPHAELA_FORA_DO_DEPLOY = true` em `src/lib/data.ts`.
+  No `npm run dev` ela continua aparecendo para testes. Para liberar, trocar para `false`.
 - Tabelas `RAPHAELA_AJUDA` ainda não foram criadas no banco de produção.
 
 ## Frotas

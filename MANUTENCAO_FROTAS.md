@@ -1,4 +1,4 @@
-# Frotas: manutenção com notas, lotação e comparativos (passagem para o Cursor)
+# Frotas: manutenção com notas, lotação e comparativos
 
 Este arquivo explica o que já foi feito e o que falta terminar. Leia antes de mexer no código.
 
@@ -80,7 +80,7 @@ A API foi compilada num projeto de teste (net8) e compilou sem erro e sem aviso.
 
 O TypeScript passou sem erro nos arquivos do Frotas. A checagem usou só parte do projeto, então rode `npm run build` completo.
 
-## O que falta (para o Cursor terminar)
+## O que falta terminar
 
 1. **Compilar o projeto real:** rode `dotnet build` na API e `npm run build` (ou `npx tsc --noEmit`) no front. Corrija o que aparecer.
 2. **Rodar os 4 scripts** num SistAprovacao de teste, na ordem acima. Rode o de lotação simulando primeiro.

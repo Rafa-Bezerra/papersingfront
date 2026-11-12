@@ -10,13 +10,15 @@ import RaphaelaAjuda from "./RaphaelaAjuda";
 import PendenciasLoginModal from "./PendenciasLoginModal";
 import GestorUnidadeBanner from "./GestorUnidadeBanner";
 import { canAccessConfigRoute, isConfigMenuRoute } from "@/lib/configuracoes-permissoes";
-import { data, FROTAS_FORA_DO_DEPLOY, FROTAS_SO_ADMIN } from "@/lib/data";
+import { data, FROTAS_FORA_DO_DEPLOY, FROTAS_SO_ADMIN, RAPHAELA_FORA_DO_DEPLOY } from "@/lib/data";
 import { isPapersignWayoneEmbed, WAYONE_EMBED_SESSION_EVENT } from "@/lib/wayoneThemeSync";
 import { toast } from "sonner";
 
 interface ClientLayoutProps {
   children: ReactNode;
 }
+
+const MOSTRAR_RAPHAELA = !(RAPHAELA_FORA_DO_DEPLOY && process.env.NODE_ENV === "production");
 
 // Componente que usa o sidebar do shadcn
 function LayoutWithSidebar({ children }: ClientLayoutProps) {
@@ -52,7 +54,7 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
         </main>
       </div>
       <RafaelaTour />
-      <RaphaelaAjuda />
+      {MOSTRAR_RAPHAELA && <RaphaelaAjuda />}
       <PendenciasLoginModal />
     </div>
   );
@@ -320,7 +322,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <div className="w-full">{children}</div>
         </main>
         <RafaelaTour />
-        <RaphaelaAjuda />
+        {MOSTRAR_RAPHAELA && <RaphaelaAjuda />}
         <PendenciasLoginModal />
       </div>
     );

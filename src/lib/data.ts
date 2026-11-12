@@ -13,6 +13,8 @@ export interface NavSection {
 export const FROTAS_SO_ADMIN = true;
 /** Enquanto true: Frotas fora do menu e da rota (código fica no repo; deploy use prepare-publish.ps1 -SemFrotas). */
 export const FROTAS_FORA_DO_DEPLOY = true;
+/** Enquanto true: Raphaela assistente (chat de dúvidas) não aparece no build de produção; no `npm run dev` continua para testes. */
+export const RAPHAELA_FORA_DO_DEPLOY = true;
 
 export const data = {
   navMain: [
