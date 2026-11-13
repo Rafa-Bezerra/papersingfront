@@ -77,6 +77,14 @@ import {
 import { toast } from 'sonner'
 import { mostrarErro } from '@/utils/avisoApi'
 
+/** Campos do formulário chegam como texto ("1000,00", "1.000,00" ou "1000.5"); a API espera número. */
+function numeroDigitado(valor: unknown): number {
+    if (typeof valor === 'number') return valor
+    const texto = String(valor ?? '').trim()
+    if (!texto) return NaN
+    return Number(texto.includes(',') ? texto.replace(/\./g, '').replace(',', '.') : texto)
+}
+
 export default function Page() {
     const titulo = 'Alçadas de Aprovação'
     const tituloUpdate = 'Editar alçada'
@@ -407,11 +415,18 @@ export default function Page() {
             toast.error('Selecione um usuário cadastrado no PaperSign (GUSUARIO).')
             return
         }
+        const payload: Aprovadores = {
+            ...data,
+            usuario: codigo,
+            valor_inicial: numeroDigitado(data.valor_inicial),
+            valor_final: numeroDigitado(data.valor_final),
+            nivel: Math.trunc(numeroDigitado(data.nivel)),
+        }
         try {
             if (data.id && data.id !== 0) {
-                await updateAprovador({ ...data, usuario: codigo })
+                await updateAprovador(payload)
             } else {
-                await createAprovador({ ...data, usuario: codigo })
+                await createAprovador(payload)
             }
             toast.success('Aprovador salvo.')
             formAprovadores.reset()
@@ -492,8 +507,8 @@ export default function Page() {
             toast.error('Nível tem que ser um número inteiro, 0 ou maior.')
             return
         }
-        const inicio = Number(lote.valor_inicial)
-        const fim = Number(lote.valor_final)
+        const inicio = numeroDigitado(lote.valor_inicial)
+        const fim = numeroDigitado(lote.valor_final)
         // Mesma regra da API (AprovadorCadastroRegras.ValidarFaixa).
         if (Number.isNaN(inicio) || Number.isNaN(fim)) {
             toast.error('Valores inicial e final têm que ser números.')
@@ -1016,7 +1031,10 @@ export default function Page() {
                             <FormField
                                 control={formAprovadores.control}
                                 name="valor_inicial"
-                                rules={{ required: 'Valor inicial é obrigatório' }}
+                                rules={{
+                                    required: 'Valor inicial é obrigatório',
+                                    validate: (v) => !Number.isNaN(numeroDigitado(v)) || 'Valor inicial inválido.',
+                                }}
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor inicial</FormLabel>
@@ -1034,9 +1052,10 @@ export default function Page() {
                     required: 'Valor final é obrigatório',
                     // Mesma regra da API (AprovadorCadastroRegras.ValidarFaixa).
                     validate: (v, valores) => {
-                        const fim = Number(v)
+                        const fim = numeroDigitado(v)
+                        if (Number.isNaN(fim)) return 'Valor final inválido.'
                         if (fim === 1) return 'Valor final não pode ser 1. Sem limite: use um valor alto (ex.: 9999999).'
-                        if (fim <= Number(valores.valor_inicial)) return 'Valor final tem que ser maior que o valor inicial.'
+                        if (fim <= numeroDigitado(valores.valor_inicial)) return 'Valor final tem que ser maior que o valor inicial.'
                         return true
                     },
                 }}
@@ -1053,7 +1072,10 @@ export default function Page() {
                             <FormField
                                 control={formAprovadores.control}
                                 name="nivel"
-                                rules={{ required: 'Nível é obrigatório' }}
+                                rules={{
+                                    required: 'Nível é obrigatório',
+                                    validate: (v) => Number.isInteger(numeroDigitado(v)) || 'Nível tem que ser um número inteiro.',
+                                }}
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Nível</FormLabel>
