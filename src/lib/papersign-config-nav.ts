@@ -20,6 +20,7 @@ export function buildPapersignConfigNav(unidade: string): PapersignConfigNavItem
   ]
   if (unidade.trim().toUpperCase() === 'WAY CSC') {
     items.push({ title: 'Status do pedido', url: '/status-pedido' })
+    items.push({ title: 'Monitoramento', url: '/monitoramento' })
   }
   return items
 }

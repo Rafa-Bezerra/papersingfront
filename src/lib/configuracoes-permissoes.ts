@@ -77,12 +77,15 @@ export function normalizeConfigPath(path: string): string {
 
 export function isConfigMenuRoute(path: string): boolean {
   const p = normalizeConfigPath(path)
-  return p in ROUTE_PERM
+  return p in ROUTE_PERM || p === '/monitoramento'
 }
 
 export function canAccessConfigRoute(path: string, user: ConfigMenuSession): boolean {
-  if (user.admin) return true
   const p = normalizeConfigPath(path)
+  if (p === '/monitoramento') {
+    return Boolean(user.admin) && String(user.unidade ?? '').trim().toUpperCase() === 'WAY CSC'
+  }
+  if (user.admin) return true
   const key = ROUTE_PERM[p]
   if (!key) return false
   if (key === 'config_status_pedido') {

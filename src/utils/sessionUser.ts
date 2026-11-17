@@ -101,6 +101,11 @@ export function canRelatorioMensalSession(): boolean {
   }
 }
 
+/** Admin PaperSign na base WAY CSC (tela Monitoramento e afins). */
+export function isAdminCscSession(): boolean {
+  return isAdminSession() && isWayCscSession()
+}
+
 export function isWayCscSession(): boolean {
   if (typeof window === 'undefined') return false
   try {

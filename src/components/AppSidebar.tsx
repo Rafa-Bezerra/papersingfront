@@ -33,6 +33,7 @@ import {
   Ruler,
   FileSignature,
   Car,
+  Activity,
 } from 'lucide-react'
 import { JSX } from 'react/jsx-runtime'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -189,6 +190,7 @@ export default function AppSidebar({ navMain, showPapersignAdmin = true, isMobil
     'Alçadas': <Users className="w-5 h-5" />,
     'Centros de custos': <Settings className="w-5 h-5" />,
     'Disparos': <Mail className="w-5 h-5" />,
+    'Monitoramento': <Activity className="w-5 h-5" />,
     'Painel Fiscal': <Briefcase className="w-5 h-5" />,
     'Usuários': <User className="w-5 h-5" />,
     Configurações: <Settings className="w-5 h-5" />,
