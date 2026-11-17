@@ -1,5 +1,6 @@
 import type { Documento, DocumentoAnexo, DocumentoAnexoAssinar, DocumentoAprovacao, DocumentoAssinar } from "@/types/Documento";
 import { API_BASE, apiFetch, ASSINATURA_TIMEOUT_MS, CERTIFICADO_TIMEOUT_MS, headers } from "@/utils/constants";
+import { decodeHtml } from "@/utils/decodeHtml";
 const caminho = "Docusign";
 const elemento_singular = "documento";
 const elemento_plural = "documentos";
@@ -528,7 +529,13 @@ export async function listarEquipePlugSign(q?: string): Promise<EquipePlugSignMe
         if (q?.trim()) url.searchParams.set("q", q.trim());
         const res = await apiFetch(url.toString(), { headers: headers() }, ASSINATURA_TIMEOUT_MS);
         if (!res.ok) throw new Error(await lerErroApi(res, "listar equipe PlugSign"));
-        return await res.json();
+        const data = (await res.json()) as EquipePlugSignMembro[];
+        return (Array.isArray(data) ? data : []).map((m) => ({
+            ...m,
+            nome: decodeHtml(m.nome),
+            primeiroNome: m.primeiroNome != null ? decodeHtml(m.primeiroNome) : m.primeiroNome,
+            ultimoNome: m.ultimoNome != null ? decodeHtml(m.ultimoNome) : m.ultimoNome,
+        }));
     } catch (err) {
         throw mensagemFalhaRede("listar equipe PlugSign", err);
     }
@@ -770,9 +777,18 @@ export type LembreteAutomatico = { id?: number | null; assunto?: string | null; 
 export type WebhookPlugSign = { id?: number | null; url?: string | null; tipo?: string | null; ativo: boolean };
 export type NotificacaoWebhook = { id?: number | null; url?: string | null; tipo?: string | null; httpStatus?: number | null; dataHora?: string | null };
 
-export const adminListarClientes = (q?: string) =>
-    adminFetch<{ alterar: boolean; data: ClientePlugSign[] }>(
+export async function adminListarClientes(q?: string) {
+    const r = await adminFetch<{ alterar: boolean; data: ClientePlugSign[] }>(
         `clientes${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`, "listar clientes");
+    return {
+        ...r,
+        data: (r.data ?? []).map((c) => ({
+            ...c,
+            nome: decodeHtml(c.nome),
+            sobrenome: decodeHtml(c.sobrenome),
+        })),
+    };
+}
 export const adminAtualizarCliente = (email: string, dados: { name?: string; last_name?: string; phone?: string; cpf?: string; address?: string; birth?: string }) =>
     adminFetch<{ message: string }>(`clientes/${encodeURIComponent(email)}`, "atualizar cliente",
         { method: "PUT", body: JSON.stringify(dados) });
