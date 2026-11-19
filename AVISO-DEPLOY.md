@@ -1,13 +1,13 @@
 # Aviso de deploy
 
-**Atualizado em 16/11/2026 (Raphaela + Frotas liberados)**
+**Atualizado em 19/11/2026 (Raphaela + tour desativados em produção)**
 
-## Raphaela assistente (chat de dúvidas)
+## Raphaela assistente e tour guiado
 
-- **Liberada em produção** (`RAPHAELA_FORA_DO_DEPLOY = false` em `src/lib/data.ts`).
-- Front: `src/components/RaphaelaAjuda.tsx`, `src/lib/raphaela-*.ts`, montado em `src/components/ClientLayout.tsx`.
-- API: `RaphaelaAjudaController` / `RaphaelaAjudaStore` (repositório papersing).
-- No banco: rodar `docs/CREATE_TABLE_RAPHAELA_AJUDA.sql` e depois `docs/SEED_RAPHAELA_AJUDA_v1.sql` (com `@Aplicar = 1`) no SistAprovacao.
+- **Desativados em produção** (`RAPHAELA_FORA_DO_DEPLOY = true` em `src/lib/data.ts`).
+- No `npm run dev` continuam disponíveis para teste.
+- Front: `RaphaelaAjuda` + `RafaelaTour` em `ClientLayout.tsx` (só montam se a flag permitir).
+- API/banco do help (`RaphaelaAjuda*`) podem ficar; não aparecem na UI de produção.
 
 ## Frotas
 
