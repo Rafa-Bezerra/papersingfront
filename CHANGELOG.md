@@ -1,5 +1,9 @@
 # Changelog PaperSign Front
 
+## 1.1.1
+
+- Raphaela assistente e tour guiado desativados no build de produção (`RAPHAELA_FORA_DO_DEPLOY`).
+
 ## 1.1.0
 
 - Tela Monitoramento: painel de dependências, destinatários e aba Erros do sistema.

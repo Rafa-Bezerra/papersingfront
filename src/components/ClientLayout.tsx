@@ -53,7 +53,7 @@ function LayoutWithSidebar({ children }: ClientLayoutProps) {
           <div className="w-full">{children}</div>
         </main>
       </div>
-      <RafaelaTour />
+      {MOSTRAR_RAPHAELA && <RafaelaTour />}
       {MOSTRAR_RAPHAELA && <RaphaelaAjuda />}
       <PendenciasLoginModal />
     </div>
@@ -321,7 +321,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         <main className="papersign-wayone-embed-main min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto p-2 sm:p-4 lg:p-6">
           <div className="w-full">{children}</div>
         </main>
-        <RafaelaTour />
+        {MOSTRAR_RAPHAELA && <RafaelaTour />}
         {MOSTRAR_RAPHAELA && <RaphaelaAjuda />}
         <PendenciasLoginModal />
       </div>
