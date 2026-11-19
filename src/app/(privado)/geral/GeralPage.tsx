@@ -75,8 +75,20 @@ import {
     FormMessage
 } from '@/components/ui/form'
 
-export default function Page() {
+type GeralPageProps = {
+    /** Sufixo do centro de custo da unidade logada (ex.: ".1" → "262.1"). Sem a prop, não filtra por centro de custo. */
+    sufixoCentroCustoUnidade?: string
+}
+
+// Prefixo numérico do centro de custo da unidade ("WAY 262" → "262"; "WAY CSC" → "001").
+function prefixoCentroCustoDaUnidade(unidade: string): string {
+    if (unidade.trim().toUpperCase() === 'WAY CSC') return '001'
+    return unidade.replace(/\D/g, '')
+}
+
+export default function Page({ sufixoCentroCustoUnidade }: GeralPageProps = {}) {
     const titulo = 'Movimentações para aprovação'
+    const [prefixoCentroCusto, setPrefixoCentroCusto] = useState("")
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
@@ -189,6 +201,10 @@ export default function Page() {
             setUserAdministrativo(user.administrativo);
             setUserContratos(user.contratos);
             setUserName(user.nome?.toUpperCase() ?? "");
+            if (sufixoCentroCustoUnidade) {
+                const p = prefixoCentroCustoDaUnidade(String(user.unidade ?? user.UNIDADE ?? ""));
+                setPrefixoCentroCusto(p ? `${p}${sufixoCentroCustoUnidade}` : "");
+            }
             setCodusuario(user.codusuario?.toUpperCase() ?? "");
             setCodigosVinculados(
                 Array.isArray(user.codusuarios_vinculados) ? user.codusuarios_vinculados : []
@@ -281,7 +297,7 @@ export default function Page() {
     // Solicitante/fornecedor/tipo são filtros só do cliente: reaplica sobre o último resultado, sem novo fetch.
     useEffect(() => {
         if (rawDadosRef.current) setResults(applyFilters(rawDadosRef.current, lastQRef.current));
-    }, [solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado]);
+    }, [solicitanteFiltrado, fornecedorFiltrado, tipoMovimentoFiltrado, prefixoCentroCusto]);
 
     // Auto-refresh a cada 60s; refs evitam recriar o intervalo a cada mudança de filtro/tecla.
     const handleSearchRef = useRef(handleSearch);
@@ -382,13 +398,16 @@ export default function Page() {
                 const matchTipoMovimento = tipoMovimentoFiltrado === "" || d.requisicao.tipo_movimento == tipoMovimentoFiltrado
                 const matchSolicitante = solicitanteFiltrado === "" || d.requisicao.nome_solicitante == solicitanteFiltrado
                 const matchFornecedor = fornecedorFiltrado === "" || d.requisicao.nome_fornecedor == fornecedorFiltrado
+                // Modo /controle: só movimentos com algum item no centro de custo "<unidade><sufixo>"; sem prefixo, nada.
+                const matchCentroCusto = !sufixoCentroCustoUnidade || (prefixoCentroCusto !== "" &&
+                    (d.requisicao_itens ?? []).some(i => (i.centro_custo ?? "").startsWith(prefixoCentroCusto)))
                 let usuarioAprovou = situacaoFiltrada === "" ? false : d.requisicao_aprovacoes.some(ap =>
                     aprovadorEhUsuarioLogado(ap, codigosAprovacao) && (ap.situacao === 'A' || ap.situacao === 'R')
                 );
                 if ((userAdmin || userAdministrativo) && !modoPendentesHome) {
                     usuarioAprovou = false;
                 }
-                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && !usuarioAprovou;
+                return matchQuery && matchSituacao && usuarioAprovador && matchSolicitante && matchFornecedor && matchTipoMovimento && matchCentroCusto && !usuarioAprovou;
             });
 
             const fitradosStatus = filtrados.filter(d => {

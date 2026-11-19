@@ -1,23 +1,12 @@
 import { Suspense } from "react"
-import MovimentosPage from "../components/MovimentosPage";
+import GeralPage from "../geral/GeralPage"
 import LoadingFallback from "@/components/LoadingFallback"
 
-const titulo = 'Controle imobilizado'
-const tipos_movimento: string[] = [
-  '1.2.42',
-  '1.2.44',
-  '1.2.47',
-  '1.2.48',
-];
-
 export default function Page() {
-  // Loading padrão (spinner + texto).
+  // Igual a /geral, filtrando itens do centro de custo "<unidade>.1" (ex.: 262.1).
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <MovimentosPage
-        titulo={titulo}
-        tipos_movimento={tipos_movimento}
-      />
+      <GeralPage sufixoCentroCustoUnidade=".1" />
     </Suspense>
   )
 }

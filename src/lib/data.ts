@@ -27,7 +27,7 @@ export const data = {
         { title: "Recebimento de materiais", url: "/requisicoes" },
         { title: "Controle imobilizado", url: "/controle" },
         { title: "Ordem de compra", url: "/ordens" },
-        { title: "Aquisição de serviços", url: "/aquisicoes" },
+        // "Aquisição de serviços" (/aquisicoes) oculto do menu por decisão em reunião; a rota continua existindo.
         // "Documentos" fica dentro do WaySign (aba Documentos internos); a rota /documentos continua para links e pendências.
         { title: "WaySign", url: "/docusign" },
         { title: "Projetos", url: "/projetos" },
